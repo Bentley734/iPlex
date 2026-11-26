@@ -15,15 +15,21 @@
   const error = get('video-error');
   const alternate = get('video-compatibility');
   const tabs = new Map([['movie', get('movies')], ['show', get('television')]]);
-  const titles = {movie:'Movies', show:'TV'};
+  const titles = {movie:'Movies', show:'TV Shows'};
   const validSource = /^https:\/\/media\.musicroom\.invalid\/video\/[a-f0-9]{32}$/;
   let state, kind = '', library = '', pending = 0, parent = [], next = null, busy = false, timer;
   let source, hls, candidates = [], usingFallback = false, resumeAt = 0, listOffset = 0, failed = false;
   const rendered = new Set();
 
-  function preference() { return 'musicroom-video-library.' + state.serverId + '.' + kind; }
+  function preference(type) { return 'musicroom-video-library.' + state.serverId + '.' + type; }
+  window.plexVideoCacheSelection = () => ({
+    movie: state?.serverId ? localStorage.getItem(preference('movie')) || '' : '',
+    show: state?.serverId ? localStorage.getItem(preference('show')) || '' : ''
+  });
 
   function syncTabs() {
+    get('music').setAttribute('aria-pressed', String(!kind));
+    get('music-sections').hidden = Boolean(kind);
     for (const [type, tab] of tabs) {
       tab.disabled = !state?.serverId;
       tab.setAttribute('aria-pressed', String(type === kind));
@@ -32,7 +38,7 @@
 
   function configure() {
     const available = (state.videoLibraries || []).filter(row => row.type === kind);
-    const preferred = localStorage.getItem(preference());
+    const preferred = localStorage.getItem(preference(kind));
     const restored = available.find(row => row.id === preferred)?.id || available[0]?.id || '';
     if (library !== restored) parent = [];
     library = restored;
@@ -74,15 +80,14 @@
     present();
   };
 
+  get('music').onclick = () => window.plexVideoExit();
+
   for (const [type, tab] of tabs) tab.onclick = () => {
     if (!state?.serverId || kind === type) return;
     kind = type;
     parent = [];
     search.value = '';
     present();
-    for (const active of document.querySelectorAll('nav button[aria-pressed="true"]')) {
-      if (active !== tab) active.setAttribute('aria-pressed', 'false');
-    }
     configure();
   };
 
@@ -118,7 +123,7 @@
   }
 
   picker.onchange = () => {
-    localStorage.setItem(preference(), picker.value);
+    localStorage.setItem(preference(kind), picker.value);
     parent = [];
     search.value = '';
     configure();
@@ -200,6 +205,16 @@
   function direct() {
     const candidate = candidates.shift();
     if (!candidate) { compatibility(); return; }
+    if (candidate.native) {
+      video.removeAttribute('src');
+      video.load();
+      video.hidden = true;
+      mode.textContent = 'Direct Play · VLC';
+      alternate.hidden = true;
+      window.windowsPlayback.action({action:'pause'});
+      host({action:'videoNative', id:pending, url:candidate.url, title:get('video-playing-title').textContent});
+      return;
+    }
     mode.textContent = 'Direct Play';
     alternate.hidden = false;
     video.src = candidate.url;
@@ -207,10 +222,10 @@
     video.play().catch(() => {});
   }
 
-  function compatibility() {
+  function compatibility(position) {
     if (usingFallback || !source?.hls) { showError('Plex couldn’t start this video. Check transcoding on your Plex server.'); return; }
     usingFallback = true;
-    resumeAt = Number.isFinite(video.currentTime) ? video.currentTime : 0;
+    resumeAt = Number.isFinite(position) ? position : Number.isFinite(video.currentTime) ? video.currentTime : 0;
     mode.textContent = 'Plex Transcode';
     alternate.hidden = true;
     video.removeAttribute('src');
@@ -231,7 +246,13 @@
       showError('This WebView2 runtime cannot play Plex compatibility streams.');
     }
   }
-  alternate.onclick = compatibility;
+  alternate.onclick = () => compatibility();
+  window.plexNativeVideo = reply => {
+    if (!dialog.open || reply.id !== pending) return;
+    if (reply.result === 'closed') dialog.close();
+    else if (reply.result === 'fallback') compatibility(reply.seconds);
+    else direct();
+  };
   video.addEventListener('loadedmetadata', () => {
     if (usingFallback && resumeAt > 0 && resumeAt < video.duration) video.currentTime = resumeAt;
   });
@@ -269,7 +290,7 @@
     if (!dialog.open || payload.id !== pending || !validSource.test(payload.hls)) return;
     source = payload;
     candidates = (payload.direct || []).filter(row => validSource.test(row.url))
-      .map(row => ({...row, score:directScore(row)}))
+      .map(row => ({...row, score:row.native ? 3 : directScore(row)}))
       .sort((a, b) => b.score - a.score);
     direct();
   };

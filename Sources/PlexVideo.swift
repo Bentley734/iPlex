@@ -6,9 +6,16 @@ enum PlexVideoKind: String, CaseIterable, Identifiable {
     case television = "show"
 
     var id: String { rawValue }
-    var title: String { self == .movies ? "Movies" : "TV" }
+    var title: String { self == .movies ? "Movies" : "TV Shows" }
     var icon: String { self == .movies ? "film" : "tv" }
     var plexType: String { self == .movies ? "1" : "2" }
+
+    func libraryPreference(server: String) -> String { "PlexVideoLibrary.\(rawValue).\(server)" }
+
+    func selectedLibrary(from libraries: [PlexLibrary], server: String) -> PlexLibrary? {
+        let preferred = UserDefaults.standard.string(forKey: libraryPreference(server: server))
+        return libraries.first(where: { $0.id == preferred }) ?? libraries.first
+    }
 }
 
 struct PlexVideoItem: Identifiable, Equatable {
@@ -25,8 +32,18 @@ struct PlexVideoPage {
     let next: Int?
 }
 
+struct PlexVideoFile {
+    let url: URL
+    let container: String
+
+    var isMatroska: Bool {
+        ["mkv", "matroska", "webm"].contains(container.lowercased()) ||
+        ["mkv", "webm"].contains(url.pathExtension.lowercased())
+    }
+}
+
 struct PlexVideoSource {
-    let direct: [URL]
+    let direct: [PlexVideoFile]
     let fallback: URL
 }
 
@@ -49,7 +66,7 @@ struct PlexVideoBrowser: View {
     @State private var generation = UUID()
     @State private var presentation: PlexVideoItem?
 
-    private var preference: String { "PlexVideoLibrary.\(kind.rawValue).\(server)" }
+    private var preference: String { kind.libraryPreference(server: server) }
     private var parent: PlexVideoItem? { trail.last }
     private var episodes: Bool { parent?.type == "season" }
     private var requestKey: [String] { [server, kind.rawValue, selection, parent?.id ?? "", query, String(retry)] }
@@ -157,7 +174,7 @@ struct PlexVideoBrowser: View {
     }
 
     private func poster(_ item: PlexVideoItem) -> some View {
-        PlexVideoPoster(path: item.thumb, server: server, service: service, icon: kind.icon)
+        PlexVideoPoster(path: item.thumb, server: server, section: selection, service: service, icon: kind.icon)
     }
 
     private func labels(_ item: PlexVideoItem) -> some View {
@@ -177,8 +194,7 @@ struct PlexVideoBrowser: View {
             let found = try await service.videoLibraries(server: server, kind: kind)
             try Task.checkCancellation()
             libraries = found
-            let preferred = UserDefaults.standard.string(forKey: preference)
-            selection = found.first(where: { $0.id == preferred })?.id ?? found.first?.id ?? ""
+            selection = kind.selectedLibrary(from: found, server: server)?.id ?? ""
         } catch {
             if !Task.isCancelled { message = error.localizedDescription }
         }
@@ -207,6 +223,7 @@ struct PlexVideoBrowser: View {
 private struct PlexVideoPoster: View {
     let path: String?
     let server: String
+    let section: String
     let service: PlexService
     let icon: String
     @State private var image: Image?
@@ -218,9 +235,9 @@ private struct PlexVideoPoster: View {
                 else { Image(systemName: icon).font(.title).foregroundStyle(.secondary) }
             }
             .clipShape(.rect(cornerRadius: 12))
-            .task(id: path) {
+            .task(id: [section, path ?? ""]) {
                 image = nil
-                guard let path, let data = try? await service.videoPoster(server: server, path: path),
+                guard let path, let data = try? await service.videoPoster(server: server, section: section, path: path),
                       !Task.isCancelled else { return }
                 #if os(macOS)
                 if let artwork = NSImage(data: data) { image = Image(nsImage: artwork) }
@@ -246,6 +263,7 @@ private struct PlexVideoPlayback: View {
     @State private var mode = ""
     @State private var forceTranscode = false
     @State private var source: PlexVideoSource?
+    @State private var native: URL?
     @State private var pending = true
     @State private var resumeAt = CMTime.zero
 
@@ -262,6 +280,11 @@ private struct PlexVideoPlayback: View {
                 Text(failure).padding(20).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if pending {
                 ProgressView("Preparing video…").frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else if let native {
+                NativeVideoPlayer(url: native) { seconds in
+                    resumeAt = CMTime(seconds: seconds, preferredTimescale: 1_000)
+                    forceTranscode = true
+                }.id(native)
             } else {
                 VideoPlayer(player: player).frame(maxWidth: .infinity, maxHeight: .infinity)
             }
@@ -310,6 +333,7 @@ private struct PlexVideoPlayback: View {
         failure = nil
         player.pause()
         player.replaceCurrentItem(with: nil)
+        native = nil
         do {
             let resolved: PlexVideoSource
             if let source { resolved = source }
@@ -320,13 +344,20 @@ private struct PlexVideoPlayback: View {
             }
             var direct: AVURLAsset?
             if !forceTranscode {
-                for url in resolved.direct {
-                    let asset = AVURLAsset(url: url)
+                for file in resolved.direct where !file.isMatroska {
+                    let asset = AVURLAsset(url: file.url)
                     if (try? await canDirectPlay(asset)) == true { direct = asset; break }
                     try Task.checkCancellation()
                 }
             }
             try Task.checkCancellation()
+            if !forceTranscode, direct == nil, let file = resolved.direct.first(where: \.isMatroska) ?? resolved.direct.first {
+                pauseMusic()
+                native = file.url
+                mode = "Direct Play · VLC"
+                pending = false
+                return
+            }
             let playback: AVPlayerItem
             if let direct {
                 playback = AVPlayerItem(asset: direct)

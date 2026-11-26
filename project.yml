@@ -3,8 +3,8 @@ options:
   createIntermediateGroups: true
 settings:
   SWIFT_VERSION: 5.0
-  MARKETING_VERSION: 0.1.22
-  CURRENT_PROJECT_VERSION: 23
+  MARKETING_VERSION: 0.1.23
+  CURRENT_PROJECT_VERSION: 24
   GENERATE_INFOPLIST_FILE: YES
   INFOPLIST_KEY_CFBundleDisplayName: iPlex
   INFOPLIST_KEY_NSLocalNetworkUsageDescription: iPlex connects to your Plex Media Server.
@@ -15,6 +15,10 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - Sources
+      - path: Assets/VideoLAN-SOURCE.txt
+        buildPhase: resources
+      - path: Assets/VideoLAN-LICENSE.txt
+        buildPhase: resources
       - path: Assets/wordmark.png
         buildPhase: resources
       - path: Assets/music-wordmarks.png
@@ -30,6 +34,9 @@ targets:
         buildPhase: resources
       - path: Mobile/iOS.xcassets
         buildPhase: resources
+    dependencies:
+      - framework: Dependencies/MobileVLCKit.xcframework
+        embed: true
     info:
       path: Mobile/iOS-Info.plist
       properties:
@@ -49,6 +56,10 @@ targets:
     deploymentTarget: "17.0"
     sources:
       - Sources
+      - path: Assets/VideoLAN-SOURCE.txt
+        buildPhase: resources
+      - path: Assets/VideoLAN-LICENSE.txt
+        buildPhase: resources
       - path: Assets/wordmark.png
         buildPhase: resources
       - path: Assets/music-wordmarks.png
@@ -64,6 +75,9 @@ targets:
         buildPhase: resources
       - path: Mobile/tvOS.xcassets
         buildPhase: resources
+    dependencies:
+      - framework: Dependencies/TVVLCKit.xcframework
+        embed: true
     settings:
       PRODUCT_NAME: iPlex
       PRODUCT_BUNDLE_IDENTIFIER: net.bentley734.musicroom.tvos

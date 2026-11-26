@@ -222,6 +222,13 @@
     pinnedKey = key;
     get('pinned-items').replaceChildren(...pins.map(item => libraryTile(item)));
   }
+  function genreRow(item) {
+    const row = button('', () => open(item), 'genre-row');
+    const chevron = node('span', '›');
+    chevron.setAttribute('aria-hidden', 'true');
+    row.append(node('strong', item.title), chevron);
+    return row;
+  }
   function libraryTile(item) {
     const tile = button('', () => open(item), 'tile');
     const text = node('div', '', 'tile-text');
@@ -355,18 +362,21 @@
     pageEnd.hidden = !readyToPage || pageFailed;
     pageObserver.unobserve(pageEnd);
     if (!pageEnd.hidden) pageObserver.observe(pageEnd);
-    for (const tab of sectionNames) get(tab).setAttribute('aria-pressed', String(kind === tab && !document.documentElement.hasAttribute('data-video-open')));
+    for (const tab of sectionNames) get(tab).setAttribute('aria-pressed', String(kind === tab));
     renderPins();
     renderFeature();
     if (!album) {
       const grid = get('grid');
-      const mode = libraryLayout === 'trackList' || (libraryLayout === 'albumTracks' && (kind === 'albums' || group))
+      const mode = kind === 'genres' && !group ? 'genreList' : libraryLayout === 'trackList' || (libraryLayout === 'albumTracks' && (kind === 'albums' || group))
         ? libraryLayout : 'grid';
       grid.classList.toggle('track-list', mode === 'grid' && kind === 'tracks' && !group);
       grid.dataset.layout = mode;
       get('library-track-headings').hidden = mode !== 'trackList' || kind !== 'tracks' || Boolean(group);
       const added = document.createDocumentFragment();
-      for (const item of entries.slice(grid.childElementCount)) added.append(mode === 'grid' ? libraryTile(item) : alternateTile(item,mode));
+      for (const item of entries.slice(grid.childElementCount)) {
+        if (mode === 'genreList') added.append(genreRow(item));
+        else added.append(mode === 'grid' ? libraryTile(item) : alternateTile(item,mode));
+      }
       grid.append(added);
       return;
     }
@@ -474,6 +484,8 @@
   };
   window.macPlexState = state => {
     window.plexVideoState(state);
+    get('cache-covers').disabled = !state.serverId;
+    get('cover-library').textContent = state.serverId ? artworkCacheDescription : 'Choose a Plex server to cache artwork.';
     const connected = state.status === 'connected';
     const connecting = state.status === 'connecting';
     get('connect').hidden = connected || connecting;
@@ -1082,15 +1094,13 @@
     get('eq-status').hidden = available !== false;
     get('eq-status').textContent = available === false ? 'Equalizer is unavailable for this track.' : '';
   };
+  const artworkCacheDescription = 'Save album covers, artist pictures, and movie and TV show posters from the selected libraries to this device.';
   window.musicCoverCache = state => {
     caching = state.running;
-    get('cover-library').textContent = library ? 'Save album covers and artist pictures from the selected library to this device.' :
-      'Choose a Plex music library to cache artwork.';
-    get('cache-covers').disabled = !library;
     get('cache-covers').textContent = caching ? 'Cancel Caching' : 'Cache Library Artwork';
     get('cover-cache-status').textContent = state.message;
   };
-  get('cache-covers').onclick = () => host({action:caching ? 'stopCoverCache' : 'cacheCovers'});
+  get('cache-covers').onclick = () => host({action:caching ? 'stopCoverCache' : 'cacheCovers', ...window.plexVideoCacheSelection()});
   get('disconnect').onclick = () => host({action:'disconnect'});
   get('cancel').onclick = () => host({action:'cancel'});
   get('server').onchange = event => { if (event.target.value) host({action:'selectServer', server:event.target.value}); };

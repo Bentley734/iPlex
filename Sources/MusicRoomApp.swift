@@ -251,14 +251,13 @@ private struct MusicWindow: View {
                 VStack(alignment: .leading, spacing: 18) {
                     if !plexify { HeaderBrand(theme: theme, width: min(155, width - padding * 2), height: 46) }
                     VStack(alignment: .leading, spacing: 6) {
-                        if graphite || plexify {
-                            Text("Plex library")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.secondary)
-                                .padding(.leading, 10).padding(.bottom, 3)
-                        }
-                        ForEach(model.visibleKinds, id: \.self) { tab($0) }
+                        sidebarButton("Music", icon: "music.note", selected: videoSection == nil) { videoSection = nil }
                         ForEach(PlexVideoKind.allCases) { videoTab($0) }
+                    }
+                    if videoSection == nil {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(model.visibleKinds, id: \.self) { tab($0) }
+                        }.padding(.leading, 8)
                     }
                 }
                 .padding(padding)
@@ -299,43 +298,34 @@ private struct MusicWindow: View {
         .musicGlass(theme, radius: 12)
     }
 
-    private func tab(_ kind: MusicKind) -> some View {
-        Button {
-            searchTask?.cancel()
-            videoSection = nil
-            model.selectKind(kind)
-        } label: {
+    private func sidebarButton(_ title: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
             Label {
-                Text(kind.rawValue)
+                Text(title)
             } icon: {
-                Image(systemName: kind.symbol)
-                    .frame(width: 20)
+                Image(systemName: icon).frame(width: 20)
             }
             .font(.headline)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 11).padding(.vertical, 10)
-            .foregroundStyle(videoSection == nil && model.kind == kind ? copper : .primary)
-            .background(videoSection == nil && model.kind == kind ? copper.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 8))
+            .foregroundStyle(selected ? copper : .primary)
+            .background(selected ? copper.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
-        .disabled(model.libraryID.isEmpty)
+        .accessibilityAddTraits(selected ? [.isSelected] : [])
+    }
+
+    private func tab(_ kind: MusicKind) -> some View {
+        sidebarButton(kind.rawValue, icon: kind.symbol, selected: model.kind == kind) {
+            searchTask?.cancel()
+            model.selectKind(kind)
+        }.disabled(model.libraryID.isEmpty)
     }
 
     private func videoTab(_ kind: PlexVideoKind) -> some View {
-        Button { videoSection = kind } label: {
-            Label {
-                Text(kind.title)
-            } icon: {
-                Image(systemName: kind.icon).frame(width: 20)
-            }
-            .font(.headline)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 11).padding(.vertical, 10)
-            .foregroundStyle(videoSection == kind ? copper : .primary)
-            .background(videoSection == kind ? copper.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 8))
-        }
-        .buttonStyle(.plain)
-        .disabled(model.serverID.isEmpty || !model.servers.contains { $0.id == model.serverID })
+        sidebarButton(kind.title, icon: kind.icon, selected: videoSection == kind) {
+            videoSection = kind
+        }.disabled(model.serverID.isEmpty || !model.servers.contains { $0.id == model.serverID })
     }
 
     private var mainPanel: some View {
@@ -499,7 +489,10 @@ private struct MusicWindow: View {
             if !model.busy && model.entries.isEmpty {
                 Text("No matches in this library.").foregroundStyle(.secondary).padding(26)
             }
-            if libraryLayout.applies(to: model.kind, inGroup: model.selectedGroup != nil) {
+            if model.kind == .genres && model.selectedGroup == nil {
+                MusicGenreList(library: model) { searchTask?.cancel(); model.open($0) }
+                    .padding(.horizontal, 28).padding(.bottom, 24)
+            } else if libraryLayout.applies(to: model.kind, inGroup: model.selectedGroup != nil) {
                 LibraryAlternateLayout(library: model, layout: libraryLayout)
                     .padding(.horizontal, 28).padding(.bottom, 24)
             } else {

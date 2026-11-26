@@ -665,9 +665,9 @@ namespace MusicRoom
             string relative;
             if ((method != "GET" && method != "HEAD") || !Regex.IsMatch(handle, @"^[a-f0-9]{32}\z"))
                 return Response(404, "Not Found");
-            Tuple<Server, string> video;
+            Tuple<Server, string, string> video;
             if (videoArt.TryGetValue(handle, out video))
-                return await VideoPoster(video.Item1, video.Item2, method);
+                return await VideoPoster(video.Item1, video.Item2, video.Item3, method);
             if (!art.TryGetValue(handle, out relative))
                 return Response(404, "Not Found");
             var ready = servers.TryGetValue(selectedServer, out server) && selectedSection.Length > 0;
@@ -909,7 +909,7 @@ namespace MusicRoom
         {
             string action = Str(body, "action");
             long id = Num(body, "id");
-            if (action == "cacheCovers") { await CacheLibraryArtwork(); return; }
+            if (action == "cacheCovers") { await CacheLibraryArtwork(body); return; }
             if (action == "stopCoverCache") { StopCoverCache(true); return; }
             if (action == "beginTrack" || action == "seekTrack")
             {

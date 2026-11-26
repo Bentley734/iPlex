@@ -25,15 +25,20 @@
         <canvas class="wordmark music-wordmark" aria-hidden="true" hidden></canvas>
       </button>
     </div>
-    <nav aria-label="Library">
-      <button id="albums" aria-pressed="true" disabled>Albums</button>
-      <button id="artists" aria-pressed="false" disabled>Artists</button>
-      <button id="genres" aria-pressed="false" disabled>Genres</button>
-      <button id="tracks" aria-pressed="false" disabled>Tracks</button>
-      <button id="playlists" aria-pressed="false" disabled>Playlists</button>
-      <button id="movies" aria-pressed="false" disabled>Movies</button>
-      <button id="television" aria-pressed="false" disabled>TV</button>
-    </nav>
+    <div id="library-navigation">
+      <nav aria-label="Media">
+        <button id="music" aria-pressed="true">Music</button>
+        <button id="movies" aria-pressed="false" disabled>Movies</button>
+        <button id="television" aria-pressed="false" disabled>TV Shows</button>
+      </nav>
+      <nav id="music-sections" aria-label="Music Library">
+        <button id="albums" aria-pressed="true" disabled>Albums</button>
+        <button id="artists" aria-pressed="false" disabled>Artists</button>
+        <button id="genres" aria-pressed="false" disabled>Genres</button>
+        <button id="tracks" aria-pressed="false" disabled>Tracks</button>
+        <button id="playlists" aria-pressed="false" disabled>Playlists</button>
+      </nav>
+    </div>
     <div class="sidebar-controls">
       <select id="quick-library" aria-label="Switch Music Library" hidden></select>
       <button id="settings" type="button">Settings</button>
@@ -386,7 +391,7 @@
     </section>
     <section>
       <h2>Plex Artwork</h2>
-      <p id="cover-library">Choose a Plex music library to cache artwork.</p>
+      <p id="cover-library">Choose a Plex server to cache artwork.</p>
       <button id="cache-covers" type="button" disabled>Cache Library Artwork</button>
       <p id="cover-cache-status" role="status"></p>
     </section>

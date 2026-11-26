@@ -1760,38 +1760,65 @@ extension PlexService {
     func cacheLibraryArtwork(progress: @escaping (Int, Int) -> Void,
                           completion: @escaping (Result<(Int, Int), Error>) -> Void) -> (() -> Void)? {
         let selection = status
-        guard let server = selection.selectedServerID, let section = selection.selectedLibraryID,
-              let record = try? selectedServerAccess() else {
-            completion(.failure(PlexServiceError("Choose a Plex music library first.")))
+        guard let server = selection.selectedServerID, let record = try? selectedServerAccess() else {
+            completion(.failure(PlexServiceError("Choose a Plex server first.")))
             return nil
         }
         let operation = PlexRequestOperation()
         DispatchQueue.global(qos: .utility).async {
             let result = Result {
+                let directories = try self.withConnection(record: record) { base in
+                    let request = try self.serverRequest(base: base, path: "/library/sections", query: [], token: record.token)
+                    return try operation.fetch(request, limit: 2 * 1024 * 1024)
+                }
+                var selections: [(library: String, type: String, music: MusicKind?, video: PlexVideoKind?)] = []
+                if let section = selection.selectedLibraryID {
+                    selections += [MusicKind.albums, .artists].map { (section, $0.plexType, $0, nil) }
+                }
+                for kind in PlexVideoKind.allCases {
+                    let libraries = try PlexParser.libraries(directories, type: kind.rawValue)
+                    if let library = kind.selectedLibrary(from: libraries, server: server) {
+                        selections.append((library.id, kind.plexType, nil, kind))
+                    }
+                }
                 var saved = 0, skipped = 0
-                for kind in [MusicKind.albums, .artists] {
+                for source in selections {
                     var offset = 0
                     var visited = Set<String>()
                     while true {
-                        let page = try self.withConnection(record: record) { base in
+                        let listing = try self.withConnection(record: record) { base in
                             let query: [URLQueryItem] = [
-                                .init(name: "type", value: kind.plexType), .init(name: "sort", value: "titleSort:asc"),
+                                .init(name: "type", value: source.type), .init(name: "sort", value: "titleSort:asc"),
                                 .init(name: "X-Plex-Container-Start", value: String(offset)),
                                 .init(name: "X-Plex-Container-Size", value: "60")
                             ]
-                            let request = try self.serverRequest(base: base, path: "/library/sections/\(section)/all",
+                            let request = try self.serverRequest(base: base, path: "/library/sections/\(source.library)/all",
                                                                  query: query, token: record.token)
-                            return try PlexParser.musicEntries(operation.fetch(request, limit: 8 * 1024 * 1024),
-                                                               kind: kind, section: section)
+                            return try operation.fetch(request, limit: 8 * 1024 * 1024)
                         }
-                        if page.rawCount == 0 { break }
-                        let fresh = page.items.filter { visited.insert($0.id).inserted }
-                        guard !fresh.isEmpty else { throw PlexServiceError("Plex stopped advancing through the \(kind.rawValue.lowercased()) list.") }
+                        let items: [(id: String, path: String?)]
+                        let next: Int?
+                        if let kind = source.music {
+                            let page = try PlexParser.musicEntries(listing, kind: kind, section: source.library)
+                            items = page.items.map { ($0.id, $0.artworkPath) }
+                            next = page.rawCount == 0 ? nil : offset + page.rawCount
+                        } else if let kind = source.video {
+                            let page = try PlexParser.videoPage(listing, section: source.library, expected: kind.rawValue,
+                                                                parent: nil, offset: offset, size: 60)
+                            items = page.items.map { ($0.id, $0.thumb) }
+                            next = page.next
+                        } else { break }
+
+                        let fresh = items.filter { visited.insert($0.id).inserted }
+                        guard !fresh.isEmpty else {
+                            if !items.isEmpty { throw PlexServiceError("Plex stopped advancing through the artwork list.") }
+                            break
+                        }
                         for item in fresh {
                             try operation.checkCancellation()
                             do {
-                                guard let path = item.artworkPath else { throw PlexServiceError("No artwork.") }
-                                let target = AlbumCoverCache.location(server: server, library: section, path: path)
+                                guard let path = item.path else { throw PlexServiceError("No artwork.") }
+                                let target = AlbumCoverCache.location(server: server, library: source.library, path: path)
                                 if !FileManager.default.fileExists(atPath: target.path) {
                                     let bytes = try self.withConnection(record: record) { base in
                                         try self.fetchMusicArtwork(path, base: base, token: record.token, operation: operation)
@@ -1809,7 +1836,8 @@ extension PlexService {
                                 DispatchQueue.main.async { progress(counts.0, counts.1) }
                             }
                         }
-                        offset += page.rawCount
+                        guard let next else { break }
+                        offset = next
                     }
                 }
                 try operation.checkCancellation()
@@ -1891,14 +1919,15 @@ extension PlexParser {
     }
 
     static func videoParts(_ data: Data, section: String, item: PlexVideoItem,
-                           base: URL, token: String) throws -> [URL] {
+                           base: URL, token: String) throws -> [PlexVideoFile] {
         guard let row = try metadataRows(data, sectionID: section).first(where: {
             numericIdentifier($0["ratingKey"]) == item.id && $0["type"] as? String == item.type
         }) else { throw PlexServiceError("This video is unavailable in the selected library.") }
         return (row["Media"] as? [[String: Any]] ?? []).prefix(16).compactMap { media in
             guard let parts = media["Part"] as? [[String: Any]], parts.count == 1,
                   let path = parts[0]["key"] as? String else { return nil }
-            return try? playbackURL(base: base, partPath: path, token: token)
+            guard let url = try? playbackURL(base: base, partPath: path, token: token) else { return nil }
+            return PlexVideoFile(url: url, container: media["container"] as? String ?? "")
         }
     }
 }
@@ -1951,8 +1980,10 @@ extension PlexService {
         }
     }
 
-    func videoPoster(server: String, path: String) async throws -> Data {
+    func videoPoster(server: String, section: String, path: String) async throws -> Data {
         guard let path = PlexParser.musicArtworkPath(path) else { throw PlexServiceError("Invalid poster.") }
+        let target = AlbumCoverCache.location(server: server, library: section, path: path)
+        if let data = try? Data(contentsOf: target) { return data }
         return try await videoRequest(server: server, queue: Self.artworkQueue) { record, base, operation in
             try self.fetchMusicArtwork(path, base: base, token: record.token, operation: operation)
         }

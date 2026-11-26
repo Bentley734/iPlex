@@ -6,3 +6,5 @@ xcuserdata/
 *.xcuserstate
 __pycache__/
 /Windows/Codecs/Lossless-*.exe
+
+/Dependencies/

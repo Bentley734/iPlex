@@ -472,10 +472,10 @@ struct MusicSettings: View {
                     Divider()
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Plex Artwork").font(.headline)
-                        if library.libraryID.isEmpty {
-                            Text("Choose a Plex music library to cache artwork.").foregroundStyle(.secondary)
+                        if library.serverID.isEmpty {
+                            Text("Choose a Plex server to cache artwork.").foregroundStyle(.secondary)
                         } else {
-                            Text("Save album covers and artist pictures from \(library.libraries.first { $0.id == library.libraryID }?.name ?? "your selected library") to this device.")
+                            Text("Save album covers, artist pictures, and movie and TV show posters from the selected libraries to this device.")
                                 .foregroundStyle(.secondary)
                             if library.cachingCovers {
                                 Button("Cancel Caching", action: library.stopCachingCovers)

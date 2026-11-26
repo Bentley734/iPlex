@@ -69,32 +69,45 @@ namespace MusicRoom
             if (job == null) return;
             coverCacheJob = null;
             job.Cancel();
-            if (notify) CoverCacheState(false, "Canceled. Downloaded artwork were kept.");
+            if (notify) CoverCacheState(false, "Canceled. Downloaded artwork was kept.");
         }
 
-        async Task CacheLibraryArtwork()
+        async Task CacheLibraryArtwork(Dictionary<string, object> request)
         {
             Server server;
-            string section = selectedSection;
-            if (coverCacheJob != null || section.Length == 0 || !servers.TryGetValue(selectedServer, out server))
+            if (coverCacheJob != null || !servers.TryGetValue(selectedServer, out server))
                 return;
+            var selections = new List<Tuple<string, string, string>>();
+            if (selectedSection.Length > 0)
+            {
+                selections.Add(Tuple.Create(selectedSection, "album", "9"));
+                selections.Add(Tuple.Create(selectedSection, "artist", "8"));
+            }
+            foreach (var kind in new[] { Tuple.Create("movie", "1"), Tuple.Create("show", "2") })
+            {
+                var available = videoSections.Where(section => section.type == kind.Item1).ToArray();
+                var preferred = Str(request, kind.Item1);
+                var selected = available.FirstOrDefault(section => section.id == preferred) ?? available.FirstOrDefault();
+                if (selected != null) selections.Add(Tuple.Create(selected.id, kind.Item1, kind.Item2));
+            }
             var job = CancellationTokenSource.CreateLinkedTokenSource(shutdown.Token);
             var token = job.Token;
             coverCacheJob = job;
-            CoverCacheState(true, "Checking albums and artists…");
+            CoverCacheState(true, "Checking selected libraries…");
             int saved = 0, skipped = 0;
             string message = "";
             Func<string> summary = () => saved + (saved == 1 ? " image cached" : " images cached") +
                                           (skipped == 0 ? "" : " · " + skipped + " unavailable");
             try
             {
-                foreach (string kind in new[] { "album", "artist" })
+                foreach (var selection in selections)
                 {
+                    string section = selection.Item1, kind = selection.Item2;
                     int offset = 0;
                     var seen = new HashSet<string>();
                     while (true)
                     {
-                        string endpoint = "/library/sections/" + section + "/all?type=" + (kind == "album" ? "9" : "8") + "&sort=titleSort%3Aasc" +
+                        string endpoint = "/library/sections/" + section + "/all?type=" + selection.Item3 + "&sort=titleSort%3Aasc" +
                                           "&X-Plex-Container-Size=60&X-Plex-Container-Start=" + offset;
                         var rows = await WithServer(server, async url => Metadata(await FetchPlex(HttpMethod.Get,
                             new Uri(url, endpoint), server.Token, token, 8 * 1024 * 1024), section).ToArray(), token);

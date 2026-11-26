@@ -542,11 +542,11 @@ final class LibraryModel: ObservableObject {
     }
 
     func cacheLibraryArtwork() {
-        guard !libraryID.isEmpty, !cachingCovers else { return }
+        guard !serverID.isEmpty, !cachingCovers else { return }
         let generation = UUID()
         cacheGeneration = generation
         cachingCovers = true
-        coverCacheStatus = "Checking albums and artists…"
+        coverCacheStatus = "Checking selected libraries…"
         cancelCoverCache = service.cacheLibraryArtwork { [weak self] saved, skipped in
             guard let self, self.cacheGeneration == generation else { return }
             self.coverCacheStatus = Self.cacheSummary(saved: saved, skipped: skipped)
@@ -569,7 +569,7 @@ final class LibraryModel: ObservableObject {
         cancelCoverCache?()
         cancelCoverCache = nil
         cachingCovers = false
-        coverCacheStatus = "Canceled. Downloaded artwork were kept."
+        coverCacheStatus = "Canceled. Downloaded artwork was kept."
     }
 
     private static func cacheSummary(saved: Int, skipped: Int) -> String {

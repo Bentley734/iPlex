@@ -1,0 +1,17 @@
+iPlex uses dynamically linked VideoLAN components under the GNU Lesser General Public
+License, version 2.1 or later. See VideoLAN-LICENSE.txt. Upstream packages are unmodified
+except for selecting the platform and playback plug-ins.
+
+VLCKit, MobileVLCKit and TVVLCKit 3.7.3
+https://download.videolan.org/cocoapods/prod/
+https://code.videolan.org/videolan/VLCKit/-/tree/319ed2c0
+https://code.videolan.org/videolan/vlc/-/tree/79128878
+
+VideoLAN.LibVLC.Windows 3.0.24
+https://www.nuget.org/packages/VideoLAN.LibVLC.Windows/3.0.24
+https://code.videolan.org/videolan/libvlc-nuget
+https://download.videolan.org/pub/videolan/vlc/3.0.24/
+
+The iPlex source and build instructions are at https://github.com/Bentley734/iPlex.
+To use a compatible modified library, replace the corresponding local build dependency
+and rebuild the app with the signing identity appropriate for your device.

@@ -105,9 +105,11 @@ private struct MusicLibraryScreen: View {
                 HStack {
                     Button("Music", systemImage: "music.note") { videoSection = nil }
                         .tint(videoSection == nil ? accent : .primary)
+                        .accessibilityAddTraits(videoSection == nil ? [.isSelected] : [])
                     ForEach(PlexVideoKind.allCases) { kind in
                         Button(kind.title, systemImage: kind.icon) { videoSection = kind }
                             .tint(videoSection == kind ? accent : .primary)
+                            .accessibilityAddTraits(videoSection == kind ? [.isSelected] : [])
                     }
                     Spacer()
                 }
@@ -243,7 +245,9 @@ private struct MusicLibraryScreen: View {
                         Text(artist.title).font(.largeTitle.bold()).padding(.bottom, 16)
                     }
                     if !library.busy && library.entries.isEmpty { Text("No matches in this library.").foregroundStyle(.secondary) }
-                    if libraryLayout.applies(to: library.kind, inGroup: library.selectedGroup != nil) {
+                    if library.kind == .genres && library.selectedGroup == nil {
+                        MusicGenreList(library: library) { search?.cancel(); library.open($0) }
+                    } else if libraryLayout.applies(to: library.kind, inGroup: library.selectedGroup != nil) {
                         LibraryAlternateLayout(library: library, layout: libraryLayout)
                     } else {
                         let trackList = library.kind == .tracks && library.selectedGroup == nil

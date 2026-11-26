@@ -69,6 +69,7 @@ namespace MusicRoom
                     return;
                 }
                 closing = true;
+                if (nativeVideo != null) nativeVideo.Close();
                 if (checkUpdate != null) checkUpdate.Cancel();
                 media.Dispose();
             };
@@ -124,6 +125,30 @@ namespace MusicRoom
             }
         }
 
+        NativeVideoWindow nativeVideo;
+
+        void OpenNativeVideo(Dictionary<string, object> request)
+        {
+            long id = WindowsMediaService.Num(request, "id");
+            var url = media.NativeVideoSource(WindowsMediaService.Str(request, "url"));
+            if (nativeVideo != null || url == null) { Emit("plexNativeVideo", new { id, result = "failed" }); return; }
+            try
+            {
+                var title = WindowsMediaService.Str(request, "title");
+                if (title.Length > 200) title = title.Substring(0, 200);
+                nativeVideo = new NativeVideoWindow(url, title, (result, seconds) => {
+                    nativeVideo = null;
+                    Emit("plexNativeVideo", new { id, result, seconds });
+                });
+                nativeVideo.Show(this);
+            }
+            catch (Exception)
+            {
+                if (nativeVideo != null) { nativeVideo.Dispose(); nativeVideo = null; }
+                Emit("plexNativeVideo", new { id, result = "failed" });
+            }
+        }
+
         async void MessageReceived(object sender, CoreWebView2WebMessageReceivedEventArgs args)
         {
             if (closing || args.Source != Page || args.WebMessageAsJson.Length > 16000) return;
@@ -150,6 +175,12 @@ namespace MusicRoom
                 else if (action == "dragFloatingPlayer")
                     BeginInvoke(new Action(() => { if (!closing && floatingPlayer) DragFloatingPlayer(); }));
                 else if (action == "updateApp") await UpdateApp();
+                else if (action == "videoNative") OpenNativeVideo(request);
+                else if (action == "videoClose")
+                {
+                    if (nativeVideo != null) nativeVideo.Close();
+                    await media.Handle(request);
+                }
                 else await media.Handle(request);
             }
             catch (ArgumentException) { }

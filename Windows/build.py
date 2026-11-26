@@ -11,6 +11,8 @@ from zipfile import ZipFile, ZIP_DEFLATED
 ROOT = Path(__file__).resolve().parent
 ASSETS = ROOT.parent / "Assets"
 SDK_DIGEST = "5ea526bbd728adda0da4d31219267e96460494a427e4894c4e09d9f320f4b9aa"
+VLC_PACKAGE = ROOT.parent / "Dependencies/VideoLAN.LibVLC.Windows.3.0.24.nupkg"
+VLC_DIGEST = "3da3f37ee2b2b10e5c788d830a3b513658c36521ea1b0f966ed86eb69f41ef3c"
 DEFAULT_ICON = "prismatic-note"
 ICONS = (
     DEFAULT_ICON, "prismatic-note-dark", "music-gradient", "music-wordmark", "music-crimson",
@@ -38,11 +40,41 @@ def make_icon(png, destination):
         destination.write_bytes(header + b"".join(parts))
 
 
+
+def package_vlc(package, architecture, destination):
+    playback = {
+        "audio_filter", "audio_mixer", "audio_output", "codec", "demux", "d3d11", "d3d9",
+        "logger", "packetizer", "spu", "stream_filter", "text_renderer", "video_chroma",
+        "video_filter", "video_output",
+    }
+    transport = {
+        "libfilesystem_plugin.dll", "libhttp_plugin.dll", "libhttps_plugin.dll",
+        "libattachment_plugin.dll", "libgnutls_plugin.dll", "libxml_plugin.dll",
+    }
+    prefix = f"build/{architecture}/"
+    with ZipFile(destination, "w", ZIP_DEFLATED) as archive:
+        for name in package.namelist():
+            if not name.startswith(prefix) or not name.endswith(".dll"):
+                continue
+            relative = name.removeprefix(prefix)
+            parts = relative.split("/")
+            if relative in {"libvlc.dll", "libvlccore.dll"} or (
+                len(parts) == 3 and parts[0] == "plugins" and (parts[1] in playback or parts[2] in transport)
+            ):
+                archive.writestr(relative, package.read(name))
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for option in ("sdk", "compiler", "references", "codecs", "output"):
         parser.add_argument("--" + option, type=Path, required=True)
+    parser.add_argument("--vlc", type=Path, default=VLC_PACKAGE)
     args = parser.parse_args()
+    if not args.vlc.is_file():
+        raise SystemExit("Fetch the video runtime with ./fetch-video-dependencies.sh windows first.")
+    with args.vlc.open("rb") as source:
+        if hashlib.file_digest(source, "sha256").hexdigest() != VLC_DIGEST:
+            raise SystemExit("The VideoLAN package did not match the pinned checksum.")
     if hashlib.sha256(args.sdk.read_bytes()).hexdigest() != SDK_DIGEST:
         raise SystemExit("The WebView2 SDK package did not match the pinned checksum.")
     args.output.mkdir(parents=True, exist_ok=True)
@@ -69,6 +101,11 @@ def main():
                 embed(file, name)
             for name in ("LICENSE.txt", "NOTICE.txt"):
                 (stage / ("WebView2-" + name)).write_bytes(sdk.read(name))
+        with ZipFile(args.vlc) as vlc:
+            for arch in ("x86", "x64", "arm64"):
+                archive = stage / f"VLC-{arch}.zip"
+                package_vlc(vlc, arch, archive)
+                embed(archive, archive.name)
         for arch in ("x86", "x64"):
             name = f"Lossless-{arch}.exe"
             embed(args.codecs / name, name)
@@ -97,6 +134,8 @@ def main():
             bundle.write(args.output / "iPlex.exe", "iPlex.exe")
             bundle.write(stage / (DEFAULT_ICON + ".ico"), "Icons/Prismatic Note Light.ico")
             bundle.write(ROOT / "HLS-js-LICENSE.txt", "Notices/HLS-js-LICENSE.txt")
+            for name in ("VideoLAN-LICENSE.txt", "VideoLAN-SOURCE.txt"):
+                bundle.write(ASSETS / name, "Notices/" + name)
             for name in ("WebView2-LICENSE.txt", "WebView2-NOTICE.txt"):
                 bundle.write(stage / name, "Notices/" + name)
             for name in ("COPYING.LGPLv2.1", "ThirdParty.txt"):

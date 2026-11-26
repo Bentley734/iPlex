@@ -16,7 +16,7 @@ namespace MusicRoom
         const string VideoPrefix = "/video/:/transcode/universal/";
         const string VideoOrigin = "https://media.musicroom.invalid/video/";
         List<Section> videoSections = new List<Section>();
-        readonly Dictionary<string, Tuple<Server, string>> videoArt = new Dictionary<string, Tuple<Server, string>>();
+        readonly Dictionary<string, Tuple<Server, string, string>> videoArt = new Dictionary<string, Tuple<Server, string, string>>();
         readonly Dictionary<string, string> videoArtIds = new Dictionary<string, string>();
         readonly Dictionary<string, VideoResource> videoResources = new Dictionary<string, VideoResource>();
         readonly Dictionary<Uri, string> videoAliases = new Dictionary<Uri, string>();
@@ -27,6 +27,7 @@ namespace MusicRoom
             public Server Server;
             public Uri Target;
             public string Mime;
+            public bool Matroska;
         }
 
         static readonly Dictionary<string, string> VideoMimes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
@@ -38,26 +39,28 @@ namespace MusicRoom
             { ".vob", "video/mpeg" }, { ".flv", "video/x-flv" }
         };
 
-        string RegisterVideoArt(Server server, string path)
+        string RegisterVideoArt(Server server, string library, string path)
         {
             if (path == null) return "";
             string id;
-            if (!videoArtIds.TryGetValue(path, out id))
+            string key = library + "/" + path;
+            if (!videoArtIds.TryGetValue(key, out id))
             {
                 if (videoArt.Count >= 2400) { videoArt.Clear(); videoArtIds.Clear(); }
                 id = Guid.NewGuid().ToString("N");
-                videoArtIds.Add(path, id);
-                videoArt.Add(id, Tuple.Create(server, path));
+                videoArtIds.Add(key, id);
+                videoArt.Add(id, Tuple.Create(server, library, path));
             }
             return "/art/" + id;
         }
 
-        async Task<WindowsMediaResponse> VideoPoster(Server server, string path, string method)
+        async Task<WindowsMediaResponse> VideoPoster(Server server, string library, string path, string method)
         {
             await artSlots.WaitAsync(shutdown.Token);
             try
             {
-                var bytes = await FetchArtwork(server, path, shutdown.Token);
+                var target = CoverCachePath(server.Id, library, path);
+                var bytes = File.Exists(target) ? File.ReadAllBytes(target) : await FetchArtwork(server, path, shutdown.Token);
                 string mime = ArtworkMime(bytes);
                 return mime == null ? Response(415, "Unsupported image") :
                     Response(200, "OK", "Content-Type: " + mime + "\r\n", method == "HEAD" ? null : new MemoryStream(bytes, false));
@@ -97,14 +100,14 @@ namespace MusicRoom
             catch (Exception) { }
         }
 
-        string RegisterVideoResource(Server server, Uri target, string mime)
+        string RegisterVideoResource(Server server, Uri target, string mime, bool matroska = false)
         {
             string alias;
             if (videoAliases.TryGetValue(target, out alias)) return VideoOrigin + alias;
             if (videoResources.Count >= 30000) throw Problem("The Plex video playlist is too large.");
             alias = Guid.NewGuid().ToString("N");
             videoAliases.Add(target, alias);
-            videoResources.Add(alias, new VideoResource { Server = server, Target = target, Mime = mime });
+            videoResources.Add(alias, new VideoResource { Server = server, Target = target, Mime = mime, Matroska = matroska });
             return VideoOrigin + alias;
         }
 
@@ -164,7 +167,7 @@ namespace MusicRoom
                         key = Str(row, "ratingKey"), type = expected, title = Str(row, "title"),
                         summary = Str(row, "summary"), subtitle = expected == "episode" && Num(row, "index") > 0 ?
                             "Episode " + Str(row, "index") : Str(row, "year"),
-                        artwork = RegisterVideoArt(server, ArtworkPath(row, "thumb"))
+                        artwork = RegisterVideoArt(server, library, ArtworkPath(row, "thumb"))
                     }).ToArray();
                     int count = Rows(Get(container, "Metadata")).Count();
                     long end = offset + count, total = Num(container, "totalSize");
@@ -192,7 +195,10 @@ namespace MusicRoom
                         if (!PartPath(part)) continue;
                         if (!VideoMimes.TryGetValue(Path.GetExtension(part), out mime))
                             mime = "application/octet-stream";
-                        direct.Add(new { url = RegisterVideoResource(server, new Uri(result.Base, part), mime), mime,
+                        string container = Str(media, "container").ToLowerInvariant();
+                        bool native = mime == "video/x-matroska" || mime == "video/webm" ||
+                                      container == "mkv" || container == "matroska" || container == "webm";
+                        direct.Add(new { url = RegisterVideoResource(server, new Uri(result.Base, part), mime, native), mime, native,
                             video = Str(media, "videoCodec").ToLowerInvariant(), audio = Str(media, "audioCodec").ToLowerInvariant() });
                     }
                     var query = VideoQuery(new Dictionary<string, string> {
@@ -259,6 +265,19 @@ namespace MusicRoom
                     return match.Value.Substring(0, value.Index - match.Index) + link(value.Value) + "\"";
                 });
             }));
+        }
+
+        internal Uri NativeVideoSource(string value)
+        {
+            Uri url;
+            VideoResource resource;
+            if (!Uri.TryCreate(value, UriKind.Absolute, out url) || url.GetLeftPart(UriPartial.Authority) != "https://media.musicroom.invalid" ||
+                !Regex.IsMatch(url.AbsolutePath, @"^/video/[a-f0-9]{32}\z") || url.Query.Length != 0 || url.Fragment.Length != 0 ||
+                !videoResources.TryGetValue(url.AbsolutePath.Substring(7), out resource) || !resource.Matroska)
+                return null;
+            return new UriBuilder(resource.Target) {
+                Query = "X-Plex-Token=" + Uri.EscapeDataString(resource.Server.Token)
+            }.Uri;
         }
 
         async Task<WindowsMediaResponse> OpenVideo(string handle, string method, string range)
