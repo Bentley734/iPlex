@@ -190,7 +190,6 @@ private struct MusicWindow: View {
             VStack(spacing: 1) {
                 HStack(spacing: 20) {
                     HeaderBrand(theme: theme, width: 155, height: 42)
-                    librarySearch.frame(maxWidth: 460).disabled(model.libraryID.isEmpty)
                     Spacer(minLength: 4)
                     Button {
                         if wide { showPlexifyDeck.toggle() }
@@ -199,8 +198,7 @@ private struct MusicWindow: View {
                     .popover(isPresented: $showCompactDeck) {
                         plexifyDeck.frame(width: 250, height: 370)
                     }
-                    PlexLibrarySwitcher(library: model)
-                    settingsButton
+                    librarySearch.frame(width: 230).disabled(model.libraryID.isEmpty)
                 }
                 .padding(.horizontal, 18).padding(.vertical, 8)
                 .background(slate)
@@ -247,24 +245,31 @@ private struct MusicWindow: View {
 
     private func sidebar(width: CGFloat) -> some View {
         let padding: CGFloat = graphite || plexify ? 16 : 24
-        return ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
-                if !plexify { HeaderBrand(theme: theme, width: min(155, width - padding * 2), height: 46) }
-                if graphite {
-                    librarySearch
-                        .disabled(model.libraryID.isEmpty)
-                }
-                VStack(alignment: .leading, spacing: 6) {
-                    if graphite || plexify {
-                        Text("Plex library")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.secondary)
-                            .padding(.leading, 10).padding(.bottom, 3)
+        return VStack(spacing: 0) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 18) {
+                    if !plexify { HeaderBrand(theme: theme, width: min(155, width - padding * 2), height: 46) }
+                    VStack(alignment: .leading, spacing: 6) {
+                        if graphite || plexify {
+                            Text("Plex library")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.secondary)
+                                .padding(.leading, 10).padding(.bottom, 3)
+                        }
+                        ForEach(model.visibleKinds, id: \.self) { tab($0) }
                     }
-                    ForEach(model.visibleKinds, id: \.self) { tab($0) }
                 }
+                .padding(padding)
             }
-            .padding(padding)
+            .frame(maxHeight: .infinity)
+
+            VStack(alignment: .leading, spacing: 10) {
+                PlexLibrarySwitcher(library: model, followsAvailableWidth: true)
+                settingsButton
+            }
+            .padding(.horizontal, padding)
+            .padding(.top, 10)
+            .padding(.bottom, padding)
         }
         .background(theme.usesLiquidGlass ? .clear : slate)
         .musicGlass(theme, radius: 20)
@@ -274,6 +279,7 @@ private struct MusicWindow: View {
     private var settingsButton: some View {
         Button { showSettings = true } label: {
             Label("Settings", systemImage: "gearshape")
+                .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -313,9 +319,7 @@ private struct MusicWindow: View {
     private var mainPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
             if model.libraryID.isEmpty {
-                welcome.overlay(alignment: .topTrailing) {
-                    if !plexify { settingsButton.padding(.horizontal, 28).padding(.vertical, 20) }
-                }
+                welcome
             } else {
                 HStack(spacing: 15) {
                     if model.selectedDetail != nil || model.selectedGroup != nil {
@@ -329,12 +333,8 @@ private struct MusicWindow: View {
                         .font(.system(size: graphite ? 38 : 31, weight: .bold, design: graphite ? .rounded : .default))
                         .lineLimit(1)
                     Spacer()
-                    if !graphite && !plexify && model.selectedDetail == nil && model.selectedGroup == nil {
-                        librarySearch.frame(width: 205).disabled(model.reconnecting)
-                    }
-                    if !plexify {
-                        PlexLibrarySwitcher(library: model)
-                        settingsButton
+                    if !plexify && (graphite || (model.selectedDetail == nil && model.selectedGroup == nil)) {
+                        librarySearch.frame(width: 205)
                     }
                 }
                 .padding(.horizontal, 28).padding(.vertical, 20)

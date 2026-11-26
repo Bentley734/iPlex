@@ -590,6 +590,7 @@ struct PlexPinButton: View {
 
 struct PlexLibrarySwitcher: View {
     @ObservedObject var library: LibraryModel
+    var followsAvailableWidth = false
 
     var body: some View {
         if library.libraries.count > 1 {
@@ -599,7 +600,8 @@ struct PlexLibrarySwitcher: View {
             }
             .labelsHidden()
             .accessibilityLabel("Switch Music Library")
-            .fixedSize()
+            .fixedSize(horizontal: !followsAvailableWidth, vertical: true)
+            .frame(maxWidth: followsAvailableWidth ? .infinity : nil)
             .disabled(library.reconnecting)
         }
     }

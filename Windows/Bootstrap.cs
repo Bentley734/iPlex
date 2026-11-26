@@ -6,8 +6,8 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Windows.Forms;
 
-[assembly: AssemblyVersion("0.1.20.0")]
-[assembly: AssemblyFileVersion("0.1.20.0")]
+[assembly: AssemblyVersion("0.1.21.0")]
+[assembly: AssemblyFileVersion("0.1.21.0")]
 [assembly: AssemblyTitle("iPlex")]
 [assembly: AssemblyProduct("iPlex")]
 

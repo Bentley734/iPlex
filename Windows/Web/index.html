@@ -30,11 +30,14 @@
       <button id="tracks" aria-pressed="false" disabled>Tracks</button>
       <button id="playlists" aria-pressed="false" disabled>Playlists</button>
     </nav>
+    <div class="sidebar-controls">
+      <select id="quick-library" aria-label="Switch Music Library" hidden></select>
+      <button id="settings" type="button">Settings</button>
+    </div>
   </aside>
   <div id="sidebar-resize" role="separator" aria-label="Sidebar width" aria-orientation="vertical"
        aria-controls="library-sidebar" tabindex="0" title="Drag to resize. Double-click to reset."></div>
   <main>
-    <button id="settings" type="button">Settings</button>
     <section id="welcome">
       <img src="prismatic-note.png" alt="" width="74" height="74">
       <h1 id="welcome-title">Connect to Plex</h1>
@@ -49,7 +52,6 @@
         <button id="back" aria-label="Back" hidden>‹</button>
         <h1 id="title">Albums</h1>
         <input type="search" id="search" aria-label="Search albums or artists" placeholder="Search library" maxlength="120">
-        <select id="quick-library" aria-label="Switch Music Library" hidden></select>
       </header>
       <div class="content" id="scroll">
         <p id="message" role="status" hidden></p>
