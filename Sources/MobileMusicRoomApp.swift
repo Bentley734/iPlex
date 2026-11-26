@@ -61,7 +61,7 @@ private struct MusicLibraryScreen: View {
         }
         .tint(accent)
         #if os(iOS)
-        .statusBarHidden(showPlayer || showMiniPlayer)
+        .statusBarHidden(showMiniPlayer)
         #endif
         .sheet(isPresented: $showSettings) { MusicSettings(library: library) }
         .sheet(isPresented: $showAppIcons) { MusicAppIconPicker() }

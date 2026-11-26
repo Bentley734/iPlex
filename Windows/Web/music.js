@@ -417,11 +417,7 @@
     renderNowPlaying(playbackState);
     nowPlaying.showModal();
     showNowQueue(false);
-    host({action:'openNowPlaying'});
   };
-  nowPlaying.addEventListener('close', () => {
-    if (!nowPlaying.open) host({action:'closeNowPlaying'});
-  });
   get('close-now-playing').onclick = () => nowPlaying.close();
   get('jump-now-queue').onclick = () => showNowQueue(get('now-queue').hidden);
   get('now-prev').onclick = () => player.action({action:'previous'});

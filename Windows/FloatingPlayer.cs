@@ -9,7 +9,6 @@ namespace MusicRoom
     internal sealed partial class MusicWindow
     {
         bool floatingPlayer;
-        bool nowPlayingFullScreen;
         bool libraryTopMost;
         int libraryWindowStyle;
         Rectangle libraryBounds, floatingBounds;
@@ -22,7 +21,7 @@ namespace MusicRoom
 
         void SetFloatingPlayer(bool enabled)
         {
-            if (floatingPlayer == enabled || nowPlayingFullScreen) return;
+            if (floatingPlayer == enabled) return;
             SuspendLayout();
             try
             {
@@ -66,36 +65,6 @@ namespace MusicRoom
                     FitLibraryWebView();
                     Text = "iPlex";
                 }
-            }
-            finally { ResumeLayout(); }
-        }
-
-        void SetNowPlayingFullScreen(bool enabled)
-        {
-            if (nowPlayingFullScreen == enabled || floatingPlayer) return;
-            SuspendLayout();
-            try
-            {
-                if (enabled)
-                {
-                    var screen = Screen.FromControl(this).Bounds;
-                    libraryWindowState = WindowState;
-                    libraryBounds = libraryWindowState == FormWindowState.Normal ? Bounds : RestoreBounds;
-                    WindowState = FormWindowState.Normal;
-                    libraryWindowStyle = GetWindowLong(Handle, WindowStyleIndex);
-                    MinimumSize = Size.Empty;
-                    ApplyWindowStyle(libraryWindowStyle & ~LibraryFrame);
-                    Bounds = screen;
-                }
-                else
-                {
-                    ApplyWindowStyle(libraryWindowStyle);
-                    MinimumSize = new Size(780, 530);
-                    Bounds = libraryBounds;
-                    WindowState = libraryWindowState;
-                }
-                nowPlayingFullScreen = enabled;
-                FitLibraryWebView();
             }
             finally { ResumeLayout(); }
         }
