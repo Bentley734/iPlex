@@ -87,7 +87,11 @@ struct MusicSettings: View {
     @AppStorage(HeaderWordmark.preferenceKey) private var headerWordmark = HeaderWordmark.iplex
     @AppStorage(HeaderMarkSize.preferenceKey) private var headerMarkSize = HeaderMarkSize.medium
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
+    @AppStorage(LibraryPageSize.preferenceKey) private var pageSize = LibraryPageSize.standard
     @Environment(\.dismiss) private var dismiss
+    #if os(macOS)
+    @EnvironmentObject private var updates: MacAppUpdates
+    #endif
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -125,6 +129,24 @@ struct MusicSettings: View {
                     }
                     HeaderBrand(mark: headerMark, theme: theme, width: 170, height: 42)
                         .accessibilityHidden(true)
+                    Picker("Results per Page", selection: $pageSize) {
+                        ForEach(LibraryPageSize.allCases) { size in
+                            Text(size.label).tag(size)
+                        }
+                    }
+                    .onChange(of: pageSize) { _, _ in library.refreshPageSize() }
+                    Divider()
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("App Updates").font(.headline)
+                        #if os(macOS)
+                        Button(updates.buttonTitle, action: updates.act)
+                        if !updates.status.isEmpty { Text(updates.status).foregroundStyle(.secondary) }
+                        #elseif os(iOS)
+                        Link("View GitHub Releases", destination: URL(string: "https://github.com/Bentley734/iPlex/releases")!)
+                        #else
+                        Text("github.com/Bentley734/iPlex/releases").foregroundStyle(.secondary)
+                        #endif
+                    }
                     Divider()
                     VStack(alignment: .leading, spacing: 15) {
                         HStack {

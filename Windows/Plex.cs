@@ -341,7 +341,11 @@ namespace MusicRoom
         }
         static readonly Regex ItemID = new Regex(@"^[1-9][0-9]{0,19}\z");
         static readonly Regex ArtPath = new Regex(@"^/library/metadata/[0-9]+/thumb(?:/[0-9]+)?\z");
-        readonly Dictionary<string, Dictionary<string, object>> items = new Dictionary<string, Dictionary<string, object>>();
+        sealed class LibraryItem
+        {
+            internal string Kind, Title;
+        }
+        readonly Dictionary<string, LibraryItem> items = new Dictionary<string, LibraryItem>();
         readonly Dictionary<string, string> art = new Dictionary<string, string>();
         readonly Dictionary<string, string> artIDs = new Dictionary<string, string>();
         readonly SemaphoreSlim artSlots = new SemaphoreSlim(4);
@@ -366,24 +370,28 @@ namespace MusicRoom
                 throw Problem("Choose a Plex music library.");
             bool artists = Str(request, "kind") == "artists";
             long start = Math.Min(Math.Max(0, Num(request, "offset")), 1000000);
+            long requestedSize = Num(request, "pageSize");
+            long size = requestedSize == 30 || requestedSize == 120 ? requestedSize : 60;
             string artist = Str(request, "artist");
             string query = Str(request, "query").Trim();
             string section = selectedSection;
             var endpoint = "/library/sections/" + section + "/all?type=" + (artists ? "8" : "9") + "&sort=titleSort%3Aasc";
             if (artist.Length != 0)
             {
-                Dictionary<string, object> record;
-                if (!ItemID.IsMatch(artist) || !items.TryGetValue(artist, out record) || Str(record, "type") != "artist")
+                LibraryItem record;
+                if (!ItemID.IsMatch(artist) || !items.TryGetValue(artist, out record) || record.Kind != "artist")
                     throw Problem("Choose an artist from the library.");
                 endpoint = "/library/metadata/" + artist + "/children?";
                 artists = false;
             }
             else if (!String.IsNullOrEmpty(query))
                 endpoint += "&title=" + Uri.EscapeDataString(query.Substring(0, Math.Min(query.Length, 120)));
-            endpoint += "&X-Plex-Container-Start=" + start + "&X-Plex-Container-Size=60";
-            var rows = await WithServer(server, async url =>
-                Metadata(await FetchPlex(HttpMethod.Get, new Uri(url, endpoint), server.Token, token, 8 * 1024 * 1024), section).ToArray(), token);
+            endpoint += "&X-Plex-Container-Start=" + start + "&X-Plex-Container-Size=" + size;
+            var payload = await WithServer(server, url =>
+                FetchPlex(HttpMethod.Get, new Uri(url, endpoint), server.Token, token, 8 * 1024 * 1024), token);
             token.ThrowIfCancellationRequested();
+            var rows = Metadata(payload, section).ToArray();
+            long total = Num(Map(Get(Map(payload), "MediaContainer")), "totalSize");
             var results = new List<object>();
             var seen = new HashSet<string>();
             foreach (var row in rows)
@@ -393,8 +401,7 @@ namespace MusicRoom
                 string kind = Str(row, "type");
                 if (!ItemID.IsMatch(key) || title.Length == 0 || title.Length > 300 ||
                     kind != (artists ? "artist" : "album") || !seen.Add(key)) continue;
-                if (items.Count >= 8000) items.Remove(items.Keys.First());
-                items[key] = row;
+                items[key] = new LibraryItem { Kind = kind, Title = title };
                 string artwork = "";
                 string thumb = Str(row, "thumb");
                 if (thumb.Length < 180 && ArtPath.IsMatch(thumb))
@@ -402,11 +409,6 @@ namespace MusicRoom
                     string handle;
                     if (!artIDs.TryGetValue(thumb, out handle))
                     {
-                        if (art.Count >= 8000)
-                        {
-                            string old = art.Keys.First();
-                            artIDs.Remove(art[old]); art.Remove(old);
-                        }
                         handle = Guid.NewGuid().ToString("N");
                         art[handle] = thumb;
                         artIDs[thumb] = handle;
@@ -416,7 +418,9 @@ namespace MusicRoom
                 results.Add(new { id = key, title, kind, artwork, artist = Str(row, "parentTitle"), year = Num(row, "year"),
                     genre = Rows(Get(row, "Genre")).Select(genre => Str(genre, "tag")).FirstOrDefault() ?? "" });
             }
-            Send("musicEntries", new { id, entries = results, next = start + rows.Length, more = rows.Length >= 60 && results.Count > 0 });
+            long next = start + rows.Length;
+            bool more = results.Count > 0 && next <= 1000000 && (total > 0 ? next < total : rows.Length >= size);
+            Send("musicEntries", new { id, entries = results, next, more });
         }
 
         public async Task<WindowsMediaResponse> Artwork(string handle, string method)
@@ -454,8 +458,8 @@ namespace MusicRoom
         {
             string key = Str(request, "album");
             Server server;
-            Dictionary<string, object> item;
-            if (!ItemID.IsMatch(key) || !items.TryGetValue(key, out item) || Str(item, "type") != "album" ||
+            LibraryItem item;
+            if (!ItemID.IsMatch(key) || !items.TryGetValue(key, out item) || item.Kind != "album" ||
                 !servers.TryGetValue(selectedServer, out server) || selectedSection.Length == 0)
                 throw Problem("Choose an album from the library.");
             string section = selectedSection;
@@ -486,7 +490,7 @@ namespace MusicRoom
             }, token);
             token.ThrowIfCancellationRequested();
             albumID = key;
-            albumTitle = Str(item, "title");
+            albumTitle = item.Title;
             albumTracks = tracks;
             Send("musicAlbum", new { id, tracks = tracks.Select(track => new { track.number, track.title, track.durationSeconds }).ToArray() });
         }

@@ -6,6 +6,12 @@
   let server = '', library = '', kind = 'albums', artist = null, album = null, playing = null;
   let tracks = [], entries = [], request = 0, playRequest = 0, offset = 0, busy = false, timer;
   let hasMore = false;
+  let paging = false;
+  let pageFailed = false;
+  let pageSize = '60';
+  let listingQuery = '';
+  let refreshAfterAlbum = false;
+  const listingIDs = new Set();
   let caching = false;
   let selectedTheme = 'copper';
   let deckOpen = window.matchMedia('(min-width: 1040px)').matches;
@@ -15,6 +21,10 @@
   // Regions in the supplied transparent wordmark sheet, including a small inset.
   const wordmarkRegions = new Map([['music', [722, 251, 684, 210]], ['musicBold', [645, 609, 810, 193]]]);
   const wordmarkSheet = new Image();
+  const pageEnd = get('page-end');
+  const pageObserver = new IntersectionObserver(rows => {
+    if (!album && hasMore && !busy && !pageFailed && rows.some(row => row.isIntersecting)) browse(true);
+  }, {root:get('scroll')});
   const bands = ['bass', 'mid', 'treble'];
   const node = (tag, text = '', cls = '') => {
     const el = document.createElement(tag);
@@ -53,17 +63,25 @@
   }
   function browse(append = false) {
     if (!library || (append && busy)) return;
+    paging = append;
+    pageFailed = false;
     album = null;
     if (!append) {
       offset = 0;
       entries = [];
+      listingIDs.clear();
+      listingQuery = get('search').value;
       hasMore = false;
       get('grid').replaceChildren();
     }
     busy = true;
     render();
     status('Loading library…');
-    host({action:'browse', id:++request, kind, query:get('search').value, artist:artist?.id, offset});
+    requestPage();
+  }
+  function requestPage() {
+    host({action:'browse', id:++request, kind, query:listingQuery, artist:artist?.id, offset,
+          pageSize:pageSize === 'all' ? 120 : Number(pageSize)});
   }
   function open(item) {
     clearTimeout(timer);
@@ -73,6 +91,7 @@
       return;
     }
     album = item;
+    paging = false;
     tracks = [];
     busy = true;
     render();
@@ -85,7 +104,11 @@
     get('back').hidden = !artist && !album;
     get('grid').hidden = Boolean(album);
     get('details').hidden = !album;
-    get('more').hidden = Boolean(album) || !hasMore || busy;
+    const readyToPage = !album && hasMore && !busy;
+    get('retry-page').hidden = !readyToPage || !pageFailed;
+    pageEnd.hidden = !readyToPage || pageFailed;
+    pageObserver.unobserve(pageEnd);
+    if (!pageEnd.hidden) pageObserver.observe(pageEnd);
     get('albums').setAttribute('aria-pressed', String(kind === 'albums'));
     get('artists').setAttribute('aria-pressed', String(kind === 'artists'));
     renderFeature();
@@ -150,10 +173,16 @@
   };
   window.musicEntries = reply => {
     if (reply.id !== request || album) return;
-    const seen = new Set(entries.map(item => item.id));
-    for (const row of reply.entries) if (!seen.has(row.id)) { entries.push(row); seen.add(row.id); }
+    const oldCount = entries.length;
+    for (const row of reply.entries) if (!listingIDs.has(row.id)) { entries.push(row); listingIDs.add(row.id); }
+    hasMore = reply.more && reply.next > offset && entries.length > oldCount;
     offset = reply.next;
-    hasMore = reply.more;
+    if (pageSize === 'all' && hasMore) {
+      paging = true;
+      requestPage();
+      return;
+    }
+    paging = false;
     busy = false;
     status(entries.length ? '' : 'No matches in this library.');
     render();
@@ -168,6 +197,8 @@
   window.musicError = reply => {
     if (reply.id !== request) return;
     busy = false;
+    pageFailed = paging;
+    paging = false;
     pendingAlbum = null;
     status(reply.message);
     render();
@@ -255,6 +286,12 @@
   get('connect').onclick = () => host({action:'connect'});
   get('settings').onclick = () => get('settings-page').showModal();
   get('close-settings').onclick = () => get('settings-page').close();
+  get('app-update').onclick = () => host({action:'updateApp'});
+  window.musicAppUpdate = state => {
+    get('app-update-status').textContent = state.status;
+    get('app-update').textContent = state.action;
+    get('app-update').disabled = Boolean(state.disabled);
+  };
   function chooseTheme(value) {
     const theme = ['classic', 'video', 'plexify'].includes(value) ? value : 'copper';
     selectedTheme = theme;
@@ -336,6 +373,12 @@
     try { localStorage.setItem('musicroom-eq', JSON.stringify(settings)); } catch {}
   }
   get('theme').onchange = event => chooseTheme(event.target.value);
+  get('library-page-size').onchange = event => {
+    selectPageSize(event.target.value);
+    clearTimeout(timer);
+    if (album) refreshAfterAlbum = true;
+    else browse();
+  };
   get('mini-player-style').onchange = event => chooseMiniPlayer(event.target.value);
   get('plexify-deck-toggle').onclick = () => { deckOpen = !deckOpen; updateDeckVisibility(); };
   get('header-logo').onchange = event => chooseHeaderLogo(event.target.value);
@@ -369,6 +412,7 @@
     host({action:'icon', choice:event.target.value});
   };
   try {
+    selectPageSize(localStorage.getItem('musicroom-library-page-size'));
     chooseTheme(localStorage.getItem('musicroom-theme'));
     chooseMiniPlayer(localStorage.getItem('musicroom-mini-player'));
     chooseHeaderLogo(localStorage.getItem('musicroom-header-logo'));
@@ -394,11 +438,20 @@
     timer = setTimeout(() => browse(), 300);
   };
   get('back').onclick = () => {
-    if (album) { ++request; album = null; tracks = []; busy = false; status(''); render(); }
+    if (album) {
+      ++request; album = null; tracks = []; busy = false; status('');
+      if (refreshAfterAlbum) { refreshAfterAlbum = false; browse(); }
+      else render();
+    }
     else { artist = null; browse(); }
   };
-  get('more').onclick = () => browse(true);
+  get('retry-page').onclick = () => browse(true);
   for (const control of ['previous', 'toggle', 'next']) get(control).onclick = () => player.action({action:control});
   get('seek').oninput = event => player.action({action:'seek', seconds:event.target.value});
   host({action:'status'});
+  function selectPageSize(value) {
+    pageSize = ['30', '60', '120', 'all'].includes(value) ? value : '60';
+    get('library-page-size').value = pageSize;
+    try { localStorage.setItem('musicroom-library-page-size', pageSize); } catch {}
+  }
 })();

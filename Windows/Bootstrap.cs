@@ -6,8 +6,8 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Windows.Forms;
 
-[assembly: AssemblyVersion("0.1.3.0")]
-[assembly: AssemblyFileVersion("0.1.3.0")]
+[assembly: AssemblyVersion("0.1.4.0")]
+[assembly: AssemblyFileVersion("0.1.4.0")]
 [assembly: AssemblyTitle("iPlex")]
 [assembly: AssemblyProduct("iPlex")]
 
@@ -20,10 +20,16 @@ namespace MusicRoom
         private static readonly Dictionary<string, string> Assemblies = new Dictionary<string, string>(StringComparer.Ordinal);
 
         [STAThread]
-        static void Main()
+        static void Main(string[] args)
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
+            if (args.Length == 2 && args[0] == "--apply-iplex-update")
+            {
+                AppUpdater.Apply(args[1]);
+                return;
+            }
+            string updateAcknowledgment = args.Length == 2 && args[0] == "--confirm-iplex-update" ? args[1] : null;
             try
             {
                 string machine = Environment.GetEnvironmentVariable("PROCESSOR_ARCHITECTURE");
@@ -36,7 +42,7 @@ namespace MusicRoom
                     string path;
                     return Assemblies.TryGetValue(new AssemblyName(e.Name).Name, out path) ? Assembly.LoadFrom(path) : null;
                 };
-                Run(Path.GetDirectoryName(loader));
+                Run(Path.GetDirectoryName(loader), updateAcknowledgment);
             }
             catch (Exception)
             {
@@ -46,10 +52,10 @@ namespace MusicRoom
         }
 
         [MethodImpl(MethodImplOptions.NoInlining)]
-        private static void Run(string loaderFolder)
+        private static void Run(string loaderFolder, string updateAcknowledgment)
         {
             Microsoft.Web.WebView2.Core.CoreWebView2Environment.SetLoaderDllFolderPath(loaderFolder);
-            using (var window = new MusicWindow()) Application.Run(window);
+            using (var window = new MusicWindow(updateAcknowledgment)) Application.Run(window);
         }
 
         // Each version has its own immutable path so a running app and its updater can coexist.

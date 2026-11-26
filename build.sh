@@ -8,6 +8,7 @@ for asset in "$project"/Assets/*.png "$project"/Assets/*.icns; do
     if [[ -f "$asset" ]]; then cp "$asset" "$bundle/Contents/Resources/"; fi
 done
 ditto --norsrc --noextattr --noqtn "$project/Assets/HeaderMarks" "$bundle/Contents/Resources/HeaderMarks"
+cp "$project/Assets/install-update.sh" "$bundle/Contents/Resources/install-update.sh"
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 for architecture in arm64 x86_64; do

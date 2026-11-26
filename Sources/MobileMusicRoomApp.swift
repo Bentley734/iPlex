@@ -198,11 +198,16 @@ private struct MusicLibraryScreen: View {
                             .buttonStyle(.plain)
                             #endif
                         }
+                        if library.more && !library.busy && library.message == nil {
+                            Color.clear.frame(height: 1).accessibilityHidden(true)
+                                .id(library.entries.count)
+                                .onAppear { library.loadMore() }
+                        }
                     }
                 }
                 if library.busy { ProgressView().padding() }
-                if library.more && !library.busy && library.selectedAlbum == nil {
-                    Button("Load More", action: library.loadMore).padding()
+                if library.more && !library.busy && library.selectedAlbum == nil && library.message != nil {
+                    Button("Retry", action: library.loadMore).padding()
                 }
             }.contentMargins(.horizontal, 8, for: .scrollContent)
         }.padding(14)

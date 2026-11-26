@@ -64,7 +64,7 @@ namespace MusicRoom
             long number;
             return Int64.TryParse(Str(value, key), NumberStyles.Integer, CultureInfo.InvariantCulture, out number) ? number : 0;
         }
-        static IEnumerable<Dictionary<string, object>> Rows(object value)
+        internal static IEnumerable<Dictionary<string, object>> Rows(object value)
         {
             var items = value as IEnumerable;
             return items == null || value is string ? Enumerable.Empty<Dictionary<string, object>>() : items.Cast<object>().OfType<Dictionary<string, object>>();

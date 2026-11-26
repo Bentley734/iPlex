@@ -5,15 +5,19 @@ import SwiftUI
 @main
 struct MusicRoomApp: App {
     @StateObject private var model = LibraryModel()
+    @StateObject private var updates = MacAppUpdates()
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
     @AppStorage("IconStyle") private var iconStyle = "groove"
+
+    init() { MacAppUpdates.recordLaunchingProcess() }
 
     var body: some Scene {
         WindowGroup {
             MusicWindow(model: model)
+                .environmentObject(updates)
                 .frame(minWidth: 780, minHeight: 540)
                 .preferredColorScheme(theme.scheme)
-                .task { applyIcon(); model.restore() }
+                .task { updates.acknowledgeLaunch(); applyIcon(); model.restore() }
                 .onChange(of: iconStyle) { _, _ in applyIcon() }
         }
         .defaultSize(width: 1120, height: 750)
@@ -25,12 +29,9 @@ struct MusicRoomApp: App {
                     }
                 }
                 Picker("App Icon", selection: $iconStyle) {
-                    Text("Copper Groove").tag("groove")
-                    Text("Prism").tag("prism")
-                    Text("Teal Signal").tag("signal")
-                    Text("Classic Click Wheel").tag("clickwheel")
-                    Text("Prismatic Note Light").tag("prismatic-note")
-                    Text("Prismatic Note Dark").tag("prismatic-note-dark")
+                    ForEach(AppIconChoice.allCases) { choice in
+                        Text(choice.label).tag(choice.rawValue)
+                    }
                 }
             }
         }
@@ -405,10 +406,17 @@ private struct MusicWindow: View {
                     }
                     .buttonStyle(.plain)
                 }
+                if model.more && !model.busy && model.message == nil {
+                    Color.clear.frame(height: 1).accessibilityHidden(true)
+                        .id(model.entries.count)
+                        .onAppear { model.loadMore() }
+                }
             }
             .padding(.horizontal, 28).padding(.bottom, 24)
             if model.busy { ProgressView().controlSize(.small).padding() }
-            if model.more && !model.busy { Button("Load More", action: model.loadMore).padding(.bottom, 24) }
+            if model.more && !model.busy && model.message != nil {
+                Button("Retry", action: model.loadMore).padding(.bottom, 24)
+            }
         }
     }
 

@@ -4,6 +4,7 @@ using System.Drawing;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using Microsoft.Web.WebView2.Core;
@@ -19,9 +20,15 @@ namespace MusicRoom
         readonly Dictionary<string, byte[]> assets = new Dictionary<string, byte[]>(StringComparer.Ordinal);
         Icon dockIcon;
         bool closing;
+        string updateAcknowledgment;
+        CancellationTokenSource checkUpdate;
+        AppUpdater.Release appRelease;
+        byte[] appUpdate;
+        bool installingUpdate;
 
-        public MusicWindow()
+        public MusicWindow(string updateAcknowledgment = null)
         {
+            this.updateAcknowledgment = updateAcknowledgment;
             Text = "iPlex";
             StartPosition = FormStartPosition.CenterScreen;
             ClientSize = new Size(1120, 750);
@@ -62,6 +69,7 @@ namespace MusicRoom
                     return;
                 }
                 closing = true;
+                if (checkUpdate != null) checkUpdate.Cancel();
                 media.Dispose();
             };
             FormClosed += delegate { if (dockIcon != null) dockIcon.Dispose(); };
@@ -127,6 +135,11 @@ namespace MusicRoom
                 if (request.TryGetValue("body", out body))
                     request = WindowsMediaService.Map(body);
                 string action = WindowsMediaService.Str(request, "action");
+                if (action == "status" && updateAcknowledgment != null)
+                {
+                    AppUpdater.Confirm(updateAcknowledgment);
+                    updateAcknowledgment = null;
+                }
                 if (action == "icon")
                 {
                     string choice = WindowsMediaService.Str(request, "choice");
@@ -137,10 +150,58 @@ namespace MusicRoom
                     BeginInvoke(new Action(() => { if (!closing) SetFloatingPlayer(action == "openFloatingPlayer"); }));
                 else if (action == "dragFloatingPlayer")
                     BeginInvoke(new Action(() => { if (!closing && floatingPlayer) DragFloatingPlayer(); }));
+                else if (action == "updateApp") await UpdateApp();
                 else await media.Handle(request);
             }
             catch (ArgumentException) { }
             catch (InvalidOperationException) { }
+        }
+
+        async Task UpdateApp()
+        {
+            if (installingUpdate) return;
+            if (checkUpdate != null) { checkUpdate.Cancel(); return; }
+            if (appUpdate != null)
+            {
+                installingUpdate = true;
+                Emit("musicAppUpdate", new { status = "Preparing the update…", action = "Restart to Update", disabled = true });
+                try
+                {
+                    await Task.Run(() => AppUpdater.Begin(appRelease, appUpdate));
+                    Close();
+                }
+                catch (Exception error)
+                {
+                    Emit("musicAppUpdate", new { status = error.Message, action = "Restart to Update", disabled = false });
+                }
+                finally { installingUpdate = false; }
+                return;
+            }
+            using (var cancellation = new CancellationTokenSource())
+            {
+                checkUpdate = cancellation;
+                const string Check = "Check for Updates";
+                Emit("musicAppUpdate", new { status = "Checking GitHub…", action = "Cancel" });
+                try
+                {
+                    appRelease = await AppUpdater.Check(cancellation.Token);
+                    if (appRelease == null)
+                        Emit("musicAppUpdate", new { status = "iPlex is up to date.", action = Check });
+                    else
+                    {
+                        Emit("musicAppUpdate", new { status = "Downloading iPlex " + appRelease.Version.ToString(3) + "…", action = "Cancel" });
+                        var bytes = await AppUpdater.Download(appRelease, cancellation.Token);
+                        cancellation.Token.ThrowIfCancellationRequested();
+                        appUpdate = bytes;
+                        Emit("musicAppUpdate", new { status = "The update is ready to install.", action = "Restart to Update" });
+                    }
+                }
+                catch (Exception error)
+                {
+                    Emit("musicAppUpdate", new { status = cancellation.IsCancellationRequested ? "Update canceled." : error.Message, action = Check });
+                }
+                finally { checkUpdate = null; }
+            }
         }
 
         static string Type(string path)

@@ -56,7 +56,8 @@
         <section id="details" hidden></section>
         <section id="plexify-feature" aria-label="From your library" hidden></section>
         <div id="grid" class="grid"></div>
-        <button id="more" hidden>Load More</button>
+        <div id="page-end" aria-hidden="true" hidden></div>
+        <button id="retry-page" hidden>Retry</button>
       </div>
     </section>
   </main>
@@ -167,6 +168,14 @@
         <canvas class="wordmark music-wordmark" hidden></canvas>
       </div>
     </section>
+    <label class="theme-choice">Results per Page
+      <select id="library-page-size">
+        <option value="30">30</option>
+        <option value="60" selected>60</option>
+        <option value="120">120</option>
+        <option value="all">All</option>
+      </select>
+    </label>
     <section>
       <div class="settings-head">
         <h2>Equalizer</h2>
@@ -176,6 +185,11 @@
       <label class="eq-band">Midrange <input id="mid" type="range" min="-10" max="10" step="1" value="0"><output for="mid" id="mid-value">+0 dB</output></label>
       <label class="eq-band">Treble <input id="treble" type="range" min="-10" max="10" step="1" value="0"><output for="treble" id="treble-value">+0 dB</output></label>
       <p id="eq-status" role="status" hidden></p>
+    </section>
+    <section>
+      <h2>App Updates</h2>
+      <p id="app-update-status" role="status"></p>
+      <button id="app-update" type="button">Check for Updates</button>
     </section>
     <section>
       <h2>Plex Artwork</h2>

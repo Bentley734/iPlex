@@ -3,8 +3,8 @@ options:
   createIntermediateGroups: true
 settings:
   SWIFT_VERSION: 5.0
-  MARKETING_VERSION: 0.1.3
-  CURRENT_PROJECT_VERSION: 4
+  MARKETING_VERSION: 0.1.4
+  CURRENT_PROJECT_VERSION: 5
   GENERATE_INFOPLIST_FILE: YES
   INFOPLIST_KEY_CFBundleDisplayName: iPlex
   INFOPLIST_KEY_NSLocalNetworkUsageDescription: iPlex connects to your Plex music server.
@@ -22,11 +22,8 @@ targets:
       - path: Assets/HeaderMarks
         type: folder
         buildPhase: resources
-      - path: Mobile/IconPreviews
-        buildPhase: resources
-      - path: Mobile/prismatic-note-preview.png
-        buildPhase: resources
-      - path: Mobile/prismatic-note-dark-preview.png
+      - path: Mobile/iOSIconPreviews
+        type: folder
         buildPhase: resources
       - path: Mobile/iOS.xcassets
         buildPhase: resources
@@ -42,7 +39,7 @@ targets:
       PRODUCT_BUNDLE_IDENTIFIER: net.bentley734.musicroom.ios
       TARGETED_DEVICE_FAMILY: "1,2"
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-      ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "ClassicClickWheel PrismaticNote PrismaticNoteDark"
+      ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "Prism Signal ClassicClickWheel PrismaticNote PrismaticNoteDark MusicGradient MusicWordmark MusicCrimson MusicMonochrome MusicOrange MusicArtists MusicPink Napster NapsterMono Spotify Plex"
   MusicRoom-tvOS:
     type: application
     platform: tvOS
@@ -56,7 +53,8 @@ targets:
       - path: Assets/HeaderMarks
         type: folder
         buildPhase: resources
-      - path: Mobile/IconPreviews
+      - path: Mobile/TVIconPreviews
+        type: folder
         buildPhase: resources
       - path: Mobile/tvOS.xcassets
         buildPhase: resources
@@ -64,4 +62,4 @@ targets:
       PRODUCT_NAME: iPlex
       PRODUCT_BUNDLE_IDENTIFIER: net.bentley734.musicroom.tvos
       ASSETCATALOG_COMPILER_APPICON_NAME: TVBrand
-      ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: ClassicClickWheel
+      ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "Prism Signal ClassicClickWheel PrismaticNote PrismaticNoteDark MusicGradient MusicWordmark MusicCrimson MusicMonochrome MusicOrange MusicArtists MusicPink Napster NapsterMono Spotify Plex"

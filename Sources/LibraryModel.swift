@@ -1,6 +1,15 @@
 import ImageIO
 import SwiftUI
 
+enum LibraryPageSize: String, CaseIterable, Identifiable {
+    static let preferenceKey = "LibraryPageSize"
+    case compact = "30", standard = "60", expanded = "120", all = "all"
+
+    var id: Self { self }
+    var label: String { self == .all ? "All" : rawValue }
+    var batch: Int { Int(rawValue) ?? 120 }
+}
+
 @MainActor
 final class LibraryModel: ObservableObject {
     @Published private(set) var connected = false
@@ -33,6 +42,8 @@ final class LibraryModel: ObservableObject {
     let player = PlayerController()
     private var operation: Task<Void, Never>?
     private var offset = 0
+    private var listingQuery = ""
+    private var refreshAfterAlbum = false
     private let artwork = NSCache<NSString, MusicImage>()
     private var artworkRequests = [ArtworkKey: ArtworkRequest]()
     private var artworkCollection = UUID()
@@ -190,6 +201,8 @@ final class LibraryModel: ObservableObject {
         playingTracks = []
         playingArtwork = nil
         offset = 0
+        listingQuery = ""
+        refreshAfterAlbum = false
         more = false
         player.stop()
         artworkCollection = UUID()
@@ -204,10 +217,17 @@ final class LibraryModel: ObservableObject {
 
     func browse() {
         guard !libraryID.isEmpty else { return }
+        refreshAfterAlbum = false
         selectedArtist = nil
         selectedAlbum = nil
         tracks = []
         perform { try await self.loadEntries(append: false) }
+    }
+
+    func refreshPageSize() {
+        guard !libraryID.isEmpty else { return }
+        if selectedAlbum == nil { perform { try await self.loadEntries(append: false) } }
+        else { refreshAfterAlbum = true }
     }
 
     func loadMore() {
@@ -235,6 +255,10 @@ final class LibraryModel: ObservableObject {
         cancel()
         selectedAlbum = nil
         tracks = []
+        if refreshAfterAlbum {
+            refreshAfterAlbum = false
+            refreshPageSize()
+        }
     }
 
     func play(at index: Int) {
@@ -332,19 +356,33 @@ final class LibraryModel: ObservableObject {
     }
 
     private func loadEntries(append: Bool) async throws {
-        let start = append ? offset : 0
-        let artist = selectedArtist
-        let result = try await request {
-            service.musicEntries(kind: artist == nil ? kind : .albums, query: query, offset: start,
-                                 artist: artist, completion: $0)
+        let setting = UserDefaults.standard.string(forKey: LibraryPageSize.preferenceKey)
+            .flatMap(LibraryPageSize.init(rawValue:)) ?? .standard
+        var start = append ? offset : 0
+        if !append {
+            more = false
+            listingQuery = query
         }
-        try Task.checkCancellation()
-        let existing = append ? entries : []
-        var seen = Set(existing.map(\.id))
-        let unique = result.items.filter { seen.insert($0.id).inserted }
-        entries = existing + unique
-        offset = start + result.rawCount
-        more = result.rawCount >= 60 && !unique.isEmpty
+        let artist = selectedArtist
+        let requestedKind: MusicKind = artist == nil ? kind : .albums
+        let requestedQuery = listingQuery
+        var accumulated = append ? entries : []
+        var seen = Set(accumulated.map(\.id))
+        var hasMore: Bool
+        repeat {
+            let result = try await request {
+                service.musicEntries(kind: requestedKind, query: requestedQuery, offset: start,
+                                     limit: setting.batch, artist: artist, completion: $0)
+            }
+            try Task.checkCancellation()
+            let unique = result.items.filter { seen.insert($0.id).inserted }
+            start += result.rawCount
+            hasMore = !unique.isEmpty && result.hasMore
+            accumulated.append(contentsOf: unique)
+        } while setting == .all && hasMore
+        entries = accumulated
+        offset = start
+        more = hasMore
     }
 
     private func perform(_ action: @escaping @MainActor () async throws -> Void) {

@@ -761,12 +761,20 @@ enum PlexParser {
             && fileName.lowercased().hasPrefix(folder.lowercased() + ".t")
     }
 
-    private static func metadataRows(_ data: Data, sectionID: String?) throws -> [[String: Any]] {
+    private static func metadataContainer(_ data: Data) throws -> [String: Any] {
         guard data.count <= 8 * 1024 * 1024,
               let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let container = root["MediaContainer"] as? [String: Any] else {
             throw PlexServiceError("Plex returned invalid library results.")
         }
+        return container
+    }
+
+    private static func metadataRows(_ data: Data, sectionID: String?) throws -> [[String: Any]] {
+        try metadataRows(metadataContainer(data), sectionID: sectionID)
+    }
+
+    private static func metadataRows(_ container: [String: Any], sectionID: String?) throws -> [[String: Any]] {
         // Section-scoped endpoints sometimes place the identifier only on the container.
         func belongsToSection(_ item: [String: Any]) -> Bool {
             guard let sectionID = sectionID, let supplied = item["librarySectionID"] else { return true }
@@ -1452,8 +1460,10 @@ struct MusicEntry: Identifiable, Hashable {
 }
 
 extension PlexParser {
-    static func musicEntries(_ data: Data, kind: MusicKind, section: String) throws -> (items: [MusicEntry], rawCount: Int) {
-        let rows = try metadataRows(data, sectionID: section)
+    static func musicEntries(_ data: Data, kind: MusicKind, section: String) throws
+        -> (items: [MusicEntry], rawCount: Int, totalSize: Int?) {
+        let container = try metadataContainer(data)
+        let rows = try metadataRows(container, sectionID: section)
         var seen = Set<String>()
         let items = rows.compactMap { row -> MusicEntry? in
             guard row["type"] as? String == kind.plexName,
@@ -1464,7 +1474,7 @@ extension PlexParser {
                               genres: (row["Genre"] as? [[String: Any]] ?? []).prefix(8).compactMap { string($0["tag"], maximum: 80) },
                               artworkPath: musicArtworkPath(row["thumb"] as? String), kind: kind)
         }
-        return (items, rows.count)
+        return (items, rows.count, integer(container["totalSize"]))
     }
 
     static func musicArtworkPath(_ value: String?) -> String? {
@@ -1505,12 +1515,12 @@ extension PlexParser {
 }
 
 extension PlexService {
-    func musicEntries(kind: MusicKind, query: String, offset: Int, artist: MusicEntry? = nil,
-                      completion: @escaping (Result<(items: [MusicEntry], rawCount: Int), Error>) -> Void) {
+    func musicEntries(kind: MusicKind, query: String, offset: Int, limit: Int, artist: MusicEntry? = nil,
+                      completion: @escaping (Result<(items: [MusicEntry], rawCount: Int, hasMore: Bool), Error>) -> Void) {
         inMusicLibrary(phase: "Browsing library", completion: completion) { base, section, token, operation in
             var parameters: [URLQueryItem] = [
                 .init(name: "X-Plex-Container-Start", value: String(offset)),
-                .init(name: "X-Plex-Container-Size", value: "60")
+                .init(name: "X-Plex-Container-Size", value: String(limit))
             ]
             let path: String
             if let artist, artist.kind == .artists, artist.id.allSatisfy({ $0.isASCII && $0.isNumber }) {
@@ -1523,7 +1533,9 @@ extension PlexService {
             }
             let data = try operation.fetch(self.serverRequest(base: base, path: path, query: parameters, token: token),
                                            limit: 8 * 1024 * 1024)
-            return try PlexParser.musicEntries(data, kind: kind, section: section)
+            let page = try PlexParser.musicEntries(data, kind: kind, section: section)
+            return (page.items, page.rawCount,
+                    page.totalSize.map { offset + page.rawCount < $0 } ?? (page.rawCount >= limit))
         }
     }
 
