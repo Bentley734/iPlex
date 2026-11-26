@@ -24,6 +24,7 @@ private struct MusicLibraryScreen: View {
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @State private var showSettings = false
+    @AppStorage(LibraryLayout.preferenceKey) private var libraryLayout = LibraryLayout.grid
     @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @State private var showAppIcons = false
@@ -95,7 +96,7 @@ private struct MusicLibraryScreen: View {
             }
             .padding(.horizontal, 20)
             .musicGlass(theme, radius: 20)
-            .padding(.horizontal, theme == .liquidGlass ? 12 : 0)
+            .padding(.horizontal, theme.usesLiquidGlass ? 12 : 0)
             #if os(tvOS)
             .focusSection()
             #endif
@@ -103,11 +104,11 @@ private struct MusicLibraryScreen: View {
                 connection
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .musicGlass(theme, radius: 22)
-                    .padding(.horizontal, theme == .liquidGlass ? 12 : 0)
+                    .padding(.horizontal, theme.usesLiquidGlass ? 12 : 0)
             } else {
                 browser
                     .musicGlass(theme, radius: 22)
-                    .padding(.horizontal, theme == .liquidGlass ? 12 : 0)
+                    .padding(.horizontal, theme.usesLiquidGlass ? 12 : 0)
                 if let album = library.playingAlbum {
                     HStack(spacing: 8) {
                         Button { showPlayer = true } label: {
@@ -186,7 +187,7 @@ private struct MusicLibraryScreen: View {
                     .textFieldStyle(.plain)
                     .submitLabel(.search)
                     .padding(10)
-                    .background(theme == .liquidGlass ? .clear : Color.primary.opacity(0.08),
+                    .background(theme.usesLiquidGlass ? .clear : Color.primary.opacity(0.08),
                                 in: RoundedRectangle(cornerRadius: 9))
                     .musicGlass(theme, radius: 13)
             } else {
@@ -219,41 +220,46 @@ private struct MusicLibraryScreen: View {
                         Text(artist.title).font(.largeTitle.bold()).padding(.bottom, 16)
                     }
                     if !library.busy && library.entries.isEmpty { Text("No matches in this library.").foregroundStyle(.secondary) }
-                    let trackList = library.kind == .tracks && library.selectedGroup == nil
-                    LazyVGrid(columns: [GridItem(trackList ? .flexible() : artworkColumns, spacing: 20)],
-                              spacing: trackList ? 8 : 20) {
-                        ForEach(library.entries) { entry in
-                            Button { search?.cancel(); library.open(entry) } label: {
-                                let layout = trackList ? AnyLayout(HStackLayout(spacing: 12)) :
-                                    AnyLayout(VStackLayout(alignment: .leading, spacing: 7))
-                                layout {
-                                    MusicArtwork(item: entry, library: library)
-                                        .aspectRatio(1, contentMode: .fit)
-                                        .frame(width: trackList ? 46 : nil, height: trackList ? 46 : nil)
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(entry.title).font(.headline).lineLimit(1)
-                                        if !entry.artist.isEmpty {
-                                            Text(entry.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                    if libraryLayout.applies(to: library.kind, inGroup: library.selectedGroup != nil) {
+                        LibraryAlternateLayout(library: library, layout: libraryLayout)
+                    } else {
+                        let trackList = library.kind == .tracks && library.selectedGroup == nil
+                        LazyVGrid(columns: [GridItem(trackList ? .flexible() : artworkColumns, spacing: 20)],
+                                  spacing: trackList ? 8 : 20) {
+                            ForEach(library.entries) { entry in
+                                Button { search?.cancel(); library.open(entry) } label: {
+                                    let layout = trackList ? AnyLayout(HStackLayout(spacing: 12)) :
+                                        AnyLayout(VStackLayout(alignment: .leading, spacing: 7))
+                                    layout {
+                                        MusicArtwork(item: entry, library: library)
+                                            .aspectRatio(1, contentMode: .fit)
+                                            .frame(width: trackList ? 46 : nil, height: trackList ? 46 : nil)
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            Text(entry.title).font(.headline).lineLimit(1)
+                                            if !entry.artist.isEmpty {
+                                                Text(entry.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                            }
                                         }
-                                    }
-                                }.frame(maxWidth: .infinity, alignment: .leading)
+                                    }.frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                                #if os(tvOS)
+                                .buttonStyle(.card)
+                                #else
+                                .buttonStyle(.plain)
+                                #endif
+                                .contextMenu {
+                                    if !entry.kind.isGroup { LibraryQueueActions(library: library, entry: entry) }
+                                    PlexPinButton(library: library, entry: entry)
+                                }
                             }
-                            #if os(tvOS)
-                            .buttonStyle(.card)
-                            #else
-                            .buttonStyle(.plain)
-                            #endif
-                            .contextMenu {
-                                if !entry.kind.isGroup { LibraryQueueActions(library: library, entry: entry) }
-                                PlexPinButton(library: library, entry: entry)
+                            if library.more && !library.busy && library.message == nil {
+                                Color.clear.frame(height: 1).accessibilityHidden(true)
+                                    .id(library.entries.count)
+                                    .onAppear { library.loadMore() }
                             }
-                        }
-                        if library.more && !library.busy && library.message == nil {
-                            Color.clear.frame(height: 1).accessibilityHidden(true)
-                                .id(library.entries.count)
-                                .onAppear { library.loadMore() }
                         }
                     }
+
                 }
                 if library.busy { ProgressView().padding() }
                 if library.more && !library.busy && library.selectedDetail == nil && library.message != nil {

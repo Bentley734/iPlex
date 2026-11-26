@@ -58,6 +58,9 @@
           <h2 id="pinned-heading">Pinned</h2><div id="pinned-items"></div>
         </section>
         <section id="plexify-feature" aria-label="From your library" hidden></section>
+        <div id="library-track-headings" class="track-columns" aria-hidden="true" hidden>
+          <span>#</span><span>Track</span><span>Artist</span><span>Album</span><span>Time</span>
+        </div>
         <div id="grid" class="grid"></div>
         <div id="page-end" aria-hidden="true" hidden></div>
         <button id="retry-page" hidden>Retry</button>
@@ -191,6 +194,8 @@
       <select id="theme">
         <option value="copper">Copper Groove</option>
         <option value="classic">Classic iPod</option>
+        <option value="classicDark">Classic iPod Dark</option>
+        <option value="classicOLED">Classic iPod OLED</option>
         <option value="video">iPod Video</option>
         <option value="plexify">Plexify</option>
         <option value="liquidGlass">Liquid Glass</option>
@@ -278,6 +283,13 @@
         <button type="button" value="plex" aria-pressed="false"><img src="plex.ico" alt=""><span>Plex</span></button>
       </div>
     </section>
+    <label class="theme-choice">Library Layout
+      <select id="library-layout">
+        <option value="grid">Artwork Grid</option>
+        <option value="albumTracks">Albums with Tracks</option>
+        <option value="trackList">Track List</option>
+      </select>
+    </label>
     <label class="theme-choice">Library Artwork Size
       <select id="library-artwork-size">
         <option value="small">Small</option>

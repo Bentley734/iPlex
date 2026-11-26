@@ -83,7 +83,8 @@ window.clickWheel = (() => {
 
   function updateTheme(choice) {
     theme = choice;
-    style = preference === 'automatic' ? (['classic', 'video'].includes(theme) ? theme : '') : preference;
+    const automaticStyles = {classic:'classic', classicDark:'classicBlack', classicOLED:'classicBlack', video:'video'};
+    style = preference === 'automatic' ? (automaticStyles[theme] || '') : preference;
     root.dataset.miniPlayer = style;
     byId('mini-queue').hidden = style !== 'queue';
     byId('queue-close').hidden = style !== 'queue';

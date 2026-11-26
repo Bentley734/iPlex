@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum MusicTheme: String, CaseIterable, Identifiable {
-    case copper, classic, video, plexify, liquidGlass
+    case copper, classic, classicDark, classicOLED, video, plexify, liquidGlass
     #if os(macOS)
     case graphite
     #endif
@@ -11,6 +11,8 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         switch self {
         case .copper: "Copper Groove"
         case .classic: "Classic iPod"
+        case .classicDark: "Classic iPod Dark"
+        case .classicOLED: "Classic iPod OLED"
         case .video: "iPod Video"
         case .plexify: "Plexify"
         case .liquidGlass: "Liquid Glass"
@@ -20,10 +22,15 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         }
     }
     var scheme: ColorScheme { self == .classic ? .light : .dark }
+    var usesLiquidGlass: Bool { self == .liquidGlass || self == .classicDark || self == .classicOLED }
+    var keepsBlackCanvas: Bool { self == .classicOLED }
+
     var accent: Color {
         switch self {
         case .copper: Color(red: 1, green: 0.64, blue: 0.44)
         case .classic: Color(red: 0.04, green: 0.34, blue: 0.65)
+        case .classicDark: Color(red: 0.72, green: 0.82, blue: 0.95)
+        case .classicOLED: Color(red: 0.80, green: 0.87, blue: 0.96)
         case .video: Color(red: 0.56, green: 0.80, blue: 1)
         case .plexify: Color(red: 0.48, green: 0.90, blue: 0.88)
         case .liquidGlass: Color(red: 0.67, green: 0.89, blue: 1)
@@ -36,6 +43,8 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         switch self {
         case .copper: Color(red: 0.104, green: 0.102, blue: 0.119)
         case .classic: Color(red: 0.84, green: 0.89, blue: 0.94)
+        case .classicDark: Color(red: 0.12, green: 0.13, blue: 0.15)
+        case .classicOLED: .black
         case .video: Color(red: 0.09, green: 0.12, blue: 0.18)
         case .plexify: Color(red: 0.075, green: 0.125, blue: 0.155)
         case .liquidGlass: Color(red: 0.12, green: 0.17, blue: 0.28)
@@ -45,7 +54,9 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         }
     }
     @ViewBuilder var backdrop: some View {
-        if self == .liquidGlass {
+        if keepsBlackCanvas {
+            Color.black
+        } else if self == .liquidGlass {
             ZStack {
                 LinearGradient(colors: [surface, Color(red: 0.04, green: 0.07, blue: 0.14)],
                                startPoint: .topLeading, endPoint: .bottomTrailing)
@@ -64,12 +75,12 @@ enum MusicTheme: String, CaseIterable, Identifiable {
     }
 
     func surface(using palette: ArtworkPalette?) -> Color {
-        palette?.wash(in: scheme) ?? surface
+        keepsBlackCanvas ? surface : (palette?.wash(in: scheme) ?? surface)
     }
 
     func backdrop(using palette: ArtworkPalette?) -> some View {
         backdrop.overlay {
-            if let palette {
+            if let palette, !keepsBlackCanvas {
                 ArtworkColorWash(palette: palette, scheme: scheme)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
@@ -82,6 +93,8 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         switch self {
         case .copper: end = Color(red: 0.075, green: 0.073, blue: 0.085)
         case .classic: end = Color(red: 0.96, green: 0.98, blue: 1)
+        case .classicDark: end = Color(red: 0.045, green: 0.05, blue: 0.065)
+        case .classicOLED: end = .black
         case .video: end = Color(red: 0.025, green: 0.037, blue: 0.066)
         case .plexify: end = Color(red: 0.035, green: 0.057, blue: 0.078)
         case .liquidGlass: end = surface
@@ -144,7 +157,9 @@ private struct MusicGlassSurface: ViewModifier {
         let shape = RoundedRectangle(cornerRadius: radius)
         content.background {
             ZStack {
-                if #available(macOS 26, iOS 26, tvOS 26, *) {
+                if theme.keepsBlackCanvas {
+                    shape.fill(.ultraThinMaterial).opacity(0.12 + density * 0.25)
+                } else if #available(macOS 26, iOS 26, tvOS 26, *) {
                     Color.clear
                         .glassEffect(.regular.tint(theme.accent.opacity(0.08 + density * 0.15)).interactive(interactive), in: shape)
                         .opacity(0.30 + density * 0.67)
@@ -161,7 +176,7 @@ private struct MusicGlassSurface: ViewModifier {
 
 extension View {
     @ViewBuilder func musicGlass(_ theme: MusicTheme, radius: CGFloat, interactive: Bool = false) -> some View {
-        if theme == .liquidGlass {
+        if theme.usesLiquidGlass {
             modifier(MusicGlassSurface(theme: theme, radius: radius, interactive: interactive))
         } else {
             self
@@ -169,7 +184,7 @@ extension View {
     }
 
     @ViewBuilder func musicSheet(_ theme: MusicTheme) -> some View {
-        if theme == .liquidGlass {
+        if theme.usesLiquidGlass {
             musicGlass(theme, radius: 24)
                 .presentationBackground(.clear)
         } else {
@@ -197,8 +212,31 @@ enum MiniPlayerStyle: String, CaseIterable, Identifiable {
     func resolve(for theme: MusicTheme) -> Self? {
         guard self == .automatic else { return self }
         if theme == .classic { return .classic }
+        if theme == .classicDark || theme == .classicOLED { return .classicBlack }
         if theme == .video { return .video }
         return nil
+    }
+}
+
+enum LibraryLayout: String, CaseIterable, Identifiable {
+    static let preferenceKey = "LibraryLayout"
+    case grid, albumTracks, trackList
+
+    var id: Self { self }
+    var label: String {
+        switch self {
+        case .grid: "Artwork Grid"
+        case .albumTracks: "Albums with Tracks"
+        case .trackList: "Track List"
+        }
+    }
+
+    func applies(to kind: MusicKind, inGroup: Bool) -> Bool {
+        switch self {
+        case .grid: false
+        case .albumTracks: kind == .albums || inGroup
+        case .trackList: true
+        }
     }
 }
 
@@ -229,6 +267,7 @@ struct MusicSettings: View {
     @AppStorage(HeaderWordmark.preferenceKey) private var headerWordmark = HeaderWordmark.iplex
     @AppStorage(HeaderMarkSize.preferenceKey) private var headerMarkSize = HeaderMarkSize.medium
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
+    @AppStorage(LibraryLayout.preferenceKey) private var libraryLayout = LibraryLayout.grid
     @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
     @AppStorage(LibraryPageSize.preferenceKey) private var pageSize = LibraryPageSize.standard
     @Environment(\.dismiss) private var dismiss
@@ -258,11 +297,11 @@ struct MusicSettings: View {
                             Text(option.label).tag(option)
                         }
                     }
-                    if theme == .liquidGlass { transparencyControl }
+                    if theme.usesLiquidGlass { transparencyControl }
                     Toggle("Artwork Colors", isOn: $artworkColors)
                         .help("Match the interface to the artwork for the current track.")
                     Toggle("Animate Artwork Colors", isOn: $animateArtworkColors)
-                        .disabled(!artworkColors)
+                        .disabled(!artworkColors || theme.keepsBlackCanvas)
                         .help("Let the album colors drift slowly across the background.")
                     Picker("Mini-player", selection: $miniPlayerStyle) {
                         ForEach(MiniPlayerStyle.allCases) { style in
@@ -296,6 +335,11 @@ struct MusicSettings: View {
                         #endif
                     }
                     Divider()
+                    Picker("Library Layout", selection: $libraryLayout) {
+                        ForEach(LibraryLayout.allCases) { layout in
+                            Text(layout.label).tag(layout)
+                        }
+                    }
                     Picker("Library Artwork Size", selection: $libraryArtworkSize) {
                         ForEach(LibraryArtworkSize.allCases) { size in
                             Text(size.label).tag(size)
@@ -376,7 +420,7 @@ struct MusicSettings: View {
         #endif
         .musicSheet(theme)
         .background {
-            if theme != .liquidGlass { theme.backdrop(using: palette) }
+            if !theme.usesLiquidGlass { theme.backdrop(using: palette) }
         }
         .tint(theme.accent(using: palette))
         .preferredColorScheme(theme.scheme)

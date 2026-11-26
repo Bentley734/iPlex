@@ -46,7 +46,7 @@ struct NowPlayingView: View {
                 header
                     .padding(.horizontal, min(60, geometry.size.width * 0.045))
                     .musicGlass(theme, radius: 20)
-                    .padding(theme == .liquidGlass ? 8 : 0)
+                    .padding(theme.usesLiquidGlass ? 8 : 0)
                 HStack(spacing: 0) {
                     player
                     if showingQueue {
@@ -61,8 +61,10 @@ struct NowPlayingView: View {
         .background {
             theme.backdrop(using: palette)
                 .overlay {
-                    RadialGradient(colors: [accent.opacity(0.17), .clear], center: .topLeading,
-                                   startRadius: 0, endRadius: 950)
+                    if !theme.keepsBlackCanvas {
+                        RadialGradient(colors: [accent.opacity(0.17), .clear], center: .topLeading,
+                                       startRadius: 0, endRadius: 950)
+                    }
                 }
                 .ignoresSafeArea()
         }
@@ -138,7 +140,7 @@ struct NowPlayingView: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel("Enlarge album artwork")
                         playback(album, compact: compact)
-                            .padding(theme == .liquidGlass ? (compact ? 8 : 16) : 0)
+                            .padding(theme.usesLiquidGlass ? (compact ? 8 : 16) : 0)
                             .musicGlass(theme, radius: 22)
                             .frame(maxWidth: 510, alignment: .leading)
                             .frame(maxWidth: .infinity)
@@ -176,12 +178,12 @@ struct NowPlayingView: View {
             }
         }
         .frame(maxHeight: .infinity)
-        .background(theme == .liquidGlass ? .clear : theme.surface(using: palette))
+        .background(theme.usesLiquidGlass ? .clear : theme.surface(using: palette))
         .overlay(alignment: .leading) {
-            if theme != .liquidGlass { Divider().opacity(0.5) }
+            if !theme.usesLiquidGlass { Divider().opacity(0.5) }
         }
         .musicGlass(theme, radius: 20)
-        .padding(theme == .liquidGlass ? 8 : 0)
+        .padding(theme.usesLiquidGlass ? 8 : 0)
         #if os(tvOS)
         .focusSection()
         #endif
@@ -222,7 +224,7 @@ struct NowPlayingView: View {
                             .font(.headline)
                             .foregroundStyle(.white)
                             .padding(13)
-                            .background(.black.opacity(theme == .liquidGlass ? 0.25 : 0.72), in: Circle())
+                            .background(.black.opacity(theme.usesLiquidGlass ? 0.25 : 0.72), in: Circle())
                             .musicGlass(theme, radius: 24, interactive: true)
                             .padding(16)
                     }
@@ -407,10 +409,10 @@ struct NowPlayingView: View {
         }
         .padding(compact ? 4 : 9)
         .foregroundStyle(current ? accent : .primary)
-        .background(current ? accent.opacity(theme == .liquidGlass ? 0.25 : 0.16) : Color.primary.opacity(0.055),
+        .background(current ? accent.opacity(theme.usesLiquidGlass ? 0.25 : 0.16) : Color.primary.opacity(0.055),
                     in: RoundedRectangle(cornerRadius: 10))
         .overlay {
-            if theme == .liquidGlass {
+            if theme.usesLiquidGlass {
                 RoundedRectangle(cornerRadius: 10).strokeBorder(.white.opacity(current ? 0.22 : 0.12))
                     .allowsHitTesting(false)
             }

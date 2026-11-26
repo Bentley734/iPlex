@@ -516,6 +516,13 @@ namespace MusicRoom
                     { "year", Num(row, "year") },
                     { "genre", Rows(Get(row, "Genre")).Select(genre => Str(genre, "tag")).FirstOrDefault() ?? "" }
                 };
+                if (kind == "track")
+                {
+                    item["album"] = Str(row, "parentTitle");
+                    item["durationSeconds"] = Num(row, "duration") / 1000.0;
+                    item["number"] = Num(row, "index");
+                    item["disc"] = Num(row, "parentIndex");
+                }
                 if (saveSnapshot) snapshot.Add(new Dictionary<string, object>(item) { { "thumb", thumb } });
                 item["artwork"] = artwork;
                 results.Add(item);
@@ -692,7 +699,7 @@ namespace MusicRoom
             {".aif","audio/aiff"}, {".aiff","audio/aiff"}, {".caf","audio/x-caf"}
         };
 
-        async Task Album(Dictionary<string, object> request, long id, CancellationToken token, bool enqueue = false)
+        async Task Album(Dictionary<string, object> request, long id, CancellationToken token, bool enqueue = false, bool preview = false)
         {
             string key = Str(request, "album");
             Server server;
@@ -716,14 +723,17 @@ namespace MusicRoom
                 Send("musicEnqueued", new { id, context = item.Title, tracks = QueueEntries(tracks, key, false) });
                 return;
             }
-            albumID = key;
-            albumTitle = item.Title;
-            albumTracks = tracks;
+            if (!preview)
+            {
+                albumID = key;
+                albumTitle = item.Title;
+                albumTracks = tracks;
+            }
             long highest = tracks.Count == 0 ? 0 : tracks.Max(track => track.ratingCount);
             var popular = item.Kind == "album" && highest > 0 ? new HashSet<MediaTrack>(
                 tracks.OrderByDescending(track => track.ratingCount).Take(Math.Min(3, Math.Max(1, tracks.Count / 4)))
                     .Where(track => track.ratingCount >= highest * 0.25)) : new HashSet<MediaTrack>();
-            Send("musicAlbum", new { id, tracks = tracks.Select(track => new
+            Send(preview ? "musicAlbumPreview" : "musicAlbum", new { id, tracks = tracks.Select(track => new
                 { track.number, track.title, track.durationSeconds, popular = popular.Contains(track) }).ToArray() });
         }
 
@@ -861,6 +871,25 @@ namespace MusicRoom
             }
         }
 
+        readonly SemaphoreSlim albumPreviewSlots = new SemaphoreSlim(3);
+
+        async Task PreviewAlbum(Dictionary<string, object> body, long id)
+        {
+            var token = shutdown.Token;
+            int generation = musicGeneration;
+            await albumPreviewSlots.WaitAsync(token);
+            try
+            {
+                if (generation == musicGeneration) await Album(body, id, token, preview: true);
+            }
+            catch (Exception)
+            {
+                if (generation == musicGeneration && !token.IsCancellationRequested)
+                    Send("musicAlbumPreview", new { id, error = true });
+            }
+            finally { albumPreviewSlots.Release(); }
+        }
+
         public async Task Handle(Dictionary<string, object> body)
         {
             string action = Str(body, "action");
@@ -901,6 +930,7 @@ namespace MusicRoom
                 return;
             }
             if (action == "lyrics") { await LoadLyrics(Str(body, "handle"), id); return; }
+            if (action == "albumPreview") { await PreviewAlbum(body, id); return; }
             if (action == "enqueue")
             {
                 try { await Album(body, id, shutdown.Token, true); }

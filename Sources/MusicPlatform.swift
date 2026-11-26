@@ -372,3 +372,214 @@ struct PlexArtwork<Placeholder: View>: View {
         .onDisappear { loaded = nil }
     }
 }
+
+struct LibraryAlternateLayout: View {
+    @ObservedObject var library: LibraryModel
+    let layout: LibraryLayout
+
+    private var listsTracks: Bool { library.kind == .tracks && library.selectedGroup == nil }
+
+    var body: some View {
+        LazyVStack(alignment: .leading, spacing: layout == .albumTracks ? 16 : 2) {
+            if layout == .trackList && listsTracks {
+                LibraryTrackColumns(number: "#", title: "Track", artist: "Artist", album: "Album", duration: "Time", headings: true)
+                    .padding(.horizontal, 8)
+                    .accessibilityAddTraits(.isHeader)
+            }
+            ForEach(Array(library.entries.enumerated()), id: \.element.id) { index, entry in
+                if layout == .albumTracks {
+                    LibraryAlbumWithTracks(library: library, entry: entry)
+                } else {
+                    Button {
+                        if entry.kind == .tracks { library.playLibraryTrack(entry) }
+                        else { library.open(entry) }
+                    } label: {
+                        if entry.kind == .tracks {
+                            let details = entry.trackDetails
+                            let number = details?.number.map { index in
+                                if let disc = details?.disc, disc > 1 { return "\(disc).\(index)" }
+                                return String(index)
+                            }
+                            LibraryTrackColumns(
+                                number: number ?? "–", title: entry.title, artist: entry.artist,
+                                album: details?.album ?? "", duration: LibraryTrackColumns.clock(details?.duration)
+                            )
+                        } else {
+                            HStack {
+                                Text(entry.title).fontWeight(.medium)
+                                Spacer()
+                                Text(entry.artist).foregroundStyle(.secondary)
+                            }.lineLimit(1)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 8).padding(.vertical, 5)
+                    .background(index.isMultiple(of: 2) ? Color.primary.opacity(0.045) : Color.clear, in: .rect(cornerRadius: 5))
+                    .disabled(library.reconnecting)
+                    .contextMenu {
+                        if !entry.kind.isGroup { LibraryQueueActions(library: library, entry: entry) }
+                        PlexPinButton(library: library, entry: entry)
+                    }
+                }
+            }
+            if library.more && !library.busy && library.message == nil {
+                Color.clear.frame(height: 1).accessibilityHidden(true)
+                    .id(library.entries.count)
+                    .onAppear { library.loadMore() }
+            }
+        }
+    }
+}
+
+private struct LibraryAlbumWithTracks: View {
+    @ObservedObject var library: LibraryModel
+    let entry: MusicEntry
+    @AppStorage("MusicTheme") private var theme = MusicTheme.copper
+    @AppStorage(LibraryArtworkSize.preferenceKey) private var artworkSize = LibraryArtworkSize.medium
+    @State private var tracks: [LiveTrack] = []
+    @State private var failed = false
+    @State private var attempt = 0
+    private var previewKey: String { [library.serverID, library.libraryID, entry.id, String(library.reconnecting), String(attempt)].joined(separator: ":") }
+
+    var body: some View {
+        Group {
+            #if os(iOS)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 18) {
+                    albumCover
+                    trackRows.frame(minWidth: 230)
+                }
+                VStack(alignment: .leading, spacing: 12) {
+                    albumCover
+                    trackRows
+                }
+            }
+            #else
+            HStack(alignment: .top, spacing: 18) {
+                albumCover
+                trackRows
+            }
+            #endif
+        }
+        .modifier(LibraryAlbumCard(theme: theme))
+        .task(id: previewKey) { await load() }
+    }
+
+    private var albumCover: some View {
+        let width = (118 * artworkSize.scale).rounded()
+        return Button { library.open(entry) } label: {
+            VStack(alignment: .leading, spacing: 5) {
+                PlexArtwork(item: entry, library: library) {
+                    Image(systemName: "opticaldisc").font(.title2).foregroundStyle(.secondary)
+                }
+                .frame(width: width, height: width)
+                .background(.primary.opacity(0.08))
+                .clipShape(.rect(cornerRadius: 9))
+                Text(entry.title).font(.headline)
+                Text(entry.artist).font(.caption).foregroundStyle(.secondary)
+            }
+            .lineLimit(2)
+            .frame(width: width, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .disabled(library.reconnecting)
+        .contextMenu {
+            LibraryQueueActions(library: library, entry: entry)
+            PlexPinButton(library: library, entry: entry)
+        }
+    }
+
+    private var trackRows: some View {
+        VStack(alignment: .leading, spacing: 1) {
+            if library.reconnecting {
+                Text("Reconnecting to Plex…").foregroundStyle(.secondary)
+            } else if failed {
+                Button("Retry Tracks", systemImage: "arrow.clockwise") { attempt += 1 }
+            } else if tracks.isEmpty {
+                ProgressView("Loading tracks…")
+            } else {
+                ForEach(Array(tracks.enumerated()), id: \.element.id) { index, track in
+                    Button { library.play(entry, albumTracks: tracks, at: index) } label: {
+                        LibraryTrackColumns(number: String(track.number), title: track.title, artist: track.artist ?? entry.artist,
+                                            album: nil, duration: LibraryTrackColumns.clock(track.duration))
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 6).padding(.vertical, 4)
+                    .background(index.isMultiple(of: 2) ? Color.primary.opacity(0.045) : Color.clear, in: .rect(cornerRadius: 5))
+                    .contextMenu { LibraryQueueActions(library: library, entry: entry, track: track) }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func load() async {
+        guard !library.reconnecting else { return }
+        failed = false
+        do { tracks = try await library.previewAlbumTracks(entry) }
+        catch {
+            if !Task.isCancelled && !(error is CancellationError) { failed = true }
+        }
+    }
+}
+
+private struct LibraryAlbumCard: ViewModifier {
+    let theme: MusicTheme
+
+    func body(content: Content) -> some View {
+        content.padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.primary.opacity(0.035), in: .rect(cornerRadius: 12))
+            .musicGlass(theme, radius: 12)
+    }
+}
+
+private struct LibraryTrackColumns: View {
+    let number: String
+    let title: String
+    let artist: String
+    let album: String?
+    let duration: String
+    var headings = false
+    #if os(iOS)
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    #endif
+
+    var body: some View {
+        HStack(spacing: 9) {
+            Text(number).monospacedDigit().frame(width: 35, alignment: .trailing)
+            #if os(iOS)
+            if horizontalSizeClass == .compact {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).fontWeight(.medium)
+                    if !headings && !artist.isEmpty {
+                        Text([artist, album ?? ""].filter { !$0.isEmpty }.joined(separator: " · "))
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                }.frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                textColumns
+            }
+            #else
+            textColumns
+            #endif
+            Text(duration).monospacedDigit().frame(width: 49, alignment: .trailing)
+        }
+        .lineLimit(1)
+        .font(headings ? .caption.weight(.semibold) : .callout)
+        .foregroundStyle(headings ? .secondary : .primary)
+        .contentShape(Rectangle())
+    }
+
+    @ViewBuilder private var textColumns: some View {
+        Text(title).fontWeight(.medium).frame(maxWidth: .infinity, alignment: .leading)
+        Text(artist).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading)
+        if let album { Text(album).foregroundStyle(.secondary).frame(maxWidth: .infinity, alignment: .leading) }
+    }
+
+    static func clock(_ duration: Double?) -> String {
+        guard let duration, duration.isFinite, duration > 0, duration < Double(Int32.max) else { return "–" }
+        let seconds = Int(duration.rounded(.down))
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
+    }
+}

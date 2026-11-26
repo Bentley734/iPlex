@@ -402,6 +402,29 @@ final class LibraryModel: ObservableObject {
         }
     }
 
+    func previewAlbumTracks(_ entry: MusicEntry) async throws -> [LiveTrack] {
+        guard !reconnecting, entry.kind == .albums else { return [] }
+        let collection = artworkCollection
+        let result = try await request { service.musicTracks(entry: entry, inBackground: true, completion: $0) }
+        try Task.checkCancellation()
+        guard collection == artworkCollection else { throw CancellationError() }
+        return result
+    }
+
+    func play(_ entry: MusicEntry, albumTracks: [LiveTrack], at index: Int) {
+        guard !reconnecting, albumTracks.indices.contains(index) else { return }
+        startQueue(albumTracks, entry: entry, index: index, autoplay: true)
+    }
+
+    func playLibraryTrack(_ entry: MusicEntry) {
+        guard !reconnecting, entry.kind == .tracks else { return }
+        perform {
+            let result = try await self.request { self.service.musicTracks(entry: entry, completion: $0) }
+            try Task.checkCancellation()
+            self.play(entry, albumTracks: result, at: 0)
+        }
+    }
+
     func play(at index: Int) {
         guard let album = selectedDetail, tracks.indices.contains(index) else { return }
         startQueue(tracks, entry: album, index: index, autoplay: true)

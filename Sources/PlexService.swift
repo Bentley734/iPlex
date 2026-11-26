@@ -1512,6 +1512,14 @@ struct MusicEntry: Identifiable, Hashable, Codable {
     let genres: [String]
     let artworkPath: String?
     let kind: MusicKind
+    var trackDetails: TrackDetails? = nil
+
+    struct TrackDetails: Hashable, Codable {
+        let album: String?
+        let duration: Double?
+        let number: Int?
+        let disc: Int?
+    }
 }
 
 extension PlexParser {
@@ -1542,7 +1550,11 @@ extension PlexParser {
             return MusicEntry(id: id, title: title, artist: string(artist, maximum: 300) ?? "",
                               year: integer(row["year"]),
                               genres: (row["Genre"] as? [[String: Any]] ?? []).prefix(8).compactMap { string($0["tag"], maximum: 80) },
-                              artworkPath: artwork, kind: kind)
+                              artworkPath: artwork, kind: kind,
+                              trackDetails: kind == .tracks ? .init(
+                                album: string(row["parentTitle"], maximum: 300),
+                                duration: integer(row["duration"]).flatMap { $0 > 0 ? Double($0) / 1000 : nil },
+                                number: integer(row["index"]), disc: integer(row["parentIndex"])) : nil)
         }
         return (items, rows.count, integer(container["totalSize"]))
     }
@@ -1663,12 +1675,12 @@ extension PlexService {
         }
     }
 
-    func musicTracks(entry: MusicEntry, completion: @escaping (Result<[LiveTrack], Error>) -> Void) {
+    func musicTracks(entry: MusicEntry, inBackground: Bool = false, completion: @escaping (Result<[LiveTrack], Error>) -> Void) {
         guard !entry.kind.isGroup, !entry.id.isEmpty, entry.id.allSatisfy({ $0.isASCII && $0.isNumber }) else {
             completion(.failure(PlexServiceError("The library item identifier is invalid.")))
             return
         }
-        inMusicLibrary(phase: "Loading tracks", completion: completion) { base, section, token, operation in
+        inMusicLibrary(phase: "Loading tracks", inBackground: inBackground, completion: completion) { base, section, token, operation in
             let playlist = entry.kind == .playlists
             let path = playlist ? "/playlists/\(entry.id)/items" :
                 "/library/metadata/\(entry.id)" + (entry.kind == .albums ? "/children" : "")
@@ -1821,7 +1833,14 @@ extension PlexService {
         return queue
     }()
 
-    private func inMusicLibrary<T>(phase: String, completion: @escaping (Result<T, Error>) -> Void,
+    private static let albumPreviewQueue: OperationQueue = {
+        let queue = OperationQueue()
+        queue.maxConcurrentOperationCount = 3
+        queue.qualityOfService = .utility
+        return queue
+    }()
+
+    private func inMusicLibrary<T>(phase: String, inBackground: Bool = false, completion: @escaping (Result<T, Error>) -> Void,
                                    _ body: @escaping (URL, String, String, PlexRequestOperation) throws -> T) {
         do {
             let record = try selectedServerAccess()
@@ -1829,9 +1848,17 @@ extension PlexService {
             let section = selectedLibraryID
             lock.unlock()
             guard let section else { throw PlexServiceError("Choose a Plex music library first.") }
-            run(phase: "browsing", message: phase + "…", perform: { operation in
+            let perform: (PlexRequestOperation) throws -> T = { operation in
                 try self.withConnection(record: record) { base in try body(base, section, record.token, operation) }
-            }, completion: completion)
+            }
+            if inBackground {
+                Self.albumPreviewQueue.addOperation {
+                    let result = Result { try perform(PlexRequestOperation()) }
+                    DispatchQueue.main.async { completion(result) }
+                }
+            } else {
+                run(phase: "browsing", message: phase + "…", perform: perform, completion: completion)
+            }
         } catch {
             completion(.failure(error))
         }

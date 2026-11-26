@@ -13,6 +13,9 @@
   let paging = false;
   let pageFailed = false;
   let pageSize = '60';
+  let libraryLayout = 'grid';
+  let albumPreviewSequence = 0;
+  const albumPreviews = new Map();
   let listingQuery = '';
   let refreshAfterAlbum = false;
   const listingIDs = new Set();
@@ -200,7 +203,7 @@
     menu.append(summary, commands);
     return menu;
   }
-  function libraryQueueActions(item, track) {
+  function libraryQueueActions(item, track, trackTitle) {
     const commands = [];
     if (track !== undefined || item.kind !== 'artist') {
       commands.push(['Play Next', () => enqueueItem(item, true, track)],
@@ -210,7 +213,7 @@
       commands.push([pins.some(pin => pin.id === item.id) ? 'Unpin' : 'Pin',
         () => host({action:'togglePin', item:item.id})]);
     }
-    return actions('Actions for ' + (track === undefined ? item.title : tracks[track]?.title || 'track'), commands);
+    return actions('Actions for ' + (track === undefined ? item.title : trackTitle || tracks[track]?.title || 'track'), commands);
   }
   function renderPins() {
     get('pinned-shelf').hidden = !pins.length || Boolean(album || group || get('search').value.trim());
@@ -247,21 +250,98 @@
       reply.tracks.forEach(player.releaseTrack);
       return;
     }
-    const {item, playNext} = pendingEnqueue;
+    const {item, playNext, startIndex} = pendingEnqueue;
     pendingEnqueue = null;
-    if (!nowQueue.length || playbackState.status === 'finished') {
+    if (startIndex !== undefined || !nowQueue.length || playbackState.status === 'finished') {
       nowQueue.forEach(player.releaseTrack);
       playing = item;
       const revision = player.reset(reply.context, 'plex');
-      player.queue({...reply, origin:'plex'}, 0, revision, null, playNext);
+      player.queue({...reply, origin:'plex'}, startIndex ?? 0, revision, null, startIndex !== undefined || playNext);
     } else player.enqueue(reply.tracks, playNext);
-    status(playNext ? 'Added to Play Next.' : 'Added to the queue.');
+    status(startIndex !== undefined ? '' : playNext ? 'Added to Play Next.' : 'Added to the queue.');
   };
   window.musicEnqueueError = reply => {
     if (reply.id !== pendingEnqueue?.id) return;
     pendingEnqueue = null;
     status(reply.message);
   };
+  const albumPreviewObserver = new IntersectionObserver(records => {
+    for (const record of records) {
+      if (!record.isIntersecting) continue;
+      const target = record.target;
+      albumPreviewObserver.unobserve(target);
+      if (target.isConnected && !launchPreview && !replacingPreview) loadInlineAlbum(target);
+    }
+  }, {root:get('scroll')});
+
+  function playLibraryRow(item, startIndex = 0) {
+    if (launchPreview || replacingPreview || pendingEnqueue || pendingAlbum) return;
+    player.prepareAudio();
+    const id = --enqueueSequence;
+    pendingEnqueue = {id, item, startIndex};
+    host({action:'enqueue', id, album:item.id});
+  }
+  function loadInlineAlbum(target) {
+    const id = ++albumPreviewSequence;
+    albumPreviews.set(id, target);
+    target.replaceChildren(node('p','Loading tracks…'));
+    host({action:'albumPreview', id, album:target.album.id});
+  }
+  window.musicAlbumPreview = reply => {
+    const target = albumPreviews.get(reply.id);
+    albumPreviews.delete(reply.id);
+    if (!target?.isConnected) return;
+    if (reply.error || !reply.tracks?.length) {
+      target.replaceChildren(button('Retry Tracks', () => loadInlineAlbum(target)));
+      return;
+    }
+    const item = target.album;
+    target.replaceChildren(...reply.tracks.map((track,index) => {
+      const row = trackColumns(track, () => playLibraryRow(item,index), true, item.artist);
+      const cell = node('div','','compact-track');
+      cell.append(row, libraryQueueActions(item,index,track.title));
+      return cell;
+    }));
+  };
+  function trackColumns(track, action, grouped = false, artist = track.artist || '') {
+    const row = button('', action, 'track-columns' + (grouped ? ' grouped-track' : ''));
+    const number = track.number > 0 ? (track.disc > 1 ? track.disc + '.' : '') + track.number : '–';
+    const title = node('strong', track.title);
+    if (track.popular) {
+      const badge = node('span',' 🔥','popular-track');
+      badge.setAttribute('aria-label','Popular track');
+      title.append(badge);
+    }
+    row.append(node('span',number,'track-index'), title, node('span',artist,'track-artist'));
+    if (!grouped) row.append(node('span',track.album || '','track-album'));
+    row.append(node('span',track.durationSeconds > 0 ? time(track.durationSeconds) : '–','track-time'));
+    return row;
+  }
+  function alternateTile(item, mode) {
+    if (mode === 'albumTracks') {
+      const card = node('article','','album-with-tracks');
+      const list = node('div','','inline-album-tracks');
+      list.album = item;
+      list.append(node('p', launchPreview ? 'Reconnecting to Plex…' : 'Loading tracks…'));
+      card.append(libraryTile(item), list);
+      if (!launchPreview && !replacingPreview) albumPreviewObserver.observe(list);
+      return card;
+    }
+    const cell = node('div','','compact-track');
+    const row = item.kind === 'track'
+      ? trackColumns(item, () => playLibraryRow(item))
+      : button(item.title, () => open(item), 'compact-library-entry');
+    cell.append(row);
+    if (!launchPreview && item.kind !== 'genre') cell.append(libraryQueueActions(item));
+    return cell;
+  }
+  function useLibraryLayout(value) {
+    libraryLayout = ['albumTracks','trackList'].includes(value) ? value : 'grid';
+    get('library-layout').value = libraryLayout;
+    try { localStorage.setItem('musicroom-library-layout',libraryLayout); } catch {}
+    get('grid').replaceChildren();
+    render();
+  }
   function render() {
     get('title').textContent = album?.title || group?.title || sectionLabel(kind);
     get('search').hidden = Boolean(group || album);
@@ -280,12 +360,17 @@
     renderFeature();
     if (!album) {
       const grid = get('grid');
-      grid.classList.toggle('track-list', kind === 'tracks' && !group);
+      const mode = libraryLayout === 'trackList' || (libraryLayout === 'albumTracks' && (kind === 'albums' || group))
+        ? libraryLayout : 'grid';
+      grid.classList.toggle('track-list', mode === 'grid' && kind === 'tracks' && !group);
+      grid.dataset.layout = mode;
+      get('library-track-headings').hidden = mode !== 'trackList' || kind !== 'tracks' || Boolean(group);
       const added = document.createDocumentFragment();
-      for (const item of entries.slice(grid.childElementCount)) added.append(libraryTile(item));
+      for (const item of entries.slice(grid.childElementCount)) added.append(mode === 'grid' ? libraryTile(item) : alternateTile(item,mode));
       grid.append(added);
       return;
     }
+    get('library-track-headings').hidden = true;
     const heading = node('div', '', 'album-heading');
     const metadata = node('div');
     metadata.append(node('h2', album.artist || sectionLabel(album.kind)),
@@ -428,6 +513,7 @@
       playing = album = group = pendingAlbum = null;
       nowQueue = [];
       pendingEnqueue = null;
+      albumPreviews.clear();
       closePlaybackSheets();
       if (get('now-playing').open) get('now-playing').close();
       player.reset();
@@ -497,7 +583,7 @@
   function chooseArtworkColors(enabled) {
     artworkColors = enabled;
     get('artwork-colors').checked = enabled;
-    get('animate-artwork-colors').disabled = !enabled;
+    get('animate-artwork-colors').disabled = !enabled || selectedTheme === 'classicOLED';
     try { localStorage.setItem('musicroom-artwork-colors', enabled ? '1' : '0'); } catch {}
     updateArtworkColors(playbackState);
   }
@@ -851,12 +937,15 @@
     get('app-update').disabled = Boolean(state.disabled);
   };
   function chooseTheme(value) {
-    const theme = ['classic', 'video', 'plexify', 'liquidGlass'].includes(value) ? value : 'copper';
+    const theme = ['classic', 'classicDark', 'classicOLED', 'video', 'plexify', 'liquidGlass'].includes(value) ? value : 'copper';
     selectedTheme = theme;
     document.documentElement.dataset.theme = theme;
     window.clickWheel.updateTheme(theme);
     get('theme').value = theme;
-    get('glass-transparency-setting').hidden = theme !== 'liquidGlass';
+    const usesGlass = ['liquidGlass', 'classicDark', 'classicOLED'].includes(theme);
+    layout.toggleAttribute('data-glass', usesGlass);
+    get('glass-transparency-setting').hidden = !usesGlass;
+    get('animate-artwork-colors').disabled = !get('artwork-colors').checked || theme === 'classicOLED';
     applyPalette();
     updateDeckVisibility();
     renderFeature();
@@ -967,6 +1056,7 @@
   get('artwork-colors').onchange = event => chooseArtworkColors(event.target.checked);
   get('animate-artwork-colors').onchange = event => chooseArtworkMotion(event.target.checked);
   get('library-artwork-size').onchange = event => selectArtworkSize(event.target.value);
+  get('library-layout').onchange = event => useLibraryLayout(event.target.value);
   get('library-page-size').onchange = event => {
     selectPageSize(event.target.value);
     clearTimeout(timer);
@@ -1032,6 +1122,7 @@
   try {
     selectPageSize(localStorage.getItem('musicroom-library-page-size'));
     selectArtworkSize(localStorage.getItem('musicroom-library-artwork-size'));
+    useLibraryLayout(localStorage.getItem('musicroom-library-layout'));
     savedSidebarWidth = Number(localStorage.getItem('musicroom-sidebar-width')) || 0;
     chooseTheme(localStorage.getItem('musicroom-theme'));
     chooseGlassTransparency(localStorage.getItem('musicroom-glass-transparency'));

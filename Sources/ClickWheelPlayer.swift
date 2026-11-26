@@ -92,7 +92,7 @@ private struct QueueMiniPlayer: View {
         .padding(20)
         .frame(maxWidth: 520, maxHeight: 550)
         .background {
-            if theme != .liquidGlass {
+            if !theme.usesLiquidGlass {
                 RoundedRectangle(cornerRadius: 20)
                     .fill(.linearGradient(colors: [Color(red: 0.18, green: 0.22, blue: 0.27), Color(white: 0.09)],
                                           startPoint: .topLeading, endPoint: .bottomTrailing))

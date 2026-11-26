@@ -66,6 +66,7 @@ private struct MusicWindow: View {
     @State private var searchTask: Task<Void, Never>?
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
+    @AppStorage(LibraryLayout.preferenceKey) private var libraryLayout = LibraryLayout.grid
     @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
     @AppStorage("LibrarySidebarWidth") private var sidebarPreference = 0
     @GestureState private var sidebarDrag: CGFloat = 0
@@ -128,7 +129,7 @@ private struct MusicWindow: View {
                         resizableSidebar(availableWidth: width, defaultWidth: 216)
                         mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
                             .musicGlass(theme, radius: 22)
-                            .padding(theme == .liquidGlass ? 7 : 0)
+                            .padding(theme.usesLiquidGlass ? 7 : 0)
                     }
                     Rectangle().fill(Color.primary.opacity(0.12)).frame(height: 1)
                     transport
@@ -265,9 +266,9 @@ private struct MusicWindow: View {
             }
             .padding(padding)
         }
-        .background(theme == .liquidGlass ? .clear : slate)
+        .background(theme.usesLiquidGlass ? .clear : slate)
         .musicGlass(theme, radius: 20)
-        .padding(theme == .liquidGlass ? 7 : 0)
+        .padding(theme.usesLiquidGlass ? 7 : 0)
     }
 
     private var settingsButton: some View {
@@ -283,7 +284,7 @@ private struct MusicWindow: View {
                 .textFieldStyle(.plain)
         }
         .padding(9)
-        .background(theme == .liquidGlass ? .clear : graphite || plexify ? .white.opacity(0.06) : slate,
+        .background(theme.usesLiquidGlass ? .clear : graphite || plexify ? .white.opacity(0.06) : slate,
                     in: RoundedRectangle(cornerRadius: 8))
         .musicGlass(theme, radius: 12)
     }
@@ -472,43 +473,48 @@ private struct MusicWindow: View {
             if !model.busy && model.entries.isEmpty {
                 Text("No matches in this library.").foregroundStyle(.secondary).padding(26)
             }
-            let trackList = model.kind == .tracks && model.selectedGroup == nil
-            let scale = libraryArtworkSize.scale
-            let artwork = GridItem.Size.adaptive(minimum: ((graphite ? 133 : 145) * scale).rounded(),
-                                                 maximum: (190 * scale).rounded())
-            LazyVGrid(columns: [GridItem(trackList ? .flexible() : artwork, spacing: 21)],
-                      alignment: .leading, spacing: trackList ? 8 : 24) {
-                ForEach(model.entries) { entry in
-                    Button { searchTask?.cancel(); model.open(entry) } label: {
-                        let layout = trackList ? AnyLayout(HStackLayout(spacing: 12)) :
-                            AnyLayout(VStackLayout(alignment: .leading, spacing: 7))
-                        layout {
-                            CoverArt(item: entry, model: model)
-                                .aspectRatio(1, contentMode: .fit)
-                                .frame(width: trackList ? 46 : nil, height: trackList ? 46 : nil)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(entry.title).font(.headline).lineLimit(1)
-                                if !entry.artist.isEmpty {
-                                    Text(entry.artist).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+            if libraryLayout.applies(to: model.kind, inGroup: model.selectedGroup != nil) {
+                LibraryAlternateLayout(library: model, layout: libraryLayout)
+                    .padding(.horizontal, 28).padding(.bottom, 24)
+            } else {
+                let trackList = model.kind == .tracks && model.selectedGroup == nil
+                let scale = libraryArtworkSize.scale
+                let artwork = GridItem.Size.adaptive(minimum: ((graphite ? 133 : 145) * scale).rounded(),
+                                                     maximum: (190 * scale).rounded())
+                LazyVGrid(columns: [GridItem(trackList ? .flexible() : artwork, spacing: 21)],
+                          alignment: .leading, spacing: trackList ? 8 : 24) {
+                    ForEach(model.entries) { entry in
+                        Button { searchTask?.cancel(); model.open(entry) } label: {
+                            let layout = trackList ? AnyLayout(HStackLayout(spacing: 12)) :
+                                AnyLayout(VStackLayout(alignment: .leading, spacing: 7))
+                            layout {
+                                CoverArt(item: entry, model: model)
+                                    .aspectRatio(1, contentMode: .fit)
+                                    .frame(width: trackList ? 46 : nil, height: trackList ? 46 : nil)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(entry.title).font(.headline).lineLimit(1)
+                                    if !entry.artist.isEmpty {
+                                        Text(entry.artist).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+                                    }
                                 }
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(Rectangle())
+                        .buttonStyle(.plain)
+                        .contextMenu {
+                            if !entry.kind.isGroup { LibraryQueueActions(library: model, entry: entry) }
+                            PlexPinButton(library: model, entry: entry)
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .contextMenu {
-                        if !entry.kind.isGroup { LibraryQueueActions(library: model, entry: entry) }
-                        PlexPinButton(library: model, entry: entry)
+                    if model.more && !model.busy && model.message == nil {
+                        Color.clear.frame(height: 1).accessibilityHidden(true)
+                            .id(model.entries.count)
+                            .onAppear { model.loadMore() }
                     }
                 }
-                if model.more && !model.busy && model.message == nil {
-                    Color.clear.frame(height: 1).accessibilityHidden(true)
-                        .id(model.entries.count)
-                        .onAppear { model.loadMore() }
-                }
+                .padding(.horizontal, 28).padding(.bottom, 24)
             }
-            .padding(.horizontal, 28).padding(.bottom, 24)
             if model.busy { ProgressView().controlSize(.small).padding() }
             if model.more && !model.busy && model.message != nil {
                 Button("Retry", action: model.loadMore).padding(.bottom, 24)
@@ -573,9 +579,9 @@ private struct MusicWindow: View {
             Text(clock(model.state.elapsed)).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 40)
         }
         .padding(.horizontal, 22).frame(height: 69)
-        .background(theme == .liquidGlass ? .clear : slate)
+        .background(theme.usesLiquidGlass ? .clear : slate)
         .musicGlass(theme, radius: 24)
-        .padding(theme == .liquidGlass ? 8 : 0)
+        .padding(theme.usesLiquidGlass ? 8 : 0)
     }
 
     @ViewBuilder private var miniPlayerButton: some View {
