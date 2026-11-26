@@ -57,6 +57,70 @@ enum MusicPlatform {
     #endif
 }
 
+struct ArtworkPalette {
+    static let preferenceKey = "UseArtworkColors"
+
+    private struct Sample {
+        var weight = 0.0
+        var red = 0.0
+        var green = 0.0
+        var blue = 0.0
+    }
+
+    private let rgb: SIMD3<Double>
+
+    @MainActor init?(_ artwork: MusicImage) {
+        #if os(macOS)
+        guard let image = artwork.cgImage(forProposedRect: nil, context: nil, hints: nil) else { return nil }
+        #else
+        guard let image = artwork.cgImage else { return nil }
+        #endif
+        let size = 32
+        var pixels = [UInt8](repeating: 0, count: size * size * 4)
+        let drawn = pixels.withUnsafeMutableBytes { bytes -> Bool in
+            let colorSpace = CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB()
+            guard let context = CGContext(data: bytes.baseAddress, width: size, height: size,
+                                          bitsPerComponent: 8, bytesPerRow: size * 4, space: colorSpace,
+                                          bitmapInfo: CGBitmapInfo.byteOrder32Big.rawValue | CGImageAlphaInfo.premultipliedLast.rawValue) else { return false }
+            context.interpolationQuality = .medium
+            context.draw(image, in: CGRect(x: 0, y: 0, width: size, height: size))
+            return true
+        }
+        guard drawn else { return nil }
+        var bins = [Sample](repeating: Sample(), count: 64)
+        for index in stride(from: 0, to: pixels.count, by: 4) {
+            let alpha = Double(pixels[index + 3])
+            guard alpha >= 128 else { continue }
+            let red = min(1, Double(pixels[index]) / alpha)
+            let green = min(1, Double(pixels[index + 1]) / alpha)
+            let blue = min(1, Double(pixels[index + 2]) / alpha)
+            let high = max(red, green, blue)
+            let chroma = high - min(red, green, blue)
+            let weight = (0.08 + chroma * 3) * (0.3 + high)
+            let index = Int(red * 3.999) * 16 + Int(green * 3.999) * 4 + Int(blue * 3.999)
+            bins[index].weight += weight
+            bins[index].red += red * weight
+            bins[index].green += green * weight
+            bins[index].blue += blue * weight
+        }
+        guard let best = bins.max(by: { $0.weight < $1.weight }), best.weight > 0 else { return nil }
+        rgb = SIMD3(best.red, best.green, best.blue) / best.weight
+    }
+
+    func accent(in scheme: ColorScheme) -> Color {
+        scheme == .dark ? color(mixing: 1, amount: 0.55) : color(mixing: 0, amount: 0.55)
+    }
+
+    func wash(in scheme: ColorScheme) -> Color {
+        scheme == .dark ? color(mixing: 0.08, amount: 0.67) : color(mixing: 1, amount: 0.72)
+    }
+
+    private func color(mixing neutral: Double, amount: Double) -> Color {
+        let result = rgb * (1 - amount) + SIMD3(repeating: neutral * amount)
+        return Color(red: result.x, green: result.y, blue: result.z)
+    }
+}
+
 enum HeaderWordmark: String, CaseIterable, Identifiable {
     static let preferenceKey = "HeaderWordmark"
     case iplex, music, musicBold

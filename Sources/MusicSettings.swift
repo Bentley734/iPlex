@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum MusicTheme: String, CaseIterable, Identifiable {
-    case copper, classic, video, plexify
+    case copper, classic, video, plexify, liquidGlass
     #if os(macOS)
     case graphite
     #endif
@@ -13,6 +13,7 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         case .classic: "Classic iPod"
         case .video: "iPod Video"
         case .plexify: "Plexify"
+        case .liquidGlass: "Liquid Glass"
         #if os(macOS)
         case .graphite: "Graphite Studio"
         #endif
@@ -25,6 +26,7 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         case .classic: Color(red: 0.04, green: 0.34, blue: 0.65)
         case .video: Color(red: 0.56, green: 0.80, blue: 1)
         case .plexify: Color(red: 0.48, green: 0.90, blue: 0.88)
+        case .liquidGlass: Color(red: 0.67, green: 0.89, blue: 1)
         #if os(macOS)
         case .graphite: Color(red: 1, green: 0.75, blue: 0.45)
         #endif
@@ -36,23 +38,73 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         case .classic: Color(red: 0.84, green: 0.89, blue: 0.94)
         case .video: Color(red: 0.09, green: 0.12, blue: 0.18)
         case .plexify: Color(red: 0.075, green: 0.125, blue: 0.155)
+        case .liquidGlass: Color(red: 0.12, green: 0.17, blue: 0.28)
         #if os(macOS)
         case .graphite: Color(red: 0.09, green: 0.095, blue: 0.103)
         #endif
         }
     }
-    var backdrop: LinearGradient {
+    @ViewBuilder var backdrop: some View {
+        if self == .liquidGlass {
+            ZStack {
+                LinearGradient(colors: [surface, Color(red: 0.04, green: 0.07, blue: 0.14)],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                RadialGradient(colors: [Color.indigo.opacity(0.58), .clear],
+                               center: .topTrailing, startRadius: 20, endRadius: 530)
+                RadialGradient(colors: [Color.cyan.opacity(0.25), .clear],
+                               center: .bottomLeading, startRadius: 15, endRadius: 460)
+            }
+        } else {
+            standardBackdrop
+        }
+    }
+
+    func accent(using palette: ArtworkPalette?) -> Color {
+        palette?.accent(in: scheme) ?? accent
+    }
+
+    func surface(using palette: ArtworkPalette?) -> Color {
+        palette?.wash(in: scheme) ?? surface
+    }
+
+    func backdrop(using palette: ArtworkPalette?) -> some View {
+        backdrop.overlay {
+            if let palette {
+                LinearGradient(colors: [palette.wash(in: scheme).opacity(0.88), .clear],
+                               startPoint: .topLeading, endPoint: .bottomTrailing)
+            }
+        }
+    }
+
+    private var standardBackdrop: LinearGradient {
         let end: Color
         switch self {
         case .copper: end = Color(red: 0.075, green: 0.073, blue: 0.085)
         case .classic: end = Color(red: 0.96, green: 0.98, blue: 1)
         case .video: end = Color(red: 0.025, green: 0.037, blue: 0.066)
         case .plexify: end = Color(red: 0.035, green: 0.057, blue: 0.078)
+        case .liquidGlass: end = surface
         #if os(macOS)
         case .graphite: end = Color(red: 0.055, green: 0.059, blue: 0.068)
         #endif
         }
         return LinearGradient(colors: [surface, end], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+}
+
+extension View {
+    @ViewBuilder func musicGlass(_ theme: MusicTheme, radius: CGFloat, interactive: Bool = false) -> some View {
+        if theme == .liquidGlass {
+            let shape = RoundedRectangle(cornerRadius: radius)
+            if #available(macOS 26, iOS 26, tvOS 26, *) {
+                glassEffect(.regular.tint(theme.accent.opacity(0.12)).interactive(interactive), in: shape)
+            } else {
+                background(.regularMaterial, in: shape)
+                    .overlay { shape.strokeBorder(.white.opacity(0.20)).allowsHitTesting(false) }
+            }
+        } else {
+            self
+        }
     }
 }
 
@@ -83,6 +135,7 @@ enum MiniPlayerStyle: String, CaseIterable, Identifiable {
 struct MusicSettings: View {
     @ObservedObject var library: LibraryModel
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
+    @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
     @AppStorage(HeaderWordmark.preferenceKey) private var headerWordmark = HeaderWordmark.iplex
     @AppStorage(HeaderMarkSize.preferenceKey) private var headerMarkSize = HeaderMarkSize.medium
@@ -95,6 +148,8 @@ struct MusicSettings: View {
     @State private var showAppIcons = false
     #endif
 
+    private var palette: ArtworkPalette? { artworkColors ? library.playingPalette : nil }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             HStack {
@@ -104,11 +159,17 @@ struct MusicSettings: View {
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
+                    if library.connected {
+                        plexConnection
+                        Divider()
+                    }
                     Picker("Theme", selection: $theme) {
                         ForEach(MusicTheme.allCases) { option in
                             Text(option.label).tag(option)
                         }
                     }
+                    Toggle("Artwork Colors", isOn: $artworkColors)
+                        .help("Match the interface to the artwork for the current track.")
                     Picker("Mini-player", selection: $miniPlayerStyle) {
                         ForEach(MiniPlayerStyle.allCases) { style in
                             Text(style.label).tag(style)
@@ -163,6 +224,7 @@ struct MusicSettings: View {
                         Text("App Updates").font(.headline)
                         #if os(macOS)
                         Button(updates.buttonTitle, action: updates.act)
+                            .disabled(updates.installing)
                         if !updates.status.isEmpty { Text(updates.status).foregroundStyle(.secondary) }
                         #elseif os(iOS)
                         Link("View GitHub Releases", destination: URL(string: "https://github.com/Bentley734/iPlex/releases")!)
@@ -213,9 +275,33 @@ struct MusicSettings: View {
         #if os(iOS) || os(tvOS)
         .sheet(isPresented: $showAppIcons) { MusicAppIconPicker() }
         #endif
-        .background(theme.backdrop)
-        .tint(theme.accent)
+        .background(theme.backdrop(using: palette))
+        .tint(theme.accent(using: palette))
         .preferredColorScheme(theme.scheme)
+    }
+
+    private var plexConnection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Plex Connection").font(.headline)
+            if library.servers.isEmpty {
+                Button("Refresh Servers", action: library.restore).disabled(library.busy)
+            } else {
+                Picker("Server", selection: Binding(get: { library.serverID }, set: library.chooseServer)) {
+                    Text("Choose server").tag("")
+                    ForEach(library.servers, id: \.id) { Text($0.name).tag($0.id) }
+                }
+            }
+            if !library.libraries.isEmpty {
+                Picker("Music Library", selection: Binding(get: { library.libraryID }, set: library.chooseLibrary)) {
+                    Text("Choose library").tag("")
+                    ForEach(library.libraries, id: \.id) { Text($0.name).tag($0.id) }
+                }
+            }
+            if library.libraryID.isEmpty, let message = library.message {
+                Text(message).foregroundStyle(.secondary)
+            }
+            Button("Disconnect Plex", action: library.disconnect)
+        }
     }
 
     private func band(_ title: String, _ key: WritableKeyPath<PlaybackEQSettings, Double>) -> some View {

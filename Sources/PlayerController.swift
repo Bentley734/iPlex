@@ -275,9 +275,9 @@ final class PlayerController {
         }
     }
 
-    func updateAlbumArtwork(_ image: MusicImage) {
+    func updateAlbumArtwork(_ image: MusicImage?) {
         onMain { [weak self] in
-            self?.albumArtwork = MPMediaItemArtwork(boundsSize: image.size) { _ in image }
+            self?.albumArtwork = image.map { cover in MPMediaItemArtwork(boundsSize: cover.size) { _ in cover } }
             self?.updateNowPlaying()
         }
     }

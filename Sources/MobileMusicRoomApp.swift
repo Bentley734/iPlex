@@ -21,8 +21,8 @@ struct MobileMusicRoomApp: App {
 
 private struct MusicLibraryScreen: View {
     @ObservedObject var library: LibraryModel
-    @State private var showConnection = false
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
+    @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @State private var showSettings = false
     @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
@@ -30,6 +30,8 @@ private struct MusicLibraryScreen: View {
     @State private var showPlayer = false
     @State private var search: Task<Void, Never>?
 
+    private var palette: ArtworkPalette? { artworkColors ? library.playingPalette : nil }
+    private var accent: Color { theme.accent(using: palette) }
     private var selectedMiniPlayer: MiniPlayerStyle? { miniPlayerStyle.resolve(for: theme) }
 
     private var columnWidth: CGFloat {
@@ -49,14 +51,18 @@ private struct MusicLibraryScreen: View {
                 libraryScreen
             }
         }
+        .tint(accent)
         #if os(iOS)
         .statusBarHidden(showPlayer && selectedMiniPlayer != nil)
         #endif
         .sheet(isPresented: $showSettings) { MusicSettings(library: library) }
-        .sheet(isPresented: $showConnection) { connection.padding(26) }
         .sheet(isPresented: $showAppIcons) { MusicAppIconPicker() }
         .sheet(isPresented: Binding(get: { showPlayer && selectedMiniPlayer == nil },
-                                    set: { showPlayer = $0 })) { nowPlaying.padding(24) }
+                                    set: { showPlayer = $0 })) {
+            nowPlaying.padding(24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(theme.backdrop(using: palette).ignoresSafeArea())
+        }
         .onChange(of: library.query) { _, _ in
             search?.cancel()
             search = Task {
@@ -75,12 +81,11 @@ private struct MusicLibraryScreen: View {
                     .accessibilityLabel("App Icon")
                 Button { showSettings = true } label: { Image(systemName: "gearshape") }
                     .accessibilityLabel("Settings")
-                if library.connected {
-                    Button { showConnection = true } label: { Image(systemName: "server.rack") }
-                        .accessibilityLabel("Plex settings")
-                }
+
             }
             .padding(.horizontal, 20)
+            .musicGlass(theme, radius: 20)
+            .padding(.horizontal, theme == .liquidGlass ? 12 : 0)
             #if os(tvOS)
             .focusSection()
             #endif
@@ -101,11 +106,13 @@ private struct MusicLibraryScreen: View {
                             Image(systemName: "waveform")
                         }.padding(.horizontal, 14).padding(.vertical, 8)
                     }.accessibilityLabel("Open Now Playing")
-                        .buttonStyle(.bordered).padding(.horizontal, 16)
+                        .buttonStyle(.bordered)
+                        .musicGlass(theme, radius: 20, interactive: true)
+                        .padding(.horizontal, 16)
                 }
             }
         }
-        .background(theme.backdrop.ignoresSafeArea())
+        .background(theme.backdrop(using: palette).ignoresSafeArea())
     }
 
     private var connection: some View {
@@ -125,22 +132,8 @@ private struct MusicLibraryScreen: View {
                 }
                 Button("Cancel", action: library.cancel)
             } else if library.connected {
-                if library.servers.isEmpty {
-                    Button("Refresh Servers", action: library.restore)
-                } else {
-                    Picker("Server", selection: Binding(get: { library.serverID }, set: library.chooseServer)) {
-                        Text("Choose server").tag("")
-                        ForEach(library.servers, id: \.id) { Text($0.name).tag($0.id) }
-                    }
-                }
-                if !library.libraries.isEmpty {
-                    Picker("Music library", selection: Binding(get: { library.libraryID }, set: library.chooseLibrary)) {
-                        Text("Choose library").tag("")
-                        ForEach(library.libraries, id: \.id) { Text($0.name).tag($0.id) }
-                    }
-                }
-                Button("Disconnect Plex", action: library.disconnect)
-                if showConnection { Button("Done") { showConnection = false } }
+                Text("Choose a Plex server and music library in Settings.").foregroundStyle(.secondary)
+                Button("Open Plex Settings") { showSettings = true }.buttonStyle(.borderedProminent)
             } else {
                 Button("Connect Plex", action: library.signIn).buttonStyle(.borderedProminent)
             }
@@ -160,7 +153,10 @@ private struct MusicLibraryScreen: View {
                 TextField("Search " + library.kind.rawValue.lowercased(), text: $library.query)
                     .textFieldStyle(.plain)
                     .submitLabel(.search)
-                    .padding(10).background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
+                    .padding(10)
+                    .background(theme == .liquidGlass ? .clear : Color.primary.opacity(0.08),
+                                in: RoundedRectangle(cornerRadius: 9))
+                    .musicGlass(theme, radius: 13)
             } else {
                 Button {
                     if library.selectedDetail != nil { library.closeDetail() }
@@ -228,7 +224,7 @@ private struct MusicLibraryScreen: View {
                 library.selectKind(kind)
             }
             .buttonStyle(.bordered)
-            .tint(library.kind == kind ? theme.accent : Color.gray)
+            .tint(library.kind == kind ? accent : Color.gray)
             .accessibilityAddTraits(library.kind == kind ? .isSelected : [])
         }
     }
@@ -284,12 +280,12 @@ private struct MusicLibraryScreen: View {
                 }.buttonStyle(.bordered)
                 if theme == .plexify, let next = library.state.nextTitle {
                     VStack(alignment: .leading, spacing: 5) {
-                        Text("Up Next").font(.caption.weight(.semibold)).foregroundStyle(theme.accent)
+                        Text("Up Next").font(.caption.weight(.semibold)).foregroundStyle(accent)
                         Text(next).lineLimit(2)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(14)
-                    .background(theme.surface, in: RoundedRectangle(cornerRadius: 10))
+                    .background(theme.surface(using: palette), in: RoundedRectangle(cornerRadius: 10))
                 }
             }
             Button("Done") { showPlayer = false }

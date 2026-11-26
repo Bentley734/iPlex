@@ -35,7 +35,7 @@ namespace MusicRoom
         internal sealed class MediaTrack
         {
             public int number;
-            public string title, localPath, token, mime;
+            public string title, localPath, token, mime, artwork;
             public double? durationSeconds;
             public Uri remote;
             public bool directMp4;

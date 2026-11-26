@@ -65,6 +65,7 @@ private struct MusicWindow: View {
     @ObservedObject var model: LibraryModel
     @State private var searchTask: Task<Void, Never>?
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
+    @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @State private var showSettings = false
@@ -72,8 +73,9 @@ private struct MusicWindow: View {
     @State private var showPlexifyDeck = true
     @State private var showCompactDeck = false
     @State private var miniPlayer = MacMiniPlayer()
-    private var copper: Color { theme.accent }
-    private var slate: Color { theme.surface }
+    private var palette: ArtworkPalette? { artworkColors ? model.playingPalette : nil }
+    private var copper: Color { theme.accent(using: palette) }
+    private var slate: Color { theme.surface(using: palette) }
     private var graphite: Bool { theme == .graphite }
     private var plexify: Bool { theme == .plexify }
 
@@ -103,7 +105,7 @@ private struct MusicWindow: View {
                 }
             }
         }
-        .background(theme.backdrop)
+        .background(theme.backdrop(using: palette))
         .sheet(isPresented: $showSettings) { MusicSettings(library: model) }
         .tint(copper)
         .onChange(of: model.query) { _, _ in
@@ -191,36 +193,19 @@ private struct MusicWindow: View {
                     }
                     ForEach(model.visibleKinds, id: \.self) { tab($0) }
                 }
-                if model.connected {
-                    VStack(alignment: .leading, spacing: 10) {
-                        if !model.servers.isEmpty {
-                            Picker("Server", selection: Binding(get: { model.serverID }, set: model.chooseServer)) {
-                                Text("Choose server").tag("")
-                                ForEach(model.servers, id: \.id) { Text($0.name).tag($0.id) }
-                            }
-                        }
-                        if !model.libraries.isEmpty {
-                            Picker("Library", selection: Binding(get: { model.libraryID }, set: model.chooseLibrary)) {
-                                Text("Choose library").tag("")
-                                ForEach(model.libraries, id: \.id) { Text($0.name).tag($0.id) }
-                            }
-                        }
-                    }
-                    .labelsHidden()
-                }
-                if !graphite && !plexify { settingsButton }
-                if graphite {
-                    Divider()
-                    settingsButton
-                }
-                if model.connected {
-                    Button("Disconnect Plex", action: model.disconnect)
-                        .buttonStyle(.plain).foregroundStyle(.secondary)
-                }
             }
             .padding(graphite || plexify ? 16 : 24)
         }
-        .background(slate)
+        .background {
+            if theme == .liquidGlass {
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(.regularMaterial)
+                    .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(.white.opacity(0.16)) }
+                    .padding(7)
+            } else {
+                slate
+            }
+        }
     }
 
     private var settingsButton: some View {
@@ -236,7 +221,9 @@ private struct MusicWindow: View {
                 .textFieldStyle(.plain)
         }
         .padding(9)
-        .background(graphite || plexify ? .white.opacity(0.06) : slate, in: RoundedRectangle(cornerRadius: 8))
+        .background(theme == .liquidGlass ? .clear : graphite || plexify ? .white.opacity(0.06) : slate,
+                    in: RoundedRectangle(cornerRadius: 8))
+        .musicGlass(theme, radius: 12)
     }
 
     private func tab(_ kind: MusicKind) -> some View {
@@ -263,7 +250,9 @@ private struct MusicWindow: View {
     private var mainPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
             if model.libraryID.isEmpty {
-                welcome
+                welcome.overlay(alignment: .topTrailing) {
+                    if !plexify { settingsButton.padding(.horizontal, 28).padding(.vertical, 20) }
+                }
             } else {
                 HStack(spacing: 15) {
                     if model.selectedDetail != nil || model.selectedGroup != nil {
@@ -280,6 +269,7 @@ private struct MusicWindow: View {
                     if !graphite && !plexify && model.selectedDetail == nil && model.selectedGroup == nil {
                         librarySearch.frame(width: 205)
                     }
+                    if !plexify { settingsButton }
                 }
                 .padding(.horizontal, 28).padding(.vertical, 20)
                 if let message = model.message {
@@ -298,7 +288,7 @@ private struct MusicWindow: View {
                     VStack(alignment: .leading, spacing: 15) {
                         Text(model.connected ? "Choose a music library" : "Your Plex library")
                             .font(.system(size: 40, weight: .bold, design: .rounded))
-                        Text(model.connected ? "Choose a server and library in the sidebar." :
+                        Text(model.connected ? "Choose a server and library in Settings." :
                              "Connect to Plex to play music from your collection.")
                             .foregroundStyle(.secondary)
                         connectionControls
@@ -326,7 +316,7 @@ private struct MusicWindow: View {
                 .accessibilityHidden(true)
             Text(model.connected ? "Choose your music library" : "Your music. Your server.")
                 .font(.system(size: 38, weight: .bold))
-            Text(model.connected ? "Select a Plex server and a music library in the sidebar." :
+            Text(model.connected ? "Choose a Plex server and music library in Settings." :
                     "Connect to Plex to browse your collection and play your music.")
                 .foregroundStyle(.secondary)
             connectionControls
@@ -345,8 +335,8 @@ private struct MusicWindow: View {
             }
         } else if !model.connected {
             Button("Connect Plex", action: model.signIn).buttonStyle(.borderedProminent)
-        } else if model.servers.isEmpty {
-            Button("Refresh Servers", action: model.restore)
+        } else {
+            Button("Open Plex Settings") { showSettings = true }.buttonStyle(.borderedProminent)
         }
     }
 
@@ -495,7 +485,9 @@ private struct MusicWindow: View {
             Text(clock(model.state.elapsed)).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 40)
         }
         .padding(.horizontal, 22).frame(height: 69)
-        .background(slate)
+        .background(theme == .liquidGlass ? .clear : slate)
+        .musicGlass(theme, radius: 24)
+        .padding(theme == .liquidGlass ? 8 : 0)
     }
 
     @ViewBuilder private var miniPlayerButton: some View {

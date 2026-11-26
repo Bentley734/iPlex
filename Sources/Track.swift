@@ -5,6 +5,15 @@ struct LiveTrack {
     let title: String
     let duration: TimeInterval?
     let url: URL
+    let artworkPath: String?
+
+    init(number: Int, title: String, duration: TimeInterval?, url: URL, artworkPath: String? = nil) {
+        self.number = number
+        self.title = title
+        self.duration = duration
+        self.url = url
+        self.artworkPath = artworkPath
+    }
 
     var summary: [String: Any] {
         var item: [String: Any] = ["number": number, "title": title]

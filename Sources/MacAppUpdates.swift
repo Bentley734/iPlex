@@ -142,6 +142,7 @@ final class MacAppUpdates: ObservableObject {
     @Published private(set) var status = ""
     @Published private(set) var busy = false
     @Published private(set) var ready = false
+    @Published private(set) var installing = false
     private var operation: UpdateOperation?
     private var staged: URL?
     private var acknowledged = false
@@ -150,9 +151,13 @@ final class MacAppUpdates: ObservableObject {
         URL.applicationSupportDirectory.appending(path: "iPlex/AppUpdates", directoryHint: .isDirectory)
     }
 
-    var buttonTitle: String { busy ? "Cancel" : ready ? "Restart to Update" : "Check for Updates" }
+    var buttonTitle: String {
+        if installing { return "Installing Update…" }
+        return busy ? "Cancel" : ready ? "Restart to Update" : "Check for Updates"
+    }
 
     func act() {
+        guard !installing else { return }
         if let operation { operation.cancel(); return }
         if let staged { install(staged); return }
         guard let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String else { return }
@@ -198,47 +203,76 @@ final class MacAppUpdates: ObservableObject {
 
     private func install(_ candidate: URL) {
         let app = Bundle.main.bundleURL
+        let running = NSRunningApplication.runningApplications(withBundleIdentifier: "net.bentley734.musicroom")
+        let pid = ProcessInfo.processInfo.processIdentifier
+        guard !running.contains(where: { $0.processIdentifier != pid
+            && $0.bundleURL?.standardizedFileURL == app.standardizedFileURL }) else {
+            status = "Close the other iPlex instance before updating."
+            return
+        }
+        installing = true
+        status = "Preparing the update…"
+        let root = Self.updateRoot
+        let template = Bundle.main.url(forResource: "install-update", withExtension: "sh")
+        DispatchQueue.global(qos: .utility).async {
+            let result = Result {
+                try Self.startInstaller(candidate: candidate, app: app, root: root, template: template, pid: pid)
+            }
+            DispatchQueue.main.async {
+                do {
+                    try result.get()
+                    self.status = "Restarting iPlex…"
+                    Self.quitForUpdate()
+                } catch {
+                    self.installing = false
+                    self.status = error.localizedDescription
+                }
+            }
+        }
+    }
+
+    nonisolated private static func startInstaller(candidate: URL, app: URL, root: URL, template: URL?, pid: Int32) throws {
         let folder = app.deletingLastPathComponent()
         let files = FileManager.default
         let id = UUID().uuidString
         let stage = folder.appending(path: ".iPlex-update-" + id, directoryHint: .isDirectory)
         let next = stage.appending(path: "Candidate.app")
         let previous = stage.appending(path: "Previous.app")
-        let helper = Self.updateRoot.appending(path: "install-" + id + ".sh")
-        let ack = Self.updateRoot.appending(path: "ack-" + id)
+        let helper = root.appending(path: "install-" + id + ".sh")
+        let ack = root.appending(path: "ack-" + id)
         do {
             guard app.pathExtension == "app", !app.path.contains("/AppTranslocation/"),
                   !app.lastPathComponent.hasPrefix("Previous."),
                   files.isWritableFile(atPath: folder.path) else {
                 throw UpdateError("Move iPlex to a writable Applications folder and try again.")
             }
-            let running = NSRunningApplication.runningApplications(withBundleIdentifier: "net.bentley734.musicroom")
-            guard !running.contains(where: { $0.processIdentifier != ProcessInfo.processInfo.processIdentifier
-                && $0.bundleURL?.standardizedFileURL == app.standardizedFileURL }) else {
-                throw UpdateError("Close the other iPlex window before updating.")
-            }
+            guard let template else { throw UpdateError("The update helper is missing from this build.") }
             try files.createDirectory(at: stage, withIntermediateDirectories: false, attributes: [.posixPermissions: 0o700])
             try files.copyItem(at: candidate, to: next)
             try AppUpdate.run("/usr/bin/codesign", ["--verify", "--deep", "--strict", next.path])
-            guard let template = Bundle.main.url(forResource: "install-update", withExtension: "sh") else {
-                throw UpdateError("The update helper is missing from this build.")
-            }
             try files.copyItem(at: template, to: helper)
             let process = Process()
             process.executableURL = URL(fileURLWithPath: "/bin/sh")
-            process.arguments = [helper.path, String(ProcessInfo.processInfo.processIdentifier), app.path,
-                                 next.path, previous.path, Self.updateRoot.appending(path: "install.log").path, ack.path]
+            process.arguments = [helper.path, String(pid), app.path, next.path, previous.path,
+                                 root.appending(path: "install.log").path, ack.path]
             process.standardInput = FileHandle.nullDevice
             process.standardOutput = FileHandle.nullDevice
             process.standardError = FileHandle.nullDevice
             try process.run()
             try? files.removeItem(at: candidate.deletingLastPathComponent().deletingLastPathComponent())
-            NSApp.terminate(nil)
         } catch {
             try? files.removeItem(at: stage)
             try? files.removeItem(at: helper)
-            status = error.localizedDescription
+            throw error
         }
+    }
+
+    private static func quitForUpdate() {
+        // AppKit can defer termination while a sheet is open. The helper waits for this process to exit.
+        DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + .seconds(5)) {
+            exit(EXIT_SUCCESS)
+        }
+        NSApp.terminate(nil)
     }
 
     private static var acknowledgmentURL: URL? {

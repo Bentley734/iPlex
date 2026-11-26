@@ -18,6 +18,11 @@
   const listingIDs = new Set();
   let caching = false;
   let selectedTheme = 'copper';
+  let artworkColors = false;
+  let paletteSource = '';
+  let palette = null;
+  let paletteRequest = 0;
+  const artworkPattern = /^\/art\/[a-f0-9]{32}$/;
   let deckOpen = window.matchMedia('(min-width: 1040px)').matches;
   let featureKey = '';
   let deckKey = '';
@@ -51,7 +56,7 @@
     const frame = node('div', '', 'cover');
     frame.setAttribute('aria-hidden', 'true');
     frame.append(node('span', '', 'fallback'));
-    if (/^\/art\/[a-f0-9]{32}$/.test(item.artwork || '')) {
+    if (artworkPattern.test(item.artwork || '')) {
       const img = new Image();
       img.alt = '';
       img.loading = 'lazy';
@@ -221,11 +226,13 @@
   window.macPlexState = state => {
     const connected = state.status === 'connected';
     const connecting = state.status === 'connecting';
-    get('disconnect').hidden = !connected;
     get('connect').hidden = connected || connecting;
     get('refresh-plex').hidden = !state.refreshAvailable;
     get('cancel').hidden = !connecting;
     get('connection').hidden = !connected;
+    get('open-plex-settings').hidden = !connected || Boolean(state.libraryId);
+    get('plex-settings-status').textContent = state.message;
+    get('plex-settings-status').hidden = Boolean(state.libraryId) || !state.message;
     get('library-label').hidden = !state.libraries.length;
     get('welcome-title').textContent = connected ? 'Choose your music library' : 'Connect to Plex';
     get('connection-status').textContent = state.message;
@@ -244,10 +251,69 @@
       if (library) browse();
     }
   };
+  function playingCover(state) {
+    if (!playing) return '';
+    return (playing.kind === 'playlist' ? state.artwork : playing.artwork || state.artwork) || '';
+  }
+  function applyPalette() {
+    const root = document.documentElement;
+    root.toggleAttribute('data-artwork-colors', Boolean(palette));
+    if (!palette) return;
+    const light = selectedTheme === 'classic';
+    const blend = (gray, amount) => `rgb(${palette.map(value => Math.round(value * (1 - amount) + gray * amount)).join(' ')})`;
+    root.style.setProperty('--artwork-accent', blend(light ? 0 : 255, 0.55));
+    root.style.setProperty('--artwork-wash', blend(light ? 255 : 20, light ? 0.72 : 0.67));
+  }
+  function pickPalette(image) {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = 32;
+    const context = canvas.getContext('2d');
+    if (!context) return null;
+    context.drawImage(image, 0, 0, 32, 32);
+    const pixels = context.getImageData(0, 0, 32, 32).data;
+    const bins = Array.from({length:64}, () => ({weight:0, totals:[0, 0, 0]}));
+    for (let i = 0; i < pixels.length; i += 4) {
+      if (pixels[i + 3] < 128) continue;
+      const rgb = [pixels[i], pixels[i + 1], pixels[i + 2]];
+      const high = Math.max(...rgb) / 255;
+      const low = Math.min(...rgb) / 255;
+      const weight = (0.08 + (high - low) * 3) * (0.3 + high);
+      const key = (rgb[0] >> 6) * 16 + (rgb[1] >> 6) * 4 + (rgb[2] >> 6);
+      bins[key].weight += weight;
+      rgb.forEach((value, channel) => bins[key].totals[channel] += value * weight);
+    }
+    const best = bins.reduce((best, bin) => bin.weight > best.weight ? bin : best);
+    return best.weight > 0 ? best.totals.map(value => value / best.weight) : null;
+  }
+  function updateArtworkColors(state) {
+    const path = artworkColors ? playingCover(state) : '';
+    const source = artworkPattern.test(path) ? path : '';
+    if (source === paletteSource) return;
+    paletteSource = source;
+    const request = ++paletteRequest;
+    palette = null;
+    applyPalette();
+    if (!source) return;
+    const image = new Image();
+    image.onload = () => {
+      if (request !== paletteRequest) return;
+      try { palette = pickPalette(image); } catch { palette = null; }
+      applyPalette();
+    };
+    image.src = source;
+  }
+  function chooseArtworkColors(enabled) {
+    artworkColors = enabled;
+    get('artwork-colors').checked = enabled;
+    try { localStorage.setItem('musicroom-artwork-colors', enabled ? '1' : '0'); } catch {}
+    updateArtworkColors(playbackState);
+  }
   let footerKey = '';
   window.macPlayerState = state => {
     playbackState = state;
-    const nextKey = JSON.stringify([playing?.id, state.title, state.message]);
+    const currentCover = playingCover(state);
+    updateArtworkColors(state);
+    const nextKey = JSON.stringify([playing?.id, state.title, state.message, currentCover]);
     if (footerKey !== nextKey) {
       footerKey = nextKey;
       const label = get('playing');
@@ -256,11 +322,11 @@
         const info = node('div');
         info.append(node('strong', state.title || playing.title), node('small', [playing.artist, playing.title].filter(Boolean).join(' · ')));
         if (state.message) info.append(node('small', state.message));
-        label.replaceChildren(cover(playing), info);
+        label.replaceChildren(cover({...playing, artwork:currentCover || playing.artwork}), info);
         if ('mediaSession' in navigator && typeof MediaMetadata !== 'undefined') {
           navigator.mediaSession.metadata = new MediaMetadata({
             title: state.title || playing.title, artist: playing.artist || '', album: playing.title,
-            artwork: /^\/art\/[a-f0-9]{32}$/.test(playing.artwork || '') ? [{src: new URL(playing.artwork, location.href).href}] : []
+            artwork: artworkPattern.test(currentCover) ? [{src: new URL(currentCover, location.href).href}] : []
           });
         }
       }
@@ -296,7 +362,13 @@
   }
   get('connect').onclick = () => host({action:'connect'});
   get('refresh-plex').onclick = () => host({action:'servers'});
-  get('settings').onclick = () => get('settings-page').showModal();
+  const openSettings = () => {
+    const dialog = get('settings-page');
+    dialog.showModal();
+    dialog.scrollTop = 0;
+  };
+  get('settings').onclick = openSettings;
+  get('open-plex-settings').onclick = openSettings;
   get('close-settings').onclick = () => get('settings-page').close();
   get('app-update').onclick = () => host({action:'updateApp'});
   window.musicAppUpdate = state => {
@@ -305,11 +377,12 @@
     get('app-update').disabled = Boolean(state.disabled);
   };
   function chooseTheme(value) {
-    const theme = ['classic', 'video', 'plexify'].includes(value) ? value : 'copper';
+    const theme = ['classic', 'video', 'plexify', 'liquidGlass'].includes(value) ? value : 'copper';
     selectedTheme = theme;
     document.documentElement.dataset.theme = theme;
     window.clickWheel.updateTheme(theme);
     get('theme').value = theme;
+    applyPalette();
     updateDeckVisibility();
     renderFeature();
     if (theme === 'plexify') renderDeck(playbackState);
@@ -385,6 +458,7 @@
     try { localStorage.setItem('musicroom-eq', JSON.stringify(settings)); } catch {}
   }
   get('theme').onchange = event => chooseTheme(event.target.value);
+  get('artwork-colors').onchange = event => chooseArtworkColors(event.target.checked);
   get('library-page-size').onchange = event => {
     selectPageSize(event.target.value);
     clearTimeout(timer);
@@ -450,6 +524,7 @@
   try {
     selectPageSize(localStorage.getItem('musicroom-library-page-size'));
     chooseTheme(localStorage.getItem('musicroom-theme'));
+    chooseArtworkColors(localStorage.getItem('musicroom-artwork-colors') === '1');
     chooseMiniPlayer(localStorage.getItem('musicroom-mini-player'));
     chooseHeaderLogo(localStorage.getItem('musicroom-header-logo'));
     chooseHeaderWordmark(localStorage.getItem('musicroom-header-wordmark'));

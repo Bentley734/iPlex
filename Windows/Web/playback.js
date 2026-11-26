@@ -20,7 +20,7 @@ window.windowsPlayback = (() => {
     window.macPlayerState?.({
       visible: state !== 'closed', status: state, message: error, error,
       tracks: tracks.map(({title, durationSeconds}) => ({title, durationSeconds})),
-      trackIndex: index, context: collection, title: track.title || collection,
+      trackIndex: index, context: collection, title: track.title || collection, artwork: track.artwork,
       duration: decoded ? decoded.buffer.duration : Number.isFinite(audio.duration) && audio.currentSrc === expectedURL ? audio.duration : track.durationSeconds || 0,
       elapsed: decoded ? decodedTime() : audio.currentSrc === expectedURL ? audio.currentTime : 0,
       canPrevious: index > 0, canNext: index + 1 < tracks.length

@@ -496,20 +496,7 @@ namespace MusicRoom
                 }
                 if (kind == "genre") key = "genre:" + key;
                 items[key] = new LibraryItem { Kind = kind, Title = title };
-                string artwork = "";
-                string thumb = new[] { "thumb", "parentThumb", "composite" }.Select(field => Str(row, field))
-                    .FirstOrDefault(value => value.Length < 180 && ArtPath.IsMatch(value));
-                if (thumb != null)
-                {
-                    string handle;
-                    if (!artIDs.TryGetValue(thumb, out handle))
-                    {
-                        handle = Guid.NewGuid().ToString("N");
-                        art[handle] = thumb;
-                        artIDs[thumb] = handle;
-                    }
-                    artwork = "/art/" + handle;
-                }
+                string artwork = RegisterArtwork(ArtworkPath(row, "thumb", "parentThumb", "composite"));
                 results.Add(new { id = key, title, kind, artwork, artist = Str(row, kind == "track" ? "grandparentTitle" : "parentTitle"), year = Num(row, "year"),
                     genre = Rows(Get(row, "Genre")).Select(genre => Str(genre, "tag")).FirstOrDefault() ?? "" });
             }
@@ -517,6 +504,25 @@ namespace MusicRoom
             bool more = results.Count > 0 && next <= 1000000 &&
                 (localPaging ? next < matches : total > 0 ? next < total : rows.Length >= size);
             Send("musicEntries", new { id, entries = results, next, more });
+        }
+
+        static string ArtworkPath(Dictionary<string, object> row, params string[] fields)
+        {
+            return fields.Select(field => Str(row, field))
+                .FirstOrDefault(value => value.Length < 180 && ArtPath.IsMatch(value));
+        }
+
+        string RegisterArtwork(string thumb)
+        {
+            if (thumb == null) return "";
+            string handle;
+            if (!artIDs.TryGetValue(thumb, out handle))
+            {
+                handle = Guid.NewGuid().ToString("N");
+                art[handle] = thumb;
+                artIDs[thumb] = handle;
+            }
+            return "/art/" + handle;
         }
 
         public async Task<WindowsMediaResponse> Artwork(string handle, string method)
@@ -593,6 +599,7 @@ namespace MusicRoom
                             long duration = Num(row, "duration");
                             found.Add(new MediaTrack { number = found.Count + 1, title = Str(row, "title"),
                                 durationSeconds = duration > 0 ? (double?)duration / 1000 : null,
+                                artwork = ArtworkPath(row, "parentThumb", "thumb"),
                                 remote = new Uri(url, partPath), token = server.Token, mime = mime,
                                 directMp4 = Str(part, "audioCodec") == "aac" || Str(row, "audioCodec") == "aac" });
                             break;
@@ -626,7 +633,7 @@ namespace MusicRoom
                 {
                     string handle = Guid.NewGuid().ToString("N");
                     handles.Add(handle, track);
-                    entries.Add(new { track.title, track.durationSeconds, url = "https://media.musicroom.invalid/" + handle });
+                    entries.Add(new { track.title, track.durationSeconds, artwork = RegisterArtwork(track.artwork), url = "https://media.musicroom.invalid/" + handle });
                 }
             }
             Send("musicQueue", new { id, context = albumTitle, origin = "plex", startIndex = index, tracks = entries });

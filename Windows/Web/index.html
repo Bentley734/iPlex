@@ -25,21 +25,15 @@
       <button id="tracks" aria-pressed="false" disabled>Tracks</button>
       <button id="playlists" aria-pressed="false" disabled>Playlists</button>
     </nav>
-    <div id="connection" hidden>
-      <label>Server<select id="server"></select></label>
-      <label id="library-label">Music library<select id="library"></select></label>
-    </div>
-    <div class="preferences">
-      <button id="settings" type="button">Settings</button>
-      <button id="disconnect" hidden>Disconnect Plex</button>
-    </div>
   </aside>
   <main>
+    <button id="settings" type="button">Settings</button>
     <section id="welcome">
       <img src="prismatic-note.png" alt="" width="74" height="74">
       <h1 id="welcome-title">Connect to Plex</h1>
       <p id="connection-status" role="status">Browse and play music from your Plex server.</p>
       <button class="primary" id="connect">Connect Plex</button>
+      <button id="open-plex-settings" type="button" hidden>Open Plex Settings</button>
       <button id="refresh-plex" type="button" hidden>Refresh Plex Servers</button>
       <button id="cancel" hidden>Cancel</button>
     </section>
@@ -115,14 +109,23 @@
       <h1 id="settings-heading">Settings</h1>
       <button id="close-settings" type="button">Done</button>
     </div>
+    <section id="connection" hidden>
+      <h2>Plex Connection</h2>
+      <label class="plex-choice">Server<select id="server"></select></label>
+      <label id="library-label" class="plex-choice">Music Library<select id="library"></select></label>
+      <p id="plex-settings-status" role="status" hidden></p>
+      <button id="disconnect" type="button">Disconnect Plex</button>
+    </section>
     <label class="theme-choice">Theme
       <select id="theme">
         <option value="copper">Copper Groove</option>
         <option value="classic">Classic iPod</option>
         <option value="video">iPod Video</option>
         <option value="plexify">Plexify</option>
+        <option value="liquidGlass">Liquid Glass</option>
       </select>
     </label>
+    <label class="theme-choice">Artwork Colors <input id="artwork-colors" type="checkbox"></label>
     <label class="theme-choice">Mini-player
       <select id="mini-player-style">
         <option value="automatic">Automatic</option>

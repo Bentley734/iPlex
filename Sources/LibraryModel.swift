@@ -29,7 +29,10 @@ final class LibraryModel: ObservableObject {
     @Published private(set) var linkCode: String?
     @Published private(set) var state = PlayerState()
     @Published private(set) var playbackVolume = 1.0
-    @Published private(set) var playingArtwork: MusicImage?
+    @Published private(set) var playingArtwork: MusicImage? {
+        didSet { playingPalette = playingArtwork.flatMap(ArtworkPalette.init) }
+    }
+    @Published private(set) var playingPalette: ArtworkPalette?
     @Published private(set) var equalizer = PlaybackEQSettings.flat
     @Published private(set) var equalizerAvailable: Bool?
     @Published private(set) var cachingCovers = false
@@ -48,6 +51,7 @@ final class LibraryModel: ObservableObject {
     private let artwork = NSCache<NSString, MusicImage>()
     private var artworkRequests = [ArtworkKey: ArtworkRequest]()
     private var artworkCollection = UUID()
+    private var playingArtworkKey: ArtworkKey?
     private var cancelCoverCache: (() -> Void)?
     private var cacheGeneration = UUID()
 
@@ -96,6 +100,7 @@ final class LibraryModel: ObservableObject {
                                       playing: value["playing"] as? Bool ?? false, previous: value["canPrevious"] as? Bool ?? false,
                                       next: value["canNext"] as? Bool ?? false, index: value["trackIndex"] as? Int,
                                       message: value["message"] as? String ?? "", nextTitle: value["nextTitle"] as? String)
+            if let index = value["trackIndex"] as? Int { self?.refreshPlayingArtwork(at: index) }
         }
     }
 
@@ -207,6 +212,7 @@ final class LibraryModel: ObservableObject {
         tracks = []
         playingAlbum = nil
         playingTracks = []
+        playingArtworkKey = nil
         playingArtwork = nil
         offset = 0
         listingQuery = ""
@@ -287,18 +293,33 @@ final class LibraryModel: ObservableObject {
 
     func play(at index: Int) {
         guard let album = selectedDetail, tracks.indices.contains(index) else { return }
-        let key = artworkKey(for: album)
         playingAlbum = album
         playingTracks = tracks
-        playingArtwork = key.flatMap { artwork.object(forKey: $0.path as NSString) }
-        player.loadRemoteTracks(tracks, collection: album.title, artist: album.artist, artwork: playingArtwork, startTrack: index,
+        playingArtworkKey = nil
+        playingArtwork = nil
+        player.loadRemoteTracks(tracks, collection: album.title, artist: album.artist, startTrack: index,
                                 maximumTracks: album.kind == .playlists ? PlexParser.musicPlaylistLimit : 250)
-        if playingArtwork == nil, let key {
-            fetchImage(for: key) { [weak self] image in
-                guard let self, let image, let playingAlbum = self.playingAlbum,
-                      self.artworkKey(for: playingAlbum) == key else { return }
-                self.playingArtwork = image
-                self.player.updateAlbumArtwork(image)
+    }
+
+    private func refreshPlayingArtwork(at index: Int) {
+        guard let album = playingAlbum, playingTracks.indices.contains(index) else { return }
+        let trackPath = playingTracks[index].artworkPath
+        let path = album.kind == .playlists ? trackPath : album.artworkPath ?? trackPath
+        let key = path.map { ArtworkKey(collection: artworkCollection, path: $0) }
+        guard key != playingArtworkKey else { return }
+        playingArtworkKey = key
+        if let key, let cached = artwork.object(forKey: key.path as NSString) {
+            playingArtwork = cached
+            player.updateAlbumArtwork(cached)
+        } else {
+            playingArtwork = nil
+            player.updateAlbumArtwork(nil)
+            if let key {
+                fetchImage(for: key) { [weak self] image in
+                    guard let self, let image, self.playingArtworkKey == key else { return }
+                    self.playingArtwork = image
+                    self.player.updateAlbumArtwork(image)
+                }
             }
         }
     }
