@@ -49,6 +49,8 @@ final class PlayerController {
     private var equalizerAvailability: Bool?
     private var analysisPlayingSince: TimeInterval?
 
+    @MainActor var hasActivePlayback: Bool { userWantsPlayback }
+
     init() {
         player.automaticallyWaitsToMinimizeStalling = true
         currentItemObservation = player.observe(\.currentItem, options: [.new]) { [weak self] _, _ in

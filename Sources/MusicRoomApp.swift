@@ -4,6 +4,7 @@ import SwiftUI
 
 @main
 struct MusicRoomApp: App {
+    @NSApplicationDelegateAdaptor(MusicAppDelegate.self) private var appDelegate
     @StateObject private var model = LibraryModel()
     @StateObject private var updates = MacAppUpdates()
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
@@ -17,7 +18,12 @@ struct MusicRoomApp: App {
                 .environmentObject(updates)
                 .frame(minWidth: 780, minHeight: 540)
                 .preferredColorScheme(theme.scheme)
-                .task { updates.acknowledgeLaunch(); applyIcon(); model.restore() }
+                .task {
+                    appDelegate.library = model
+                    updates.acknowledgeLaunch()
+                    applyIcon()
+                    model.restore()
+                }
                 .onChange(of: iconStyle) { _, _ in applyIcon() }
         }
         .defaultSize(width: 1120, height: 750)
@@ -43,6 +49,15 @@ struct MusicRoomApp: App {
         if let icon = choice.macImage {
             NSApplication.shared.applicationIconImage = icon
         }
+    }
+}
+
+@MainActor
+private final class MusicAppDelegate: NSObject, NSApplicationDelegate {
+    weak var library: LibraryModel?
+
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
+        library?.player.hasActivePlayback != true
     }
 }
 
@@ -229,12 +244,17 @@ private struct MusicWindow: View {
             searchTask?.cancel()
             model.selectKind(kind)
         } label: {
-            Label(kind.rawValue, systemImage: kind.symbol)
-                .font(.headline)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 11).padding(.vertical, 10)
-                .foregroundStyle(model.kind == kind ? copper : .primary)
-                .background(model.kind == kind ? copper.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 8))
+            Label {
+                Text(kind.rawValue)
+            } icon: {
+                Image(systemName: kind.symbol)
+                    .frame(width: 20)
+            }
+            .font(.headline)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 11).padding(.vertical, 10)
+            .foregroundStyle(model.kind == kind ? copper : .primary)
+            .background(model.kind == kind ? copper.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
         .disabled(model.libraryID.isEmpty)
