@@ -32,8 +32,10 @@
 		733CA465AF821A663909CC7B /* MobileMusicRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97A49FCD6AC086C13007CEB /* MobileMusicRoomApp.swift */; };
 		76564F19F8DE83CE1924C29F /* HeaderMarks in Resources */ = {isa = PBXBuildFile; fileRef = DBB6ACEC51BC04DF53298E15 /* HeaderMarks */; };
 		8024073E1FFD024E4705DA44 /* music-wordmarks.png in Resources */ = {isa = PBXBuildFile; fileRef = 295A13765A52602FCE1765AD /* music-wordmarks.png */; };
+		857073C928677ED881AC8112 /* GlassWallpaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83BDC61173C885223594A01D /* GlassWallpaper.swift */; };
 		8E529B00CBCA255DA72EBCA3 /* MusicPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CCA42EAE03D88BB3496D33 /* MusicPlatform.swift */; };
 		93D79DBF914029D9676C6472 /* iOS.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A5FD29343DF8F67713D13B64 /* iOS.xcassets */; };
+		9986C5B0BC30A08F62C49E57 /* GlassWallpaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83BDC61173C885223594A01D /* GlassWallpaper.swift */; };
 		9B3C788DCE3EB58EF492A7D2 /* PlexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C780AA4CF17CC09BC5ABE45 /* PlexService.swift */; };
 		9E13CD90F05F5C673D88190D /* iOSIconPreviews in Resources */ = {isa = PBXBuildFile; fileRef = 05B2D2D87BA0747B37ECE8A0 /* iOSIconPreviews */; };
 		A69490A6AD7CB4C928AF43CD /* Track.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8712B67A9D2431A2B0160DDC /* Track.swift */; };
@@ -61,6 +63,7 @@
 		5E789032BCF3A6169CFC2233 /* NowPlayingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingView.swift; sourceTree = "<group>"; };
 		6C780AA4CF17CC09BC5ABE45 /* PlexService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlexService.swift; sourceTree = "<group>"; };
 		81F02BA2B14ABC3859F379BD /* MusicSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicSettings.swift; sourceTree = "<group>"; };
+		83BDC61173C885223594A01D /* GlassWallpaper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassWallpaper.swift; sourceTree = "<group>"; };
 		8712B67A9D2431A2B0160DDC /* Track.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Track.swift; sourceTree = "<group>"; };
 		A0B6189D5420E12F096AED5C /* MusicAppIconPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicAppIconPicker.swift; sourceTree = "<group>"; };
 		A5FD29343DF8F67713D13B64 /* iOS.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = iOS.xcassets; sourceTree = "<group>"; };
@@ -126,6 +129,7 @@
 				D6581BBFF504F8BAA5B38470 /* AlbumCoverCache.swift */,
 				ED8702E61EE0F31C7677EC30 /* AudioAnalysis.swift */,
 				B2DA695E5F978CFBEDD54C3D /* ClickWheelPlayer.swift */,
+				83BDC61173C885223594A01D /* GlassWallpaper.swift */,
 				C69FD3E93908A0408008D345 /* LibraryModel.swift */,
 				ED9C2A0F694BD3960FADA938 /* MacAppUpdates.swift */,
 				AE3A4685EF46B49FB6B22D90 /* MacMiniPlayer.swift */,
@@ -248,6 +252,7 @@
 				B0BBD7ED21A32E626ECC7A08 /* AlbumCoverCache.swift in Sources */,
 				2F7B05532D59401224593621 /* AudioAnalysis.swift in Sources */,
 				AD0027C3EA6B7D84AD57F90D /* ClickWheelPlayer.swift in Sources */,
+				857073C928677ED881AC8112 /* GlassWallpaper.swift in Sources */,
 				66D831237EA3E508723100E1 /* LibraryModel.swift in Sources */,
 				4852498FF890C183BB536F7A /* MacAppUpdates.swift in Sources */,
 				614CA070E7014A7C66698623 /* MacMiniPlayer.swift in Sources */,
@@ -271,6 +276,7 @@
 				41BB757808343F6DE3116ACA /* AlbumCoverCache.swift in Sources */,
 				B14DB919AF1E5EA88CF12FE5 /* AudioAnalysis.swift in Sources */,
 				29CF984811D8CCAD74A6AB1F /* ClickWheelPlayer.swift in Sources */,
+				9986C5B0BC30A08F62C49E57 /* GlassWallpaper.swift in Sources */,
 				C0F0713CDBB0212EBBDFA09D /* LibraryModel.swift in Sources */,
 				4F8F42D2AB91DCC695B06BD6 /* MacAppUpdates.swift in Sources */,
 				11F3BB75364189A5F0A3B672 /* MacMiniPlayer.swift in Sources */,
@@ -342,7 +348,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 20;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -357,7 +363,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex music server.";
-				MARKETING_VERSION = 0.1.18;
+				MARKETING_VERSION = 0.1.19;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -439,7 +445,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 19;
+				CURRENT_PROJECT_VERSION = 20;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -460,7 +466,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex music server.";
-				MARKETING_VERSION = 0.1.18;
+				MARKETING_VERSION = 0.1.19;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

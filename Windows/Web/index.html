@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src https://media.musicroom.invalid; connect-src https://media.musicroom.invalid; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src https://media.musicroom.invalid; connect-src https://media.musicroom.invalid; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>iPlex</title>
   <link rel="icon" href="prismatic-note.ico">
@@ -10,6 +10,7 @@
   <script defer src="playback.js"></script>
   <script defer src="clickwheel.js"></script>
   <script defer src="music.js"></script>
+  <script defer src="wallpaper.js"></script>
 </head>
 <body>
   <aside id="library-sidebar" aria-label="iPlex">
@@ -206,6 +207,13 @@
       <input id="glass-transparency" type="range" min="0" max="100" step="5" value="40">
       <output id="glass-transparency-value" for="glass-transparency">40%</output>
     </label>
+    <section id="glass-wallpaper-setting">
+      <label for="glass-wallpaper-file">Liquid Glass Background</label>
+      <input id="glass-wallpaper-file" type="file" accept="image/*">
+      <img id="glass-wallpaper-preview" alt="Current Liquid Glass background" hidden>
+      <button id="remove-glass-wallpaper" type="button" hidden>Remove Background</button>
+      <p id="glass-wallpaper-status" role="status"></p>
+    </section>
     <label class="theme-choice">Artwork Colors <input id="artwork-colors" type="checkbox"></label>
     <label class="theme-choice">Animate Artwork Colors <input id="animate-artwork-colors" type="checkbox" checked></label>
     <label class="theme-choice">Mini-player

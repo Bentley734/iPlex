@@ -24,6 +24,7 @@ enum MusicTheme: String, CaseIterable, Identifiable {
     var scheme: ColorScheme { self == .classic ? .light : .dark }
     var usesLiquidGlass: Bool { self == .liquidGlass || self == .classicDark || self == .classicOLED }
     var keepsBlackCanvas: Bool { self == .classicOLED }
+    var supportsGlassWallpaper: Bool { usesLiquidGlass && !keepsBlackCanvas }
 
     var accent: Color {
         switch self {
@@ -81,13 +82,7 @@ enum MusicTheme: String, CaseIterable, Identifiable {
     }
 
     func backdrop(using palette: ArtworkPalette?) -> some View {
-        backdrop.overlay {
-            if let palette, !keepsBlackCanvas {
-                ArtworkColorWash(palette: palette, scheme: scheme)
-                    .allowsHitTesting(false)
-                    .accessibilityHidden(true)
-            }
-        }
+        ThemeArtworkBackdrop(theme: self, palette: palette)
     }
 
     private var standardBackdrop: LinearGradient {
@@ -105,6 +100,25 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         #endif
         }
         return LinearGradient(colors: [surface, end], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+}
+
+private struct ThemeArtworkBackdrop: View {
+    let theme: MusicTheme
+    let palette: ArtworkPalette?
+    @ObservedObject private var wallpaper = GlassWallpaper.shared
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
+
+    var body: some View {
+        theme.backdrop.overlay {
+            if theme.supportsGlassWallpaper, !reduceTransparency, let image = wallpaper.image {
+                GlassWallpaperBackdrop(image: image)
+            } else if let palette, !theme.keepsBlackCanvas {
+                ArtworkColorWash(palette: palette, scheme: theme.scheme)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
+        }
     }
 }
 
@@ -323,6 +337,7 @@ struct MusicSettings: View {
                         }
                     }
                     if theme.usesLiquidGlass { transparencyControl }
+                    if theme.supportsGlassWallpaper { GlassWallpaperSettings() }
                     Toggle("Artwork Colors", isOn: $artworkColors)
                         .help("Match the interface to the artwork for the current track.")
                     Toggle("Animate Artwork Colors", isOn: $animateArtworkColors)

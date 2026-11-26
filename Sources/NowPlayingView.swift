@@ -20,6 +20,7 @@ struct NowPlayingPopTransition: ViewModifier {
 
 struct NowPlayingView: View {
     @ObservedObject var library: LibraryModel
+    @ObservedObject private var wallpaper = GlassWallpaper.shared
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @State private var showingQueue = false
@@ -97,7 +98,7 @@ struct NowPlayingView: View {
     }
 
     @ViewBuilder private var glassArtworkBackdrop: some View {
-        if theme.usesLiquidGlass, !theme.keepsBlackCanvas, !reduceTransparency, let image = library.playingArtwork {
+        if theme.supportsGlassWallpaper, !reduceTransparency, wallpaper.image == nil, let image = library.playingArtwork {
             GeometryReader { geometry in
                 #if os(macOS)
                 let artwork = Image(nsImage: image)

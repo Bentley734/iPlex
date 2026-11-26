@@ -610,3 +610,25 @@ button:hover:enabled { border-color:var(--copper); }
   .track-columns > :nth-child(4):not(:last-child) { display:none; }
   .track-columns.grouped-track { grid-template-columns:28px minmax(0,1.4fr) minmax(0,1fr) 42px; }
 }
+
+
+#glass-wallpaper-setting { display:none; }
+:root[data-glass]:not([data-theme="classicOLED"]) #glass-wallpaper-setting { display:grid; justify-items:start; gap:9px; }
+#glass-wallpaper-setting label { font-weight:650; }
+#glass-wallpaper-file { max-width:100%; }
+#glass-wallpaper-preview { width:132px; height:74px; object-fit:cover; border-radius:8px; }
+#glass-wallpaper-status:empty { display:none; }
+:root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) body,
+:root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) #now-playing[open] {
+  background:linear-gradient(#0006,#0006),var(--glass-wallpaper) center / cover no-repeat;
+  animation:none;
+}
+:root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) main {
+  background-image:var(--glass-surface); animation:none;
+}
+:root[data-glass][data-custom-wallpaper] #now-playing[open]::before { display:none; }
+@media (prefers-reduced-transparency:reduce) {
+  :root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) body,
+  :root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) #now-playing[open] { background:var(--ink); }
+  :root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) main { background:var(--panel); }
+}
