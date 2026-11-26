@@ -26,6 +26,7 @@ aside { background:var(--panel); border-right:1px solid var(--line); padding:25p
 .header-brand[data-mark-size="large"] { --mark-size:.82; }
 .header-brand[data-mark-size="extraLarge"] { --mark-size:.94; }
 .wordmark { flex:1; min-width:0; height:100%; object-fit:contain; object-position:left center; }
+.music-wordmark { filter:brightness(0) invert(1); }
 .header-mark {
   width:calc(var(--header-height) * var(--mark-size)); height:calc(var(--header-height) * var(--mark-size));
   object-fit:contain; transform:scale(var(--artwork-scale,1));

@@ -1,5 +1,6 @@
 import CoreGraphics
 import Foundation
+import ImageIO
 import SwiftUI
 #if os(macOS)
 import AppKit
@@ -11,6 +12,21 @@ typealias MusicImage = UIImage
 
 @MainActor
 enum MusicPlatform {
+    private static let musicWordmarks: [HeaderWordmark: CGImage] = {
+        guard let url = Bundle.main.url(forResource: "music-wordmarks", withExtension: "png"),
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return [:] }
+        return Dictionary(uniqueKeysWithValues: HeaderWordmark.allCases.compactMap { option in
+            guard let region = option.region, let crop = image.cropping(to: region) else { return nil }
+            return (option, crop)
+        })
+    }()
+
+    static func wordmarkImage(_ option: HeaderWordmark) -> Image? {
+        if option == .iplex { return brandImage("wordmark") }
+        return musicWordmarks[option].map { Image(decorative: $0, scale: 1) }
+    }
+
     static func brandImage(_ name: String, subdirectory: String? = nil) -> Image? {
         guard let url = Bundle.main.url(forResource: name, withExtension: "png", subdirectory: subdirectory) else {
             return nil
@@ -39,6 +55,23 @@ enum MusicPlatform {
         #endif
     }
     #endif
+}
+
+enum HeaderWordmark: String, CaseIterable, Identifiable {
+    static let preferenceKey = "HeaderWordmark"
+    case iplex, music, musicBold
+
+    var id: Self { self }
+    var title: String { self == .iplex ? "iPlex" : "Music" }
+    var label: String { self == .musicBold ? "music (Bold)" : title }
+    // Regions in the supplied transparent wordmark sheet, including a small inset.
+    var region: CGRect? {
+        switch self {
+        case .iplex: nil
+        case .music: CGRect(x: 722, y: 251, width: 684, height: 210)
+        case .musicBold: CGRect(x: 645, y: 609, width: 810, height: 193)
+        }
+    }
 }
 
 enum HeaderMark: String, CaseIterable, Identifiable {
@@ -89,6 +122,7 @@ enum HeaderMarkSize: String, CaseIterable, Identifiable {
 
 struct HeaderBrand: View {
     @AppStorage(HeaderMarkSize.preferenceKey) private var markSize = HeaderMarkSize.medium
+    @AppStorage(HeaderWordmark.preferenceKey) private var wordmark = HeaderWordmark.iplex
     let mark: HeaderMark
     let theme: MusicTheme
     let width: CGFloat
@@ -114,12 +148,12 @@ struct HeaderBrand: View {
                     .scaleEffect(mark.artworkScale)
                     .accessibilityHidden(true)
             }
-            if let wordmark = MusicPlatform.brandImage("wordmark") {
-                wordmark.resizable().scaledToFit()
-                    .colorMultiply(ink)
-                    .accessibilityLabel("iPlex")
+            if let image = MusicPlatform.wordmarkImage(wordmark) {
+                image.renderingMode(.template).resizable().scaledToFit()
+                    .foregroundStyle(ink)
+                    .accessibilityLabel(wordmark.title)
             } else {
-                Text("iPlex").font(.system(size: height * 0.68, weight: .medium))
+                Text(wordmark.title).font(.system(size: height * 0.68, weight: wordmark == .musicBold ? .bold : .medium))
                     .lineLimit(1).minimumScaleFactor(0.6)
             }
         }

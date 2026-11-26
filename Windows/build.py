@@ -75,7 +75,7 @@ def main():
                 icon = stage / (name + ".ico")
                 make_icon(ASSETS / (name + ".png"), icon)
                 web.write(icon, icon.name)
-            for name in ("groove.png", "wordmark.png"):
+            for name in ("groove.png", "wordmark.png", "music-wordmarks.png"):
                 web.write(ASSETS / name, name)
             for mark in sorted((ASSETS / "HeaderMarks").glob("*.png")):
                 web.write(mark, "HeaderMarks/" + mark.name)

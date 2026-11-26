@@ -29,6 +29,8 @@ struct MusicRoomApp: App {
                     Text("Prism").tag("prism")
                     Text("Teal Signal").tag("signal")
                     Text("Classic Click Wheel").tag("clickwheel")
+                    Text("Prismatic Note Light").tag("prismatic-note")
+                    Text("Prismatic Note Dark").tag("prismatic-note-dark")
                 }
             }
         }

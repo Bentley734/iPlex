@@ -84,6 +84,7 @@ struct MusicSettings: View {
     @ObservedObject var library: LibraryModel
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
     @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
+    @AppStorage(HeaderWordmark.preferenceKey) private var headerWordmark = HeaderWordmark.iplex
     @AppStorage(HeaderMarkSize.preferenceKey) private var headerMarkSize = HeaderMarkSize.medium
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @Environment(\.dismiss) private var dismiss
@@ -105,6 +106,11 @@ struct MusicSettings: View {
                     Picker("Mini-player", selection: $miniPlayerStyle) {
                         ForEach(MiniPlayerStyle.allCases) { style in
                             Text(style.label).tag(style)
+                        }
+                    }
+                    Picker("Header Wordmark", selection: $headerWordmark) {
+                        ForEach(HeaderWordmark.allCases) { wordmark in
+                            Text(wordmark.label).tag(wordmark)
                         }
                     }
                     Picker("Header Logo", selection: $headerMark) {

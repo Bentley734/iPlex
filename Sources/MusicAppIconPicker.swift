@@ -11,10 +11,7 @@ struct MusicAppIconPicker: View {
     var body: some View {
         VStack(spacing: 24) {
             Text("App Icon").font(.title.bold())
-            HStack(spacing: 20) {
-                option("Copper Groove", preview: "groove-preview", icon: nil)
-                option("Classic Click Wheel", preview: "clickwheel-preview", icon: "ClassicClickWheel")
-            }
+            choices
             .disabled(changingIcon || !UIApplication.shared.supportsAlternateIcons)
             if let message {
                 Text(message).foregroundStyle(.secondary).multilineTextAlignment(.center)
@@ -25,6 +22,23 @@ struct MusicAppIconPicker: View {
                 .disabled(changingIcon)
         }
         .padding(24)
+    }
+
+    @ViewBuilder private var choices: some View {
+        #if os(iOS)
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 104), spacing: 12)], spacing: 12) {
+            originalChoices
+            option("Prismatic Note Light", preview: "prismatic-note-preview", icon: "PrismaticNote")
+            option("Prismatic Note Dark", preview: "prismatic-note-dark-preview", icon: "PrismaticNoteDark")
+        }
+        #else
+        HStack(spacing: 20) { originalChoices }
+        #endif
+    }
+
+    @ViewBuilder private var originalChoices: some View {
+        option("Copper Groove", preview: "groove-preview", icon: nil)
+        option("Classic Click Wheel", preview: "clickwheel-preview", icon: "ClassicClickWheel")
     }
 
     private func option(_ title: String, preview: String, icon: String?) -> some View {

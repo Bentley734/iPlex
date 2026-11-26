@@ -12,6 +12,9 @@
   let featureKey = '';
   let deckKey = '';
   let playbackState = {};
+  // Regions in the supplied transparent wordmark sheet, including a small inset.
+  const wordmarkRegions = new Map([['music', [722, 251, 684, 210]], ['musicBold', [645, 609, 810, 193]]]);
+  const wordmarkSheet = new Image();
   const bands = ['bass', 'mid', 'treble'];
   const node = (tag, text = '', cls = '') => {
     const el = document.createElement(tag);
@@ -279,6 +282,28 @@
     toggle.setAttribute('aria-expanded', String(visible));
     document.documentElement.dataset.plexifyDeck = visible ? 'open' : 'closed';
   }
+  function renderHeaderWordmark() {
+    const region = wordmarkRegions.get(get('header-wordmark').value);
+    const showMusic = Boolean(region && wordmarkSheet.naturalWidth);
+    for (const brand of document.querySelectorAll('.header-brand')) {
+      const canvas = brand.querySelector('.music-wordmark');
+      if (showMusic) {
+        const [x, y, width, height] = region;
+        canvas.width = width;
+        canvas.height = height;
+        canvas.getContext('2d').drawImage(wordmarkSheet, x, y, width, height, 0, 0, width, height);
+      }
+      canvas.hidden = !showMusic;
+      brand.querySelector('img.wordmark').hidden = showMusic;
+    }
+  }
+  function chooseHeaderWordmark(value) {
+    const choice = get('header-wordmark');
+    choice.value = wordmarkRegions.has(value) ? value : 'iplex';
+    if (choice.value !== 'iplex' && !wordmarkSheet.getAttribute('src')) wordmarkSheet.src = 'music-wordmarks.png';
+    renderHeaderWordmark();
+    try { localStorage.setItem('musicroom-header-wordmark', choice.value); } catch {}
+  }
   function chooseHeaderLogo(value) {
     const choice = get('header-logo');
     choice.value = value;
@@ -314,6 +339,8 @@
   get('mini-player-style').onchange = event => chooseMiniPlayer(event.target.value);
   get('plexify-deck-toggle').onclick = () => { deckOpen = !deckOpen; updateDeckVisibility(); };
   get('header-logo').onchange = event => chooseHeaderLogo(event.target.value);
+  get('header-wordmark').onchange = event => chooseHeaderWordmark(event.target.value);
+  wordmarkSheet.addEventListener('load', renderHeaderWordmark);
   get('header-logo-size').onchange = event => chooseHeaderLogoSize(event.target.value);
   for (const band of bands) get(band).oninput = updateEQ;
   get('reset-eq').onclick = () => {
@@ -345,6 +372,7 @@
     chooseTheme(localStorage.getItem('musicroom-theme'));
     chooseMiniPlayer(localStorage.getItem('musicroom-mini-player'));
     chooseHeaderLogo(localStorage.getItem('musicroom-header-logo'));
+    chooseHeaderWordmark(localStorage.getItem('musicroom-header-wordmark'));
     chooseHeaderLogoSize(localStorage.getItem('musicroom-header-logo-size'));
     const eq = JSON.parse(localStorage.getItem('musicroom-eq')) || {};
     for (const band of bands) get(band).value = Math.max(-10, Math.min(10, Number(eq[band]) || 0));

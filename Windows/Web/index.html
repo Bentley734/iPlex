@@ -16,6 +16,7 @@
     <div class="header-brand">
       <img class="header-mark" alt="" hidden>
       <img class="wordmark" src="wordmark.png" alt="iPlex">
+      <canvas class="wordmark music-wordmark" role="img" aria-label="Music" hidden></canvas>
     </div>
     <nav aria-label="Library">
       <button id="albums" aria-pressed="true" disabled>Albums</button>
@@ -134,6 +135,13 @@
       </select>
     </label>
     <section>
+      <label class="header-logo-choice">Header Wordmark
+        <select id="header-wordmark">
+          <option value="iplex">iPlex</option>
+          <option value="music">Music</option>
+          <option value="musicBold">music (Bold)</option>
+        </select>
+      </label>
       <label class="header-logo-choice">Header Logo
         <select id="header-logo">
           <option value="none">Text Only</option>
@@ -156,6 +164,7 @@
       <div class="header-brand header-preview" aria-hidden="true">
         <img class="header-mark" alt="" hidden>
         <img class="wordmark" src="wordmark.png" alt="">
+        <canvas class="wordmark music-wordmark" hidden></canvas>
       </div>
     </section>
     <section>
