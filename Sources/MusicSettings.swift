@@ -441,6 +441,12 @@ struct MusicSettings: View {
                             ))
                             .disabled(library.visibleKinds == [kind])
                         }
+                        ForEach(PlexVideoKind.allCases) { kind in
+                            Toggle(kind.title, isOn: Binding(
+                                get: { library.visibleVideoKinds.contains(kind) },
+                                set: { library.setVisibility(kind, visible: $0) }
+                            ))
+                        }
                     }
                     Divider()
                     VStack(alignment: .leading, spacing: 10) {

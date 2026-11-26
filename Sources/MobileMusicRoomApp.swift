@@ -73,7 +73,11 @@ private struct MusicLibraryScreen: View {
         .statusBarHidden(showMiniPlayer)
         #endif
         .sheet(isPresented: $showSettings) { MusicSettings(library: library) }
+        .sheet(item: $library.playlistEdit) { edit in PlexPlaylistEditor(library: library, edit: edit) }
         .sheet(isPresented: $showAppIcons) { MusicAppIconPicker() }
+        .onChange(of: library.visibleVideoKinds) { _, enabled in
+            if let videoSection, !enabled.contains(videoSection) { self.videoSection = nil }
+        }
         .onChange(of: library.query) { _, _ in
             search?.cancel()
             search = Task {
@@ -101,12 +105,12 @@ private struct MusicLibraryScreen: View {
             #if os(tvOS)
             .focusSection()
             #endif
-            if library.servers.contains(where: { $0.id == library.serverID }) {
+            if !library.serverID.isEmpty && !library.visibleVideoKinds.isEmpty {
                 HStack {
                     Button("Music", systemImage: "music.note") { videoSection = nil }
                         .tint(videoSection == nil ? accent : .primary)
                         .accessibilityAddTraits(videoSection == nil ? [.isSelected] : [])
-                    ForEach(PlexVideoKind.allCases) { kind in
+                    ForEach(library.visibleVideoKinds) { kind in
                         Button(kind.title, systemImage: kind.icon) { videoSection = kind }
                             .tint(videoSection == kind ? accent : .primary)
                             .accessibilityAddTraits(videoSection == kind ? [.isSelected] : [])
@@ -121,7 +125,8 @@ private struct MusicLibraryScreen: View {
             }
             if let videoSection, !library.serverID.isEmpty {
                 PlexVideoBrowser(kind: videoSection, server: library.serverID, service: library.service,
-                                 pauseMusic: library.player.pause)
+                                 serverReady: library.videoServerReady, connectionError: library.busy ? nil : library.message,
+                                 retryConnection: library.retryLibrary, pauseMusic: library.player.pause)
                     .id(library.serverID + videoSection.rawValue)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .musicGlass(theme, radius: 22)
@@ -208,6 +213,10 @@ private struct MusicLibraryScreen: View {
                     HStack { sectionButtons }
                 }.scrollIndicators(.hidden)
                 #endif
+                if library.kind == .playlists {
+                    Button("New Playlist", systemImage: "plus") { library.editPlaylist() }
+                        .disabled(!library.canEditPlaylists)
+                }
                 TextField("Search " + library.kind.rawValue.lowercased(), text: $library.query).disabled(library.reconnecting)
                     .textFieldStyle(.plain)
                     .submitLabel(.search)

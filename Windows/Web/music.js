@@ -210,18 +210,97 @@
     menu.append(summary, commands);
     return menu;
   }
-  function libraryQueueActions(item, track, trackTitle) {
+  function libraryQueueActions(item, track, trackTitle, trackID) {
     const commands = [];
     if (track !== undefined || item.kind !== 'artist') {
       commands.push(['Play Next', () => enqueueItem(item, true, track)],
         ['Add to Queue', () => enqueueItem(item, false, track)]);
     }
+    const key = trackID || (item.kind === 'track' ? item.id : undefined);
+    if (key) commands.push(['Add to Playlist', () => editPlaylist(key, trackTitle || item.title)]);
     if (track === undefined && ['album', 'artist', 'playlist'].includes(item.kind)) {
       commands.push([pins.some(pin => pin.id === item.id) ? 'Unpin' : 'Pin',
         () => host({action:'togglePin', item:item.id})]);
     }
     return actions('Actions for ' + (track === undefined ? item.title : trackTitle || tracks[track]?.title || 'track'), commands);
   }
+  const playlistDialog = get('playlist-editor');
+  const playlistChoices = get('playlist-editor-choices');
+  const playlistForm = get('playlist-editor-form');
+  const playlistName = get('playlist-editor-name');
+  const playlistStatus = get('playlist-editor-status');
+  const playlistClose = get('playlist-editor-close');
+  let playlistSequence = 0;
+  let playlistEdit = null;
+
+  function editPlaylist(track, title) {
+    if (!server || !library || launchPreview || playlistDialog.open) return;
+    playlistEdit = {id:++playlistSequence, server, library, track, saving:false};
+    get('playlist-editor-title').textContent = track ? 'Add to Playlist' : 'New Playlist';
+    get('playlist-editor-track').textContent = title || '';
+    get('playlist-editor-track').hidden = !track;
+    playlistChoices.replaceChildren();
+    playlistChoices.hidden = !track;
+    playlistName.value = '';
+    playlistForm.hidden = false;
+    playlistClose.textContent = 'Cancel';
+    setPlaylistSaving(false);
+    playlistStatus.textContent = '';
+    playlistDialog.showModal();
+    if (track) loadPlaylistChoices();
+    else playlistName.focus();
+  }
+
+  function loadPlaylistChoices() {
+    playlistChoices.textContent = 'Finding playlists…';
+    host({action:'editableMusicPlaylists', ...playlistEdit});
+  }
+
+  window.musicEditablePlaylists = reply => {
+    if (!playlistDialog.open || reply.id !== playlistEdit?.id) return;
+    if (reply.error) {
+      playlistChoices.replaceChildren(node('p', reply.error), button('Retry Playlists', loadPlaylistChoices));
+    } else if (reply.choices.length) {
+      playlistChoices.replaceChildren(...reply.choices.map(row => button(row.title, () => savePlaylist(row.key))));
+    } else {
+      playlistChoices.textContent = 'No editable music playlists on this server.';
+    }
+    setPlaylistSaving(playlistEdit.saving);
+  };
+
+  function setPlaylistSaving(saving) {
+    playlistEdit.saving = saving;
+    playlistClose.disabled = playlistName.disabled = get('playlist-editor-create').disabled = saving;
+    for (const choice of playlistChoices.querySelectorAll('button')) choice.disabled = saving;
+  }
+
+  function savePlaylist(playlist) {
+    if (!playlistEdit || playlistEdit.saving) return;
+    const title = playlistName.value.trim();
+    if (!playlist && !title) return;
+    setPlaylistSaving(true);
+    playlistEdit.target = playlist;
+    playlistStatus.textContent = 'Saving to Plex…';
+    host({action:'saveMusicPlaylist', ...playlistEdit, playlist, title});
+  }
+
+  get('new-playlist').onclick = () => editPlaylist();
+  playlistClose.onclick = () => playlistDialog.close();
+  playlistForm.onsubmit = event => { event.preventDefault(); savePlaylist(); };
+  playlistDialog.addEventListener('close', () => { playlistEdit = null; });
+  playlistDialog.addEventListener('cancel', event => { if (playlistEdit?.saving) event.preventDefault(); });
+  window.musicPlaylistSaved = reply => {
+    if (!playlistDialog.open || reply.id !== playlistEdit?.id) return;
+    setPlaylistSaving(false);
+    playlistStatus.textContent = reply.error || reply.message;
+    if (reply.error) return;
+    playlistChoices.hidden = playlistForm.hidden = true;
+    playlistClose.textContent = 'Done';
+    playlistClose.focus();
+    if (album?.kind === 'playlist' && album.id === playlistEdit.target) open(album);
+    else if (kind === 'playlists' && !album) browse();
+  };
+
   function renderPins() {
     get('pinned-shelf').hidden = !pins.length || Boolean(album || group || get('search').value.trim());
     const key = JSON.stringify([Boolean(launchPreview),pins]);
@@ -313,7 +392,7 @@
     target.replaceChildren(...reply.tracks.map((track,index) => {
       const row = trackColumns(track, () => playLibraryRow(item,index), true, item.artist);
       const cell = node('div','','compact-track');
-      cell.append(row, libraryQueueActions(item,index,track.title));
+      cell.append(row, libraryQueueActions(item,index,track.title,track.plexID));
       return cell;
     }));
   };
@@ -358,6 +437,8 @@
   }
   function render() {
     get('title').textContent = album?.title || group?.title || sectionLabel(kind);
+    get('new-playlist').hidden = kind !== 'playlists' || Boolean(album || group);
+    get('new-playlist').disabled = Boolean(launchPreview) || !library;
     get('search').hidden = Boolean(group || album);
     get('search').placeholder = 'Search ' + kind;
     get('search').setAttribute('aria-label', 'Search ' + kind);
@@ -409,7 +490,7 @@
       }
       row.append(node('span', String(track.number), 'number'), title, node('small', time(track.durationSeconds)));
       const entry = node('div', '', 'library-track');
-      entry.append(row, libraryQueueActions(album, index));
+      entry.append(row, libraryQueueActions(album, index, track.title, track.plexID));
       list.append(entry);
     });
     get('details').replaceChildren(heading, list);
@@ -530,6 +611,7 @@
       server = state.serverId;
       library = state.libraryId;
       window.musicCoverCache({running:false, message:''});
+      if (playlistDialog.open) playlistDialog.close();
       ++request;
       playing = album = group = pendingAlbum = null;
       nowQueue = [];

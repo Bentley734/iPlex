@@ -141,11 +141,16 @@ namespace MusicRoom
             servers.TryGetValue(selectedServer, out server);
             var preview = status == "connected" && (phase == "loading" || loadingSections || phase == "error")
                 && selectedSection.Length == 0 ? ReadLaunchLibrary() : null;
+            bool waitingForVideo = phase == "loading" || loadingSections;
+            string videoServer = status != "connected" ? "" : selectedServer.Length != 0 ? selectedServer :
+                (waitingForVideo || phase == "error" ? Pref("server") : "");
             Send("macPlexState", new {
                 status, message, loadingLibraries = loadingSections, libraryMessage = "",
                 refreshAvailable = status == "connected" && phase != "loading" && !loadingSections && selectedSection.Length == 0,
                 serverId = selectedServer, serverName = server != null ? server.Name : "",
                 libraryId = selectedSection, pins = PinSnapshot(), preview, videoLibraries = videoSections,
+                videoServer, waitingForVideo, videoConnectionError = phase == "error",
+                videoPreviews = new { movie = ReadLaunchVideo("movie", videoServer), show = ReadLaunchVideo("show", videoServer) },
                 servers =
                     servers.Values.OrderBy(s => s.Name)
                         .Select(s => new { id = s.Id, name = s.Name, selected = s.Id == selectedServer })
@@ -469,7 +474,7 @@ namespace MusicRoom
             {
                 localPaging = true;
                 endpoint = category == "genres" ? sectionPath + "/genre?type=9" :
-                    "/playlists?type=15&playlistType=audio&sectionID=" + section;
+                    AudioPlaylistEndpoint;
             }
             else
             {
@@ -684,9 +689,9 @@ namespace MusicRoom
             string relative;
             if ((method != "GET" && method != "HEAD") || !Regex.IsMatch(handle, @"^[a-f0-9]{32}\z"))
                 return Response(404, "Not Found");
-            Tuple<Server, string, string> video;
+            Tuple<string, string, string, bool> video;
             if (videoArt.TryGetValue(handle, out video))
-                return await VideoPoster(video.Item1, video.Item2, video.Item3, method);
+                return await VideoPoster(video.Item1, video.Item2, video.Item3, video.Item4, method);
             if (!art.TryGetValue(handle, out relative))
                 return Response(404, "Not Found");
             var ready = servers.TryGetValue(selectedServer, out server) && selectedSection.Length > 0;
@@ -700,11 +705,11 @@ namespace MusicRoom
                 // Retain the server that issued the art ticket for the whole request.
                 bool cached = File.Exists(target);
                 if (!cached && !ready) return Response(404, "Not Found");
-                var bytes = cached ? File.ReadAllBytes(target) : await FetchArtwork(server, relative, shutdown.Token);
+                var bytes = cached ? await Task.Run(() => File.ReadAllBytes(target), shutdown.Token) : await FetchArtwork(server, relative, shutdown.Token);
                 string mime = ArtworkMime(bytes);
                 if (!cached && mime != null && SnapshotContainsArtwork(relative))
                 {
-                    try { SaveCover(bytes, target); }
+                    try { await Task.Run(() => SaveCover(bytes, target), shutdown.Token); }
                     catch (IOException) { }
                     catch (UnauthorizedAccessException) { }
                     catch (ArgumentException) { }
@@ -768,7 +773,7 @@ namespace MusicRoom
                 tracks.OrderByDescending(track => track.ratingCount).Take(Math.Min(3, Math.Max(1, tracks.Count / 4)))
                     .Where(track => track.ratingCount >= highest * 0.25)) : new HashSet<MediaTrack>();
             Send(preview ? "musicAlbumPreview" : "musicAlbum", new { id, tracks = tracks.Select(track => new
-                { track.number, track.title, track.durationSeconds, popular = popular.Contains(track) }).ToArray() });
+                { track.number, track.title, track.durationSeconds, track.plexID, popular = popular.Contains(track) }).ToArray() });
         }
 
         async Task<List<MediaTrack>> LoadAlbumTracks(Server server, string section, string key, string kind, CancellationToken token)
@@ -924,6 +929,88 @@ namespace MusicRoom
             finally { albumPreviewSlots.Release(); }
         }
 
+        const string AudioPlaylistEndpoint = "/playlists?type=15&playlistType=audio";
+        readonly SemaphoreSlim playlistWrites = new SemaphoreSlim(1);
+
+        static IEnumerable<Dictionary<string, object>> EditablePlaylists(object payload)
+        {
+            return Metadata(payload, null).Where(row => Str(row, "type") == "playlist" && Str(row, "playlistType") == "audio"
+                && ItemID.IsMatch(Str(row, "ratingKey")) && Str(row, "title").Length > 0 && Str(row, "title").Length <= 300
+                && (Str(row, "smart") == "0" || Str(row, "smart").Equals("false", StringComparison.OrdinalIgnoreCase)))
+                .GroupBy(row => Str(row, "ratingKey")).Select(group => group.First());
+        }
+
+        async Task EditPlaylist(Dictionary<string, object> request, string action, long id)
+        {
+            var token = shutdown.Token;
+            bool writing = action == "saveMusicPlaylist";
+            if (writing && !playlistWrites.Wait(0))
+            {
+                Send("musicPlaylistSaved", new { id, error = "Another playlist change is still saving." });
+                return;
+            }
+            string callback = writing ? "musicPlaylistSaved" : "musicEditablePlaylists";
+            try
+            {
+                Server server;
+                if (!servers.TryGetValue(selectedServer, out server) || Str(request, "server") != selectedServer ||
+                    selectedSection.Length == 0 || Str(request, "library") != selectedSection)
+                    throw Problem("Reconnect to your music library before editing playlists.");
+                int generation = musicGeneration;
+                string track = Str(request, "track"), playlist = Str(request, "playlist"), title = Str(request, "title").Trim();
+                if (writing && ((track.Length > 0 && !ItemID.IsMatch(track)) ||
+                    (playlist.Length > 0 && (!ItemID.IsMatch(playlist) || track.Length == 0)) ||
+                    (playlist.Length == 0 && (title.Length == 0 || title.Length > 120 || title.Any(Char.IsControl)))))
+                    throw Problem("Enter a playlist name or choose a playlist to add this track to.");
+
+                var listing = await WithServer(server, async url => new {
+                    Base = url, Data = await FetchPlex(HttpMethod.Get, new Uri(url, AudioPlaylistEndpoint),
+                        server.Token, token, 8 * 1024 * 1024, 8)
+                }, token);
+                var choices = EditablePlaylists(listing.Data).Select(row => new {
+                    key = Str(row, "ratingKey"), title = Str(row, "title")
+                }).OrderBy(row => row.title, StringComparer.CurrentCultureIgnoreCase).ToArray();
+                if (generation != musicGeneration) return;
+                if (!writing)
+                {
+                    Send(callback, new { id, choices });
+                    return;
+                }
+                var target = choices.FirstOrDefault(row => row.key == playlist);
+                if (playlist.Length != 0 && target == null) throw Problem("This playlist is no longer available for editing.");
+                bool create = target == null;
+                string endpoint = create ? "/playlists?type=audio&smart=0&title=" + Uri.EscapeDataString(title) :
+                    "/playlists/" + playlist + "/items";
+                if (track.Length > 0)
+                {
+                    string contents = "server://" + server.Id + "/com.plexapp.plugins.library/library/metadata/" + track;
+                    endpoint += (create ? "&" : "?") + "uri=" + Uri.EscapeDataString(contents);
+                }
+                try
+                {
+                    await FetchBytes(PlexRequest(create ? HttpMethod.Post : HttpMethod.Put,
+                        new Uri(listing.Base, endpoint), server.Token), 2 * 1024 * 1024, token, 12);
+                }
+                catch (Exception error)
+                {
+                    if (error is InvalidDataException && error.Message.StartsWith("The service returned HTTP 4", StringComparison.Ordinal))
+                        throw Problem("Plex rejected the playlist change. " + error.Message);
+                    throw Problem("Plex didn’t confirm the change. Check the playlist before retrying.");
+                }
+                if (generation == musicGeneration)
+                    Send(callback, new { id, message = create ? "Playlist created." : "Added to " + target.title + "." });
+            }
+            catch (Exception error)
+            {
+                if (!token.IsCancellationRequested)
+                    Send(callback, new { id, error = error is InvalidDataException ? error.Message : "Couldn’t reach Plex to edit playlists." });
+            }
+            finally
+            {
+                if (writing) playlistWrites.Release();
+            }
+        }
+
         public async Task Handle(Dictionary<string, object> body)
         {
             string action = Str(body, "action");
@@ -957,6 +1044,8 @@ namespace MusicRoom
             bool first = !initialized;
             InitPlex();
             if (action == "status" && !(first && account.Length > 0)) { PlexState(); return; }
+            if (action == "editableMusicPlaylists" || action == "saveMusicPlaylist")
+            { await EditPlaylist(body, action, id); return; }
             if (action == "togglePin")
             {
                 try { TogglePin(Str(body, "item")); }
@@ -1019,6 +1108,8 @@ namespace MusicRoom
                     account = selectedServer = selectedSection = plexMessage = phase = "";
                     sessionOnly = false;
                     plexPrefs.Remove("lastMusicLibrary");
+                    plexPrefs.Remove("lastVideoLibrary.movie");
+                    plexPrefs.Remove("lastVideoLibrary.show");
                     SavePrefs();
                     servers.Clear();
                     sections.Clear();

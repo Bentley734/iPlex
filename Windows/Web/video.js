@@ -27,8 +27,15 @@
   const nextPlay = get('video-next-play');
   const tabs = new Map([['movie', get('movies')], ['show', get('television')]]);
   const titles = {movie:'Movies', show:'TV Shows'};
+  const sectionToggles = new Map([['movie', get('show-movies-section')], ['show', get('show-tv-section')]]);
+  const sectionPreference = 'musicroom-visible-video-sections';
+  let visibleSections = [...tabs.keys()];
+  try {
+    const saved = JSON.parse(localStorage.getItem(sectionPreference));
+    if (Array.isArray(saved)) visibleSections = visibleSections.filter(section => saved.includes(section));
+  } catch {}
   const validSource = /^https:\/\/media\.musicroom\.invalid\/video\/[a-f0-9]{32}$/;
-  let state, kind = '', library = '', pending = 0, parent = [], next = null, busy = false, timer;
+  let state, kind = '', library = '', libraryReady = false, pending = 0, parent = [], next = null, busy = false, timer;
   let source, hls, candidates = [], usingFallback = false, resumeAt = 0, listOffset = 0, failed = false;
   const rendered = new Set();
   let watchRecords = new Map(), watchSequence = 0, activeItem, activeScope, lastReport = 0;
@@ -108,7 +115,8 @@
     } else saveWatch(0, true, true);
   };
 
-  function preference(type) { return 'musicroom-video-library.' + state.serverId + '.' + type; }
+  function videoServer(value = state) { return value?.videoServer || value?.serverId || ''; }
+  function preference(type) { return 'musicroom-video-library.' + videoServer() + '.' + type; }
   window.plexVideoCacheSelection = () => ({
     movie: state?.serverId ? localStorage.getItem(preference('movie')) || '' : '',
     show: state?.serverId ? localStorage.getItem(preference('show')) || '' : ''
@@ -118,40 +126,51 @@
     get('music').setAttribute('aria-pressed', String(!kind));
     get('music-sections').hidden = Boolean(kind);
     for (const [type, tab] of tabs) {
-      tab.disabled = !state?.serverId;
+      tab.hidden = !visibleSections.includes(type);
+      tab.disabled = !videoServer();
+      sectionToggles.get(type).checked = !tab.hidden;
       tab.setAttribute('aria-pressed', String(type === kind));
     }
   }
 
   function configure() {
-    const available = (state.videoLibraries || []).filter(row => row.type === kind);
+    const available = state.waitingForVideo ? [] : (state.videoLibraries || []).filter(row => row.type === kind);
+    const preview = state.videoPreviews?.[kind];
     const preferred = localStorage.getItem(preference(kind));
-    const restored = available.find(row => row.id === preferred)?.id || available[0]?.id || '';
+    const restored = available.find(row => row.id === preferred)?.id || available[0]?.id ||
+      ((state.waitingForVideo || state.videoConnectionError) ? preview?.library : '') || '';
     if (library !== restored) {
       parent = [];
       watchRecords.clear();
     }
     library = restored;
-    picker.replaceChildren(...available.map(row => new Option(row.name, row.id)));
+    libraryReady = available.some(row => row.id === library);
+    const choices = libraryReady ? available : (restored ? [{name:preview.name, id:restored}] : []);
+    picker.replaceChildren(...choices.map(row => new Option(row.name, row.id)));
     picker.value = library;
-    picker.hidden = available.length === 0;
+    picker.hidden = choices.length === 0;
+    picker.disabled = !libraryReady;
     browse();
-    refreshWatch();
+    if (libraryReady) refreshWatch();
+    else ++watchSequence;
   }
 
   window.plexVideoState = value => {
     const previous = state;
     state = value;
-    if (kind && !state.serverId) window.plexVideoExit();
+    if (kind && !videoServer()) window.plexVideoExit();
     syncTabs();
     if (!kind) return;
-    if (previous?.serverId !== state.serverId || previous?.loadingLibraries !== state.loadingLibraries ||
+    const changedServer = videoServer(previous || {}) !== videoServer();
+    if (changedServer || previous?.waitingForVideo !== state.waitingForVideo ||
+        previous?.videoConnectionError !== state.videoConnectionError ||
         JSON.stringify(previous?.videoLibraries) !== JSON.stringify(state.videoLibraries)) {
-      if (previous?.serverId !== state.serverId) {
+      if (changedServer) {
         if (dialog.open) dialog.close();
         watchRecords.clear();
         ++watchSequence;
         parent = [];
+        search.value = '';
       }
       configure();
     }
@@ -177,8 +196,16 @@
 
   get('music').onclick = () => window.plexVideoExit();
 
+  for (const input of sectionToggles.values()) input.onchange = () => {
+    visibleSections = [...sectionToggles].filter(([, toggle]) => toggle.checked).map(([type]) => type);
+    try { localStorage.setItem(sectionPreference, JSON.stringify(visibleSections)); } catch {}
+    if (kind && !visibleSections.includes(kind)) window.plexVideoExit();
+    else syncTabs();
+  };
+  syncTabs();
+
   for (const [type, tab] of tabs) tab.onclick = () => {
-    if (!state?.serverId || kind === type) return;
+    if (!visibleSections.includes(type) || !videoServer() || kind === type) return;
     kind = type;
     watchRecords.clear();
     parent = [];
@@ -200,6 +227,7 @@
     const current = parent.at(-1);
     get('video-title').textContent = current?.title || titles[kind];
     search.hidden = Boolean(current) || !library;
+    search.disabled = !libraryReady;
     get('video-back').hidden = !current;
     const summary = get('video-summary');
     summary.textContent = current?.summary || '';
@@ -208,9 +236,14 @@
     loadMore.hidden = true;
     renderWatch();
     const id = ++pending;
-    if (!library) {
-      status.textContent = state.loadingLibraries ? 'Finding Plex libraries…' :
-        'No ' + titles[kind] + ' libraries are available on this Plex server.';
+    const preview = state.videoPreviews?.[kind];
+    if (offset === 0 && !current && !search.value.trim() && preview?.library === library) {
+      renderItems(preview.items, libraryReady);
+    }
+    if (!libraryReady) {
+      status.textContent = state.waitingForVideo ? 'Reconnecting to Plex…' :
+        state.videoConnectionError ? state.message : 'No ' + titles[kind] + ' libraries are available on this Plex server.';
+      retry.hidden = !state.videoConnectionError;
       return;
     }
     busy = true;
@@ -228,18 +261,32 @@
   get('video-back').onclick = () => { parent.pop(); browse(); };
   search.oninput = () => { clearTimeout(timer); ++pending; timer = setTimeout(browse, 280); };
   loadMore.onclick = () => { if (next !== null && !busy) browse(next); };
-  retry.onclick = () => browse(listOffset);
+  retry.onclick = () => {
+    if (!libraryReady && state.videoConnectionError) host({action:'servers'});
+    else browse(listOffset);
+  };
   window.plexVideoListing = reply => {
     if (!kind || reply.id !== pending) return;
     busy = false;
     next = reply.next ?? null;
-    for (const row of reply.items || []) {
+    if (listOffset === 0) {
+      tiles.replaceChildren();
+      rendered.clear();
+    }
+    renderItems(reply.items, true);
+    status.textContent = rendered.size ? '' : 'No matches.';
+    loadMore.hidden = next === null;
+  };
+
+  function renderItems(rows, interactive) {
+    for (const row of rows || []) {
       if (rendered.has(row.key)) continue;
       rendered.add(row.key);
       const tile = document.createElement('button');
       tile.type = 'button';
       tile.className = 'video-tile';
       tile.dataset.item = row.key;
+      tile.disabled = !interactive;
       const poster = document.createElement('span');
       poster.className = 'video-poster';
       const typeIcon = document.createElement('span');
@@ -275,9 +322,7 @@
       };
       tiles.append(tile);
     }
-    status.textContent = rendered.size ? '' : 'No matches.';
-    loadMore.hidden = next === null;
-  };
+  }
 
   function clearNext() {
     clearInterval(nextTimer);

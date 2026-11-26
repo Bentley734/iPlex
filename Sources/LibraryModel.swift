@@ -43,7 +43,9 @@ final class LibraryModel: ObservableObject {
     @Published var message: String?
     @Published private(set) var kind: MusicKind = .albums
     @Published private(set) var visibleKinds = MusicKind.allCases
+    @Published private(set) var visibleVideoKinds = PlexVideoKind.allCases
     @Published var query = ""
+    @Published var playlistEdit: PlexPlaylistEdit?
 
     let service = PlexService(version: "0.1")
     let player = PlayerController()
@@ -103,6 +105,10 @@ final class LibraryModel: ObservableObject {
                 kind = first
             }
         }
+        if let saved = defaults.stringArray(forKey: "VisibleVideoSections") {
+            visibleVideoKinds = PlexVideoKind.allCases.filter { saved.contains($0.rawValue) }
+        }
+        serverID = service.rememberedServerID ?? ""
         if let saved = service.rememberedMusicSelection {
             serverID = saved.server
             libraryID = saved.library
@@ -184,6 +190,8 @@ final class LibraryModel: ObservableObject {
             throw PlexServiceError.expiredPIN
         }
     }
+
+    var videoServerReady: Bool { !serverID.isEmpty && service.status.selectedServerID == serverID }
 
     var libraryConnectionStatus: String? {
         guard reconnecting else { return nil }
@@ -278,6 +286,7 @@ final class LibraryModel: ObservableObject {
         cancel()
         do {
             try service.disconnect()
+            PlexVideoSnapshot.clear()
             connected = false
             reconnecting = false
             launchSnapshot = nil
@@ -292,6 +301,7 @@ final class LibraryModel: ObservableObject {
 
     private func resetLibrary() {
         pendingCachedOpen = nil
+        playlistEdit = nil
         stopCachingCovers()
         coverCacheStatus = ""
         pins = []
@@ -338,6 +348,15 @@ final class LibraryModel: ObservableObject {
         visibleKinds = enabled
         UserDefaults.standard.set(enabled.map(\.rawValue), forKey: "VisibleMusicSections")
         if !enabled.contains(kind) { selectKind(first) }
+    }
+
+    func setVisibility(_ section: PlexVideoKind, visible: Bool) {
+        let enabled = PlexVideoKind.allCases.filter {
+            $0 == section ? visible : visibleVideoKinds.contains($0)
+        }
+        guard enabled != visibleVideoKinds else { return }
+        visibleVideoKinds = enabled
+        UserDefaults.standard.set(enabled.map(\.rawValue), forKey: "VisibleVideoSections")
     }
 
     func browse() {
@@ -461,6 +480,25 @@ final class LibraryModel: ObservableObject {
         startQueue(tracks, entry: album, index: index, autoplay: true)
     }
 
+    var canEditPlaylists: Bool {
+        !reconnecting && !libraryID.isEmpty && service.status.selectedLibraryID == libraryID &&
+            service.status.selectedServerID == serverID
+    }
+
+    func editPlaylist(track: String? = nil, trackTitle: String = "") {
+        guard canEditPlaylists else { return }
+        playlistEdit = PlexPlaylistEdit(server: serverID, library: libraryID, track: track, trackTitle: trackTitle)
+    }
+
+    func playlistDidChange(_ edit: PlexPlaylistEdit, playlist: String?) {
+        guard serverID == edit.server, libraryID == edit.library else { return }
+        if let detail = selectedDetail, detail.kind == .playlists, detail.id == playlist {
+            open(detail)
+        } else if kind == .playlists && selectedDetail == nil {
+            browse()
+        }
+    }
+
     func enqueue(_ entry: MusicEntry, track: LiveTrack? = nil, playNext: Bool) {
         guard !reconnecting else { return }
         if let track {
@@ -578,16 +616,16 @@ final class LibraryModel: ObservableObject {
         cacheGeneration = generation
         cachingCovers = true
         coverCacheStatus = "Checking selected libraries…"
-        cancelCoverCache = service.cacheLibraryArtwork { [weak self] saved, skipped in
+        cancelCoverCache = service.cacheLibraryArtwork { [weak self] message in
             guard let self, self.cacheGeneration == generation else { return }
-            self.coverCacheStatus = Self.cacheSummary(saved: saved, skipped: skipped)
+            self.coverCacheStatus = message
         } completion: { [weak self] result in
             guard let self, self.cacheGeneration == generation else { return }
             self.cancelCoverCache = nil
             self.cachingCovers = false
             switch result {
-            case let .success((saved, skipped)):
-                self.coverCacheStatus = Self.cacheSummary(saved: saved, skipped: skipped)
+            case let .success(message):
+                self.coverCacheStatus = message
             case let .failure(error):
                 self.coverCacheStatus = error.localizedDescription
             }
@@ -601,11 +639,6 @@ final class LibraryModel: ObservableObject {
         cancelCoverCache = nil
         cachingCovers = false
         coverCacheStatus = "Canceled. Downloaded artwork was kept."
-    }
-
-    private static func cacheSummary(saved: Int, skipped: Int) -> String {
-        let text = "\(saved) \(saved == 1 ? "image" : "images") cached"
-        return skipped == 0 ? text : text + " · \(skipped) unavailable"
     }
 
     private func loadEntries(append: Bool) async throws {

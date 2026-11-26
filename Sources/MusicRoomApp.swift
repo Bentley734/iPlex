@@ -100,7 +100,11 @@ private struct MusicWindow: View {
         .toolbarBackground(theme.surface(using: palette), for: .windowToolbar)
         .toolbarBackground(.visible, for: .windowToolbar)
         .sheet(isPresented: $showSettings) { MusicSettings(library: model) }
+        .sheet(item: $model.playlistEdit) { edit in PlexPlaylistEditor(library: model, edit: edit) }
         .tint(copper)
+        .onChange(of: model.visibleVideoKinds) { _, enabled in
+            if let videoSection, !enabled.contains(videoSection) { self.videoSection = nil }
+        }
         .onChange(of: model.query) { _, _ in
             searchTask?.cancel()
             searchTask = Task {
@@ -252,7 +256,7 @@ private struct MusicWindow: View {
                     if !plexify { HeaderBrand(theme: theme, width: min(155, width - padding * 2), height: 46) }
                     VStack(alignment: .leading, spacing: 6) {
                         sidebarButton("Music", icon: "music.note", selected: videoSection == nil) { videoSection = nil }
-                        ForEach(PlexVideoKind.allCases) { videoTab($0) }
+                        ForEach(model.visibleVideoKinds) { videoTab($0) }
                     }
                     if videoSection == nil {
                         VStack(alignment: .leading, spacing: 4) {
@@ -325,14 +329,15 @@ private struct MusicWindow: View {
     private func videoTab(_ kind: PlexVideoKind) -> some View {
         sidebarButton(kind.title, icon: kind.icon, selected: videoSection == kind) {
             videoSection = kind
-        }.disabled(model.serverID.isEmpty || !model.servers.contains { $0.id == model.serverID })
+        }.disabled(model.serverID.isEmpty)
     }
 
     private var mainPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
             if let videoSection, !model.serverID.isEmpty {
                 PlexVideoBrowser(kind: videoSection, server: model.serverID, service: model.service,
-                                 pauseMusic: model.player.pause)
+                                 serverReady: model.videoServerReady, connectionError: model.busy ? nil : model.message,
+                                 retryConnection: model.retryLibrary, pauseMusic: model.player.pause)
                     .id(model.serverID + videoSection.rawValue)
             } else if model.libraryID.isEmpty {
                 welcome
@@ -348,6 +353,10 @@ private struct MusicWindow: View {
                     Text(model.selectedDetail?.title ?? model.selectedGroup?.title ?? model.kind.rawValue)
                         .font(.system(size: graphite ? 38 : 31, weight: .bold, design: graphite ? .rounded : .default))
                         .lineLimit(1)
+                    if model.kind == .playlists && model.selectedDetail == nil && model.selectedGroup == nil {
+                        Button("New Playlist", systemImage: "plus") { model.editPlaylist() }
+                            .disabled(!model.canEditPlaylists)
+                    }
                     Spacer()
                     if !plexify && (graphite || (model.selectedDetail == nil && model.selectedGroup == nil)) {
                         librarySearch.frame(width: 205)

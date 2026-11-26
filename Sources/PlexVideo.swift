@@ -27,6 +27,29 @@ struct PlexVideoItem: Identifiable, Equatable, Codable {
     let thumb: String?
 }
 
+struct PlexVideoSnapshot: Codable {
+    let server: String
+    let library: PlexLibrary
+    let items: [PlexVideoItem]
+
+    private static func key(_ kind: PlexVideoKind) -> String { "PlexVideoSnapshot." + kind.rawValue }
+
+    static func restore(kind: PlexVideoKind, server: String) -> Self? {
+        guard let data = UserDefaults.standard.data(forKey: key(kind)),
+              let snapshot = try? JSONDecoder().decode(Self.self, from: data),
+              snapshot.server == server else { return nil }
+        return snapshot
+    }
+
+    static func clear() {
+        for kind in PlexVideoKind.allCases { UserDefaults.standard.removeObject(forKey: key(kind)) }
+    }
+
+    func save(kind: PlexVideoKind) {
+        if let data = try? JSONEncoder().encode(self) { UserDefaults.standard.set(data, forKey: Self.key(kind)) }
+    }
+}
+
 struct PlexVideoPage {
     let items: [PlexVideoItem]
     let next: Int?
@@ -80,8 +103,13 @@ struct PlexVideoBrowser: View {
     let kind: PlexVideoKind
     let server: String
     let service: PlexService
+    let serverReady: Bool
+    let connectionError: String?
+    let retryConnection: () -> Void
     let pauseMusic: () -> Void
 
+    @State private var snapshot: PlexVideoSnapshot?
+    @State private var discovered = false
     @State private var libraries = [PlexLibrary]()
     @State private var selection = ""
     @State private var trail = [PlexVideoItem]()
@@ -97,10 +125,28 @@ struct PlexVideoBrowser: View {
     @State private var recent = [VideoWatchRecord]()
     @State private var watchedItems = Set<String>()
 
+    init(kind: PlexVideoKind, server: String, service: PlexService, serverReady: Bool,
+         connectionError: String?, retryConnection: @escaping () -> Void, pauseMusic: @escaping () -> Void) {
+        self.kind = kind
+        self.server = server
+        self.service = service
+        self.serverReady = serverReady
+        self.connectionError = connectionError
+        self.retryConnection = retryConnection
+        self.pauseMusic = pauseMusic
+        let saved = PlexVideoSnapshot.restore(kind: kind, server: server)
+        _snapshot = State(initialValue: saved)
+        _libraries = State(initialValue: saved.map { [$0.library] } ?? [])
+        _selection = State(initialValue: saved?.library.id ?? "")
+        _items = State(initialValue: saved?.items ?? [])
+    }
+
+    private var ready: Bool { serverReady && discovered && !selection.isEmpty }
+    private var showingRoot: Bool { parent == nil && query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     private var preference: String { kind.libraryPreference(server: server) }
     private var parent: PlexVideoItem? { trail.last }
     private var episodes: Bool { parent?.type == "season" }
-    private var requestKey: [String] { [server, kind.rawValue, selection, parent?.id ?? "", query, String(retry)] }
+    private var requestKey: [String] { [String(ready), selection, parent?.id ?? "", query, String(retry)] }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -114,11 +160,11 @@ struct PlexVideoBrowser: View {
                 if !libraries.isEmpty {
                     Picker("Video Library", selection: $selection) {
                         ForEach(libraries, id: \.id) { Text($0.name).tag($0.id) }
-                    }.labelsHidden().accessibilityLabel("Switch \(kind.title) Library")
+                    }.labelsHidden().accessibilityLabel("Switch \(kind.title) Library").disabled(!ready)
                 }
             }
             if parent == nil && !selection.isEmpty {
-                TextField("Search \(kind.title)", text: $query)
+                TextField("Search \(kind.title)", text: $query).disabled(!ready)
                 #if !os(tvOS)
                     .textFieldStyle(.roundedBorder)
                 #endif
@@ -158,17 +204,26 @@ struct PlexVideoBrowser: View {
                                         }
                                     }
                                 }
-                            }.contextMenu {
-                                if item.type == "movie" { watchActions(item) }
+                            }.disabled(!ready).contextMenu {
+                                if ready && item.type == "movie" { watchActions(item) }
                             }
                         }
                     }
                 }
-                if let message {
+                if !serverReady {
+                    if let connectionError {
+                        VStack(spacing: 8) {
+                            Text(connectionError).foregroundStyle(.secondary)
+                            Button("Retry", action: retryConnection)
+                        }.padding(16)
+                    } else {
+                        ProgressView("Reconnecting to Plex…").padding(16)
+                    }
+                } else if let message {
                     VStack(spacing: 8) {
                         Text(message).foregroundStyle(.secondary)
                         Button("Retry") {
-                            if libraries.isEmpty { discoveryRetry += 1 }
+                            if !discovered { discoveryRetry += 1 }
                             else { retry += 1 }
                         }
                     }.padding(16)
@@ -185,19 +240,22 @@ struct PlexVideoBrowser: View {
             }
         }
         .padding(20)
-        .task(id: discoveryRetry) { await discover() }
+        .task(id: [String(serverReady), String(discoveryRetry)]) {
+            if serverReady { await discover() }
+            else { discovered = false }
+        }
         .task(id: requestKey) {
             let current = UUID()
             generation = current
-            items = []
+            items = showingRoot && snapshot?.library.id == selection ? snapshot?.items ?? [] : []
             next = nil
-            if !selection.isEmpty {
-                await load(offset: 0, generation: current)
-            }
+            refreshWatchState()
+            if ready { await load(offset: 0, generation: current) }
         }
         .onChange(of: selection) { _, value in
             if !value.isEmpty { UserDefaults.standard.set(value, forKey: preference) }
             trail = []
+            items = showingRoot && snapshot?.library.id == value ? snapshot?.items ?? [] : []
             refreshWatchState()
         }
         .sheet(item: $presentation, onDismiss: refreshWatchState) { item in
@@ -218,7 +276,7 @@ struct PlexVideoBrowser: View {
                                 Text("Resume at " + videoTime(record.seconds))
                                     .font(.caption).foregroundStyle(.secondary)
                             }.frame(width: 150, alignment: .leading)
-                        }.contextMenu { watchActions(record.item) }
+                        }.disabled(!ready).contextMenu { if ready { watchActions(record.item) } }
                     }
                 }
             }
@@ -260,7 +318,9 @@ struct PlexVideoBrowser: View {
     }
 
     private func poster(_ item: PlexVideoItem) -> some View {
-        PlexVideoPoster(path: item.thumb, server: server, section: selection, service: service, icon: kind.icon)
+        PlexVideoPoster(path: item.thumb, server: server, section: selection, service: service, icon: kind.icon,
+                        cachedOnly: !ready, cache: showingRoot && snapshot?.library.id == selection &&
+                            snapshot?.items.contains { $0.id == item.id && $0.thumb == item.thumb } == true)
     }
 
     private func labels(_ item: PlexVideoItem) -> some View {
@@ -281,6 +341,7 @@ struct PlexVideoBrowser: View {
             try Task.checkCancellation()
             libraries = found
             selection = kind.selectedLibrary(from: found, server: server)?.id ?? ""
+            discovered = true
         } catch {
             if !Task.isCancelled { message = error.localizedDescription }
         }
@@ -297,8 +358,21 @@ struct PlexVideoBrowser: View {
                                                    parent: parent, query: query, offset: offset)
             try Task.checkCancellation()
             guard generation == current else { return }
-            let previous = Set(items.map(\.id))
-            items.append(contentsOf: page.items.filter { !previous.contains($0.id) })
+            if offset == 0 {
+                items = page.items
+                if showingRoot, let library = libraries.first(where: { $0.id == selection }) {
+                    let previews = items.prefix(60).map {
+                        PlexVideoItem(id: $0.id, type: $0.type, title: $0.title, subtitle: $0.subtitle,
+                                      summary: String($0.summary.prefix(400)), thumb: $0.thumb)
+                    }
+                    let saved = PlexVideoSnapshot(server: server, library: library, items: previews)
+                    saved.save(kind: kind)
+                    snapshot = saved
+                }
+            } else {
+                let previous = Set(items.map(\.id))
+                items.append(contentsOf: page.items.filter { !previous.contains($0.id) })
+            }
             next = page.next
             refreshWatchState()
         } catch {
@@ -313,19 +387,26 @@ private struct PlexVideoPoster: View {
     let section: String
     let service: PlexService
     let icon: String
+    var cachedOnly = false
+    var cache = false
     @State private var image: Image?
+    @State private var loadedKey: [String]?
+
+    private var artworkKey: [String] { [server, section, path ?? ""] }
 
     var body: some View {
         Color.primary.opacity(0.07)
             .overlay {
-                if let image { image.resizable().scaledToFill() }
+                if loadedKey == artworkKey, let image { image.resizable().scaledToFill() }
                 else { Image(systemName: icon).font(.title).foregroundStyle(.secondary) }
             }
             .clipShape(.rect(cornerRadius: 12))
-            .task(id: [section, path ?? ""]) {
-                image = nil
-                guard let path, let data = try? await service.videoPoster(server: server, section: section, path: path),
+            .task(id: artworkKey + [String(cachedOnly), String(cache)]) {
+                guard let path else { image = nil; return }
+                guard let data = try? await service.videoPoster(server: server, section: section, path: path,
+                                                                cachedOnly: cachedOnly, cache: cache),
                       !Task.isCancelled else { return }
+                loadedKey = artworkKey
                 #if os(macOS)
                 if let artwork = NSImage(data: data) { image = Image(nsImage: artwork) }
                 #else

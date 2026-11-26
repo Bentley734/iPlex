@@ -11,6 +11,30 @@ enum AlbumCoverCache {
             .appending(path: key + ".jpg")
     }
 
+    struct Checkpoint: Codable {
+        let revision: String
+        let offset: Int
+    }
+
+    static func checkpointLocation(server: String, library: String, type: String) -> URL {
+        location(server: server, library: library, path: "scan-" + type)
+            .deletingPathExtension().appendingPathExtension("json")
+    }
+
+    static func resumeOffset(at url: URL, revision: String?) -> Int {
+        guard let revision, let data = try? Data(contentsOf: url),
+              let checkpoint = try? JSONDecoder().decode(Checkpoint.self, from: data),
+              checkpoint.revision == revision, checkpoint.offset > 0 else { return 0 }
+        return checkpoint.offset
+    }
+
+    static func saveCheckpoint(at url: URL, revision: String?, offset: Int) throws {
+        guard let revision else { return }
+        let data = try JSONEncoder().encode(Checkpoint(revision: revision, offset: offset))
+        try FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try data.write(to: url, options: .atomic)
+    }
+
     static func thumbnail(_ data: Data) -> CGImage? {
         guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return nil }
         return CGImageSourceCreateThumbnailAtIndex(source, 0, [

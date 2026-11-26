@@ -17,7 +17,7 @@ namespace MusicRoom
         const string VideoOrigin = "https://media.musicroom.invalid/video/";
         readonly VideoWatchStore videoWatch;
         List<Section> videoSections = new List<Section>();
-        readonly Dictionary<string, Tuple<Server, string, string>> videoArt = new Dictionary<string, Tuple<Server, string, string>>();
+        readonly Dictionary<string, Tuple<string, string, string, bool>> videoArt = new Dictionary<string, Tuple<string, string, string, bool>>();
         readonly Dictionary<string, string> videoArtIds = new Dictionary<string, string>();
         readonly Dictionary<string, VideoResource> videoResources = new Dictionary<string, VideoResource>();
         readonly Dictionary<Uri, string> videoAliases = new Dictionary<Uri, string>();
@@ -41,34 +41,96 @@ namespace MusicRoom
             { ".vob", "video/mpeg" }, { ".flv", "video/x-flv" }
         };
 
-        string RegisterVideoArt(Server server, string library, string path)
+        string RegisterVideoArt(string server, string library, string path, bool cache = false)
         {
             if (path == null) return "";
             string id;
-            string key = library + "/" + path;
+            string key = server + "/" + library + "/" + path;
             if (!videoArtIds.TryGetValue(key, out id))
             {
                 if (videoArt.Count >= 2400) { videoArt.Clear(); videoArtIds.Clear(); }
                 id = Guid.NewGuid().ToString("N");
                 videoArtIds.Add(key, id);
-                videoArt.Add(id, Tuple.Create(server, library, path));
             }
+            else cache |= videoArt[id].Item4;
+            videoArt[id] = Tuple.Create(server, library, path, cache);
             return "/art/" + id;
         }
 
-        async Task<WindowsMediaResponse> VideoPoster(Server server, string library, string path, string method)
+        async Task<WindowsMediaResponse> VideoPoster(string serverId, string library, string path, bool cache, string method)
         {
             await artSlots.WaitAsync(shutdown.Token);
             try
             {
-                var target = CoverCachePath(server.Id, library, path);
-                var bytes = File.Exists(target) ? File.ReadAllBytes(target) : await FetchArtwork(server, path, shutdown.Token);
+                var target = CoverCachePath(serverId, library, path);
+                var bytes = await Task.Run(() => File.Exists(target) ? File.ReadAllBytes(target) : null, shutdown.Token);
+                if (bytes == null)
+                {
+                    Server server;
+                    if (serverId != selectedServer || !servers.TryGetValue(serverId, out server) ||
+                        !videoSections.Any(section => section.id == library))
+                        return Response(404, "Not Found");
+                    bytes = cache
+                        ? await WithServer(server, url => FetchCacheThumbnail(url, path, server.Token, shutdown.Token), shutdown.Token)
+                        : await FetchArtwork(server, path, shutdown.Token);
+                    if (cache)
+                    {
+                        try { await Task.Run(() => SaveCover(bytes, target), shutdown.Token); }
+                        catch (IOException) { }
+                        catch (UnauthorizedAccessException) { }
+                        catch (ArgumentException) { }
+                        catch (System.Runtime.InteropServices.ExternalException) { }
+                    }
+                }
                 string mime = ArtworkMime(bytes);
                 return mime == null ? Response(415, "Unsupported image") :
                     Response(200, "OK", "Content-Type: " + mime + "\r\n", method == "HEAD" ? null : new MemoryStream(bytes, false));
             }
             catch (Exception) { return Response(503, "Artwork unavailable"); }
             finally { artSlots.Release(); }
+        }
+
+        void SaveLaunchVideo(string server, string library, string kind, IEnumerable<Dictionary<string, object>> rows)
+        {
+            var section = videoSections.FirstOrDefault(item => item.id == library && item.type == kind);
+            if (section == null) return;
+            var items = rows.Take(60).Select(row => new {
+                key = Str(row, "ratingKey"), type = kind,
+                title = String.Concat(Str(row, "title").Take(400)),
+                subtitle = String.Concat(Str(row, "year").Take(12)),
+                summary = String.Concat(Str(row, "summary").Take(400)),
+                thumb = ArtworkPath(row, "thumb")
+            }).ToArray();
+            plexPrefs["lastVideoLibrary." + kind] = Json().Serialize(new { server, library, name = section.name, items });
+            plexPrefs["server"] = server;
+            try { SavePrefs(); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+
+        object ReadLaunchVideo(string kind, string server)
+        {
+            if (server.Length == 0) return null;
+            Dictionary<string, object> saved;
+            try
+            {
+                var json = Pref("lastVideoLibrary." + kind);
+                if (json.Length == 0) return null;
+                saved = Map(Json().DeserializeObject(json));
+            }
+            catch (ArgumentException) { return null; }
+            catch (InvalidOperationException) { return null; }
+
+            string library = Str(saved, "library");
+            if (Str(saved, "server") != server || !ItemID.IsMatch(library)) return null;
+            var items = Rows(Get(saved, "items")).Take(60)
+                .Where(row => Str(row, "type") == kind && ItemID.IsMatch(Str(row, "key")))
+                .Select(row => {
+                    var entry = new Dictionary<string, object>(row);
+                    entry["artwork"] = RegisterVideoArt(server, library, ArtworkPath(row, "thumb"), true);
+                    return entry;
+                }).ToArray();
+            return new { library, name = Str(saved, "name"), items };
         }
 
         void ResetVideoLibraries()
@@ -176,6 +238,7 @@ namespace MusicRoom
                 {
                     long offset = Num(request, "offset");
                     if (offset < 0 || offset > Int32.MaxValue - 2000) throw Problem("Invalid video listing.");
+                    bool savePreview = key.Length == 0 && offset == 0 && Str(request, "query").Trim().Length == 0;
                     string path;
                     if (key.Length == 0)
                     {
@@ -203,8 +266,9 @@ namespace MusicRoom
                         key = Str(row, "ratingKey"), type = expected, title = Str(row, "title"),
                         summary = Str(row, "summary"), subtitle = expected == "episode" && Num(row, "index") > 0 ?
                             "Episode " + Str(row, "index") : Str(row, "year"),
-                        thumb = ArtworkPath(row, "thumb"), artwork = RegisterVideoArt(server, library, ArtworkPath(row, "thumb"))
+                        thumb = ArtworkPath(row, "thumb"), artwork = RegisterVideoArt(server.Id, library, ArtworkPath(row, "thumb"), savePreview)
                     }).ToArray();
+                    if (savePreview) SaveLaunchVideo(server.Id, library, kind, rows);
                     int count = Rows(Get(container, "Metadata")).Count();
                     long end = offset + count, total = Num(container, "totalSize");
                     Send("plexVideoListing", new { id, items, next = items.Length > 0 && (total > 0 ? end < total : count >= 60)
@@ -370,7 +434,7 @@ namespace MusicRoom
                 key = Str(candidate, "ratingKey"), type = "episode", title = Str(candidate, "title"),
                 summary = Str(candidate, "summary"), subtitle = index != Int64.MaxValue && season != Int64.MaxValue ?
                     "Season " + season + " · Episode " + index : "",
-                thumb, artwork = RegisterVideoArt(server, library, thumb)
+                thumb, artwork = RegisterVideoArt(server.Id, library, thumb)
             };
         }
 
@@ -380,7 +444,7 @@ namespace MusicRoom
                 var row = Map(value);
                 var path = Str(row, "artwork");
                 row["thumb"] = path;
-                row["artwork"] = path.Length < 180 && ArtPath.IsMatch(path) ? RegisterVideoArt(server, library, path) : "";
+                row["artwork"] = path.Length < 180 && ArtPath.IsMatch(path) ? RegisterVideoArt(server.Id, library, path) : "";
                 return row;
             }).ToArray();
             Send("plexVideoWatchState", new { id, records });

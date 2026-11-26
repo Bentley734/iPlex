@@ -60,6 +60,7 @@
       <header>
         <button id="back" aria-label="Back" hidden>‹</button>
         <h1 id="title">Albums</h1>
+        <button id="new-playlist" type="button" hidden>New Playlist</button>
         <input type="search" id="search" aria-label="Search albums or artists" placeholder="Search library" maxlength="120">
       </header>
       <div class="content" id="scroll">
@@ -98,6 +99,17 @@
       </div>
     </section>
   </main>
+  <dialog id="playlist-editor" aria-labelledby="playlist-editor-title">
+    <h2 id="playlist-editor-title">New Playlist</h2>
+    <p id="playlist-editor-track" hidden></p>
+    <div id="playlist-editor-choices"></div>
+    <form id="playlist-editor-form">
+      <input id="playlist-editor-name" type="text" placeholder="Playlist name" aria-label="Playlist name" maxlength="120" required>
+      <button id="playlist-editor-create" type="submit">Create Playlist</button>
+    </form>
+    <p id="playlist-editor-status" role="status"></p>
+    <button id="playlist-editor-close" type="button">Cancel</button>
+  </dialog>
   <dialog id="video-dialog" aria-labelledby="video-playing-title">
     <header>
       <div><h2 id="video-playing-title"></h2><span id="video-mode" role="status"></span></div>
@@ -385,6 +397,10 @@
     <section>
       <h2>Library Sections</h2>
       <div id="library-sections" class="library-sections"></div>
+      <div class="library-sections">
+        <label><input id="show-movies-section" type="checkbox" checked>Movies</label>
+        <label><input id="show-tv-section" type="checkbox" checked>TV Shows</label>
+      </div>
     </section>
     <section>
       <div class="settings-head">

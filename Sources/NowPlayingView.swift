@@ -562,6 +562,110 @@ struct LibraryQueueActions: View {
         Button("Add to Queue", systemImage: "text.append") {
             library.enqueue(entry, track: track, playNext: false)
         }
+        if let trackID = track?.plexID ?? (entry.kind == .tracks ? entry.id : nil) {
+            Button("Add to Playlist", systemImage: "text.badge.plus") {
+                library.editPlaylist(track: trackID, trackTitle: track?.title ?? entry.title)
+            }.disabled(!library.canEditPlaylists)
+        }
+    }
+}
+
+struct PlexPlaylistChoice: Identifiable {
+    let id: String
+    let title: String
+}
+
+struct PlexPlaylistEdit: Identifiable {
+    let id = UUID()
+    let server: String
+    let library: String
+    let track: String?
+    let trackTitle: String
+}
+
+struct PlexPlaylistEditor: View {
+    @ObservedObject var library: LibraryModel
+    let edit: PlexPlaylistEdit
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var playlists: [PlexPlaylistChoice] = []
+    @State private var name = ""
+    @State private var loadError: String?
+    @State private var message: String?
+    @State private var loading = true
+    @State private var saving = false
+    @State private var saved = false
+    @State private var refresh = 0
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text(edit.track == nil ? "New Playlist" : "Add to Playlist").font(.title2.bold())
+            if edit.track != nil { Text(edit.trackTitle).foregroundStyle(.secondary) }
+            if saved {
+                Button("Done") { dismiss() }
+            } else {
+                if edit.track != nil {
+                    if loading { ProgressView("Finding playlists…") }
+                    else if let loadError {
+                        Text(loadError).foregroundStyle(.secondary)
+                        Button("Retry Playlists") { refresh += 1 }
+                    } else if playlists.isEmpty {
+                        Text("No editable music playlists on this server.").foregroundStyle(.secondary)
+                    } else {
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 8) {
+                                ForEach(playlists) { playlist in
+                                    Button(playlist.title) { save(to: playlist) }
+                                        .disabled(saving)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                }
+                            }
+                        }.frame(maxHeight: 240)
+                    }
+                }
+                HStack {
+                    TextField("Playlist name", text: $name)
+                        #if !os(tvOS)
+                        .textFieldStyle(.roundedBorder)
+                        #endif
+                    Button("Create Playlist") { save(to: nil) }
+                        .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || name.count > 120)
+                }
+                .disabled(saving)
+                Button("Cancel") { dismiss() }.disabled(saving)
+            }
+            if let message { Text(message).foregroundStyle(.secondary) }
+            if saving { ProgressView("Saving to Plex…") }
+        }
+        .padding(24)
+        #if os(macOS)
+        .frame(width: 420)
+        #endif
+        .interactiveDismissDisabled(saving)
+        .task(id: refresh) {
+            guard edit.track != nil else { loading = false; return }
+            loading = true
+            loadError = nil
+            defer { loading = false }
+            do { playlists = try await library.service.editableMusicPlaylists(server: edit.server) }
+            catch { if !Task.isCancelled { loadError = error.localizedDescription } }
+        }
+    }
+
+    private func save(to playlist: PlexPlaylistChoice?) {
+        guard !saving, !saved, library.serverID == edit.server, library.libraryID == edit.library else { return }
+        saving = true
+        message = nil
+        Task {
+            defer { saving = false }
+            do {
+                try await library.service.saveMusicPlaylist(server: edit.server, track: edit.track,
+                                                            playlist: playlist?.id, title: name)
+                message = playlist.map { "Added to \($0.title)." } ?? "Playlist created."
+                saved = true
+                library.playlistDidChange(edit, playlist: playlist?.id)
+            } catch { message = error.localizedDescription }
+        }
     }
 }
 
