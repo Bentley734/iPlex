@@ -694,8 +694,8 @@ final class PlayerController {
             : collectionLabel
         var info: [String: Any] = [
             MPMediaItemPropertyTitle: tracks[index].title,
-            MPMediaItemPropertyArtist: albumArtist,
-            MPMediaItemPropertyAlbumTitle: album,
+            MPMediaItemPropertyArtist: tracks[index].artist ?? albumArtist,
+            MPMediaItemPropertyAlbumTitle: tracks[index].album ?? album,
             MPNowPlayingInfoPropertyElapsedPlaybackTime: elapsed,
             MPNowPlayingInfoPropertyPlaybackRate: player.timeControlStatus == .playing ? 1.0 : 0.0
         ]

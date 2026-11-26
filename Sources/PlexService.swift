@@ -503,7 +503,7 @@ enum PlexParser {
             }
             // Preserve the original, already authenticated URL. UI callbacks use LiveTrack.summary, which omits it.
             return LiveTrack(number: track.number, title: title, duration: track.duration, url: track.url,
-                             artworkPath: track.artworkPath)
+                             artworkPath: track.artworkPath, artist: track.artist, album: track.album)
         }
     }
 
@@ -1549,7 +1549,7 @@ extension PlexParser {
             throw PlexServiceError("This album has too many tracks for the current player.")
         }
         var seen = Set<String>()
-        var tracks = [(disc: Int, index: Int, title: String, duration: Double?, url: URL, artwork: String?)]()
+        var tracks = [(disc: Int, index: Int, track: LiveTrack)]()
         for (position, row) in rows.enumerated() {
             guard row["type"] as? String == "track", let id = numericIdentifier(row["ratingKey"]),
                   entry.kind != .albums || row["parentRatingKey"] == nil || numericIdentifier(row["parentRatingKey"]) == entry.id,
@@ -1565,8 +1565,10 @@ extension PlexParser {
             }.first
             guard let url else { continue }
             let artwork = musicArtworkPath(row["parentThumb"] as? String) ?? musicArtworkPath(row["thumb"] as? String)
-            tracks.append((integer(row["parentIndex"]) ?? 1, integer(row["index"]) ?? (position + 1),
-                           title, milliseconds(row["duration"]), url, artwork))
+            let track = LiveTrack(number: 0, title: title, duration: milliseconds(row["duration"]), url: url,
+                                  artworkPath: artwork, artist: string(row["grandparentTitle"], maximum: 300),
+                                  album: string(row["parentTitle"], maximum: 300))
+            tracks.append((integer(row["parentIndex"]) ?? 1, integer(row["index"]) ?? (position + 1), track))
         }
         if entry.kind == .albums {
             tracks = tracks.enumerated().sorted {
@@ -1574,7 +1576,9 @@ extension PlexParser {
             }.map(\.element)
         }
         return (tracks.enumerated().map { index, row in
-            LiveTrack(number: offset + index + 1, title: row.title, duration: row.duration, url: row.url, artworkPath: row.artwork)
+            let track = row.track
+            return LiveTrack(number: offset + index + 1, title: track.title, duration: track.duration, url: track.url,
+                             artworkPath: track.artworkPath, artist: track.artist, album: track.album)
         }, rows.count, integer(container["totalSize"]))
     }
 }

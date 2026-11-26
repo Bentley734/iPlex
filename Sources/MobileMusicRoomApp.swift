@@ -28,6 +28,7 @@ private struct MusicLibraryScreen: View {
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @State private var showAppIcons = false
     @State private var showPlayer = false
+    @State private var showMiniPlayer = false
     @State private var search: Task<Void, Never>?
 
     private var palette: ArtworkPalette? { artworkColors ? library.playingPalette : nil }
@@ -44,25 +45,26 @@ private struct MusicLibraryScreen: View {
 
     var body: some View {
         ZStack {
-            if showPlayer, let style = selectedMiniPlayer {
+            libraryScreen
+                .accessibilityHidden(showPlayer || showMiniPlayer)
+                .allowsHitTesting(!showPlayer && !showMiniPlayer)
+                #if os(tvOS)
+                .disabled(showPlayer || showMiniPlayer)
+                #endif
+            if showPlayer {
+                NowPlayingView(library: library) { showPlayer = false }
+            }
+            if showMiniPlayer, let style = selectedMiniPlayer {
                 Color.black.ignoresSafeArea()
-                MiniPlayerContent(library: library, style: style) { showPlayer = false }
-            } else {
-                libraryScreen
+                MiniPlayerContent(library: library, style: style) { showMiniPlayer = false }
             }
         }
         .tint(accent)
         #if os(iOS)
-        .statusBarHidden(showPlayer && selectedMiniPlayer != nil)
+        .statusBarHidden(showMiniPlayer)
         #endif
         .sheet(isPresented: $showSettings) { MusicSettings(library: library) }
         .sheet(isPresented: $showAppIcons) { MusicAppIconPicker() }
-        .sheet(isPresented: Binding(get: { showPlayer && selectedMiniPlayer == nil },
-                                    set: { showPlayer = $0 })) {
-            nowPlaying.padding(24)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(theme.backdrop(using: palette).ignoresSafeArea())
-        }
         .onChange(of: library.query) { _, _ in
             search?.cancel()
             search = Task {
@@ -95,20 +97,28 @@ private struct MusicLibraryScreen: View {
             } else {
                 browser
                 if let album = library.playingAlbum {
-                    Button { showPlayer = true } label: {
-                        HStack(spacing: 14) {
-                            MusicArtwork(item: album, library: library).frame(width: 43, height: 43)
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(library.state.title.isEmpty ? album.title : library.state.title).font(.headline)
-                                Text(album.artist).font(.caption).foregroundStyle(.secondary)
-                            }.lineLimit(1)
-                            Spacer()
-                            Image(systemName: "waveform")
-                        }.padding(.horizontal, 14).padding(.vertical, 8)
-                    }.accessibilityLabel("Open Now Playing")
+                    HStack(spacing: 8) {
+                        Button { showPlayer = true } label: {
+                            HStack(spacing: 14) {
+                                MusicArtwork(item: album, library: library).frame(width: 43, height: 43)
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(library.state.title.isEmpty ? album.title : library.state.title).font(.headline)
+                                    Text(album.artist).font(.caption).foregroundStyle(.secondary)
+                                }.lineLimit(1)
+                                Spacer()
+                                Image(systemName: "waveform")
+                            }.padding(.horizontal, 14).padding(.vertical, 8)
+                        }
+                        .accessibilityLabel("Open Now Playing")
                         .buttonStyle(.bordered)
                         .musicGlass(theme, radius: 20, interactive: true)
-                        .padding(.horizontal, 16)
+                        if selectedMiniPlayer != nil {
+                            Button("Mini-player", systemImage: "ipod") { showMiniPlayer = true }
+                                .labelStyle(.iconOnly)
+                                .buttonStyle(.bordered)
+                        }
+                    }
+                    .padding(.horizontal, 16)
                 }
             }
         }
@@ -254,42 +264,6 @@ private struct MusicLibraryScreen: View {
                 }.buttonStyle(.bordered)
             }
         }.frame(maxWidth: 1000, alignment: .leading)
-    }
-
-    private var nowPlaying: some View {
-        VStack(spacing: 18) {
-            if let album = library.playingAlbum {
-                let artworkSize = theme == .plexify ? columnWidth * 1.3 : columnWidth
-                MusicArtwork(item: album, library: library).frame(width: artworkSize, height: artworkSize)
-                Text(library.state.title).font(.title.bold())
-                Text([album.artist, album.title].filter { !$0.isEmpty }.joined(separator: " · ")).foregroundStyle(.secondary)
-                if !library.state.message.isEmpty { Text(library.state.message) }
-                Text(clock(library.state.elapsed) + " / " + clock(library.state.duration)).monospacedDigit()
-                #if os(iOS)
-                Slider(value: Binding(get: { min(library.state.elapsed, library.state.duration) },
-                                      set: { library.player.seek(to: $0) }), in: 0...max(1, library.state.duration))
-                    .disabled(library.state.duration <= 0).accessibilityLabel("Playback position")
-                #endif
-                HStack {
-                    Button("Previous", systemImage: "backward.fill", action: library.player.previous)
-                        .labelStyle(.iconOnly).disabled(!library.state.previous)
-                    Button(library.state.playing ? "Pause" : "Play",
-                           systemImage: library.state.playing ? "pause.fill" : "play.fill", action: library.player.toggle).labelStyle(.iconOnly)
-                    Button("Next", systemImage: "forward.fill", action: library.player.next)
-                        .labelStyle(.iconOnly).disabled(!library.state.next)
-                }.buttonStyle(.bordered)
-                if theme == .plexify, let next = library.state.nextTitle {
-                    VStack(alignment: .leading, spacing: 5) {
-                        Text("Up Next").font(.caption.weight(.semibold)).foregroundStyle(accent)
-                        Text(next).lineLimit(2)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(14)
-                    .background(theme.surface(using: palette), in: RoundedRectangle(cornerRadius: 10))
-                }
-            }
-            Button("Done") { showPlayer = false }
-        }.frame(maxWidth: 500)
     }
 
     private func clock(_ seconds: Double) -> String {

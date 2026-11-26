@@ -18,7 +18,7 @@ window.windowsPlayback = (() => {
   function publish() {
     const track = tracks[index] || {};
     window.macPlayerState?.({
-      visible: state !== 'closed', status: state, message: error, error,
+      visible: state !== 'closed', status: state, message: error, error, volume: outputVolume,
       tracks: tracks.map(({title, durationSeconds}) => ({title, durationSeconds})),
       trackIndex: index, context: collection, title: track.title || collection, artwork: track.artwork,
       duration: decoded ? decoded.buffer.duration : Number.isFinite(audio.duration) && audio.currentSrc === expectedURL ? audio.duration : track.durationSeconds || 0,
@@ -329,6 +329,7 @@ window.windowsPlayback = (() => {
         outputVolume = Math.max(0, Math.min(1, value));
         if (volumeStage) volumeStage.gain.setTargetAtTime(outputVolume, context.currentTime, .015);
         else audio.volume = outputVolume;
+        publish();
         break;
       }
       case 'playTrack': select(Number(p.index),true); break;

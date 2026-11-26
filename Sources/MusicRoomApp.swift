@@ -69,6 +69,7 @@ private struct MusicWindow: View {
     @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @State private var showSettings = false
+    @State private var showNowPlaying = false
     @State private var showVolume = false
     @State private var showPlexifyDeck = true
     @State private var showCompactDeck = false
@@ -107,6 +108,10 @@ private struct MusicWindow: View {
         }
         .background(theme.backdrop(using: palette))
         .sheet(isPresented: $showSettings) { MusicSettings(library: model) }
+        .sheet(isPresented: $showNowPlaying) {
+            NowPlayingView(library: model) { showNowPlaying = false }
+                .frame(minWidth: 700, idealWidth: 830, minHeight: 470, idealHeight: 620)
+        }
         .tint(copper)
         .onChange(of: model.query) { _, _ in
             searchTask?.cancel()
@@ -128,7 +133,7 @@ private struct MusicWindow: View {
                     Button {
                         if wide { showPlexifyDeck.toggle() }
                         else { showCompactDeck.toggle() }
-                    } label: { Label("Now Playing", systemImage: "rectangle.trailingthird.inset.filled") }
+                    } label: { Label("Playing Sidebar", systemImage: "rectangle.trailingthird.inset.filled") }
                     .popover(isPresented: $showCompactDeck) {
                         plexifyDeck.frame(width: 250, height: 370)
                     }
@@ -479,6 +484,7 @@ private struct MusicWindow: View {
         HStack(spacing: 16) {
             transportMetadata
             Spacer()
+            nowPlayingButton
             miniPlayerButton
             transportButtons
             seekControl.frame(width: 130)
@@ -488,6 +494,11 @@ private struct MusicWindow: View {
         .background(theme == .liquidGlass ? .clear : slate)
         .musicGlass(theme, radius: 24)
         .padding(theme == .liquidGlass ? 8 : 0)
+    }
+
+    private var nowPlayingButton: some View {
+        Button("Now Playing", systemImage: "waveform") { showNowPlaying = true }
+            .disabled(model.playingAlbum == nil)
     }
 
     @ViewBuilder private var miniPlayerButton: some View {
@@ -503,6 +514,7 @@ private struct MusicWindow: View {
     private var graphiteTransport: some View {
         HStack(spacing: 14) {
             transportMetadata.frame(maxWidth: .infinity, alignment: .leading)
+            nowPlayingButton
             miniPlayerButton
             transportButtons
             HStack(spacing: 9) {

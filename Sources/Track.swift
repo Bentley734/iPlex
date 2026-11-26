@@ -6,13 +6,18 @@ struct LiveTrack {
     let duration: TimeInterval?
     let url: URL
     let artworkPath: String?
+    let artist: String?
+    let album: String?
 
-    init(number: Int, title: String, duration: TimeInterval?, url: URL, artworkPath: String? = nil) {
+    init(number: Int, title: String, duration: TimeInterval?, url: URL, artworkPath: String? = nil,
+         artist: String? = nil, album: String? = nil) {
         self.number = number
         self.title = title
         self.duration = duration
         self.url = url
         self.artworkPath = artworkPath
+        self.artist = artist
+        self.album = album
     }
 
     var summary: [String: Any] {

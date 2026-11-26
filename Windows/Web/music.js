@@ -27,6 +27,10 @@
   let featureKey = '';
   let deckKey = '';
   let playbackState = {};
+  let nowQueue = [];
+  let renderedQueue = null;
+  let nowCover = null;
+  let nowIndex = null;
   // Regions in the supplied transparent wordmark sheet, including a small inset.
   const wordmarkRegions = new Map([['music', [722, 251, 684, 210]], ['musicBold', [645, 609, 810, 193]]]);
   const wordmarkSheet = new Image();
@@ -183,6 +187,7 @@
     if (reply.id !== playRequest || !pendingAlbum) return;
     playing = pendingAlbum;
     pendingAlbum = null;
+    nowQueue = reply.tracks;
     const revision = player.reset(reply.context, 'plex');
     footerKey = '';
     player.queue(reply, reply.startIndex, revision, null);
@@ -247,6 +252,8 @@
       window.musicCoverCache({running:false, message:''});
       ++request;
       playing = album = group = pendingAlbum = null;
+      nowQueue = [];
+      if (get('now-playing').open) get('now-playing').close();
       player.reset();
       if (library) browse();
     }
@@ -331,6 +338,8 @@
         }
       }
     }
+    get('show-now-playing').disabled = !playing;
+    if (get('now-playing').open && playing) renderNowPlaying(state);
     if (selectedTheme === 'plexify') renderDeck(state);
     window.clickWheel.update(playing, state, cover);
     const active = state.status === 'playing';
@@ -344,6 +353,69 @@
     if (document.activeElement !== get('seek')) get('seek').value = state.elapsed || 0;
     get('elapsed').textContent = time(state.elapsed);
   };
+  function renderNowPlaying(state) {
+    const track = nowQueue[state.trackIndex] || {};
+    const path = playingCover(state);
+    if (path !== nowCover) {
+      nowCover = path;
+      get('now-art').replaceChildren(cover({...playing, artwork:path}));
+    }
+    get('now-title').textContent = track.title || state.title || playing.title;
+    get('now-artist').textContent = track.artist || playing.artist || '';
+    get('now-album').textContent = track.album || (playing.kind === 'album' ? playing.title : '');
+    const message = get('now-status');
+    message.textContent = state.message || '';
+    message.hidden = !state.message;
+    const seek = get('now-seek');
+    seek.max = Math.max(1, state.duration || 0);
+    seek.disabled = !state.duration;
+    if (document.activeElement !== seek) seek.value = state.elapsed || 0;
+    get('now-elapsed').textContent = time(state.elapsed);
+    get('now-duration').textContent = time(state.duration);
+    const active = state.status === 'playing';
+    get('now-play').textContent = active ? '⏸' : '▶';
+    get('now-play').setAttribute('aria-label', active ? 'Pause' : 'Play');
+    get('now-prev').disabled = !state.canPrevious;
+    get('now-next').disabled = !state.canNext;
+    if (Number.isFinite(state.volume)) get('now-volume').value = state.volume;
+    const queue = get('now-queue-list');
+    if (renderedQueue !== nowQueue) {
+      const rows = document.createDocumentFragment();
+      nowQueue.forEach((item, index) => {
+        const row = node('li');
+        const play = button('', () => player.action({action:'playTrack', index}));
+        const info = node('span', '', 'now-queue-track');
+        info.append(node('strong', item.title));
+        if (item.artist) info.append(node('small', item.artist));
+        play.append(node('span', String(index + 1), 'now-queue-number'), info,
+                    node('span', item.durationSeconds > 0 ? time(item.durationSeconds) : '', 'now-queue-length'));
+        row.append(play);
+        rows.append(row);
+      });
+      queue.replaceChildren(rows);
+      renderedQueue = nowQueue;
+      nowIndex = null;
+    }
+    if (nowIndex !== state.trackIndex) {
+      queue.children[nowIndex]?.firstElementChild?.removeAttribute('aria-current');
+      queue.children[state.trackIndex]?.firstElementChild?.setAttribute('aria-current', 'true');
+      nowIndex = state.trackIndex;
+    }
+  }
+  const nowPlaying = get('now-playing');
+  get('show-now-playing').onclick = () => {
+    if (!playing || nowPlaying.open) return;
+    renderNowPlaying(playbackState);
+    nowPlaying.showModal();
+    nowPlaying.querySelector('.now-playing-scroll').scrollTop = 0;
+  };
+  get('close-now-playing').onclick = () => nowPlaying.close();
+  get('jump-now-queue').onclick = () => get('now-queue-heading').focus();
+  get('now-prev').onclick = () => player.action({action:'previous'});
+  get('now-play').onclick = () => player.action({action:'toggle'});
+  get('now-next').onclick = () => player.action({action:'next'});
+  get('now-seek').oninput = event => player.action({action:'seek', seconds:event.target.value});
+  get('now-volume').oninput = event => player.action({action:'volume', value:event.target.value});
   function renderDeck(state) {
     const next = state.tracks?.[state.trackIndex + 1];
     const key = JSON.stringify([playing?.id, playing?.artwork, state.title, next?.title]);

@@ -54,6 +54,7 @@ window.clickWheel = (() => {
   }
 
   function update(currentAlbum, currentState, makeCover) {
+    if (Number.isFinite(state.volume)) volume = clamp(state.volume, 1);
     if (item?.id !== currentAlbum?.id || state.trackIndex !== currentState.trackIndex) {
       preview = null;
       if (drag) drag.ignore = true;

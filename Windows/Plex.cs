@@ -600,6 +600,7 @@ namespace MusicRoom
                             found.Add(new MediaTrack { number = found.Count + 1, title = Str(row, "title"),
                                 durationSeconds = duration > 0 ? (double?)duration / 1000 : null,
                                 artwork = ArtworkPath(row, "parentThumb", "thumb"),
+                                artist = Str(row, "grandparentTitle"), album = Str(row, "parentTitle"),
                                 remote = new Uri(url, partPath), token = server.Token, mime = mime,
                                 directMp4 = Str(part, "audioCodec") == "aac" || Str(row, "audioCodec") == "aac" });
                             break;
@@ -633,7 +634,8 @@ namespace MusicRoom
                 {
                     string handle = Guid.NewGuid().ToString("N");
                     handles.Add(handle, track);
-                    entries.Add(new { track.title, track.durationSeconds, artwork = RegisterArtwork(track.artwork), url = "https://media.musicroom.invalid/" + handle });
+                    entries.Add(new { track.title, track.durationSeconds, track.artist, track.album,
+                        artwork = RegisterArtwork(track.artwork), url = "https://media.musicroom.invalid/" + handle });
                 }
             }
             Send("musicQueue", new { id, context = albumTitle, origin = "plex", startIndex = index, tracks = entries });
