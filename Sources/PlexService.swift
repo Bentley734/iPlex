@@ -329,7 +329,7 @@ enum PlexParser {
         try resourceRecords(data).map(\.server)
     }
 
-    static func libraries(_ data: Data) throws -> [PlexLibrary] {
+    static func libraries(_ data: Data, type: String = "artist") throws -> [PlexLibrary] {
         guard data.count <= 2 * 1024 * 1024,
               let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
               let container = root["MediaContainer"] as? [String: Any] else {
@@ -341,7 +341,7 @@ enum PlexParser {
         }
         var seen = Set<String>()
         return rows.compactMap { row -> PlexLibrary? in
-            guard row["type"] as? String == "artist", let id = numericIdentifier(row["key"]),
+            guard row["type"] as? String == type, let id = numericIdentifier(row["key"]),
                   let number = UInt(id), number > 0, String(number) == id,
                   let name = string(row["title"], maximum: 300), seen.insert(id).inserted else { return nil }
             return PlexLibrary(id: id, name: name)
@@ -1862,5 +1862,129 @@ extension PlexService {
         } catch {
             completion(.failure(error))
         }
+    }
+}
+
+extension PlexParser {
+    static func videoPage(_ data: Data, section: String, expected: String, parent: String?,
+                          offset: Int, size: Int) throws -> PlexVideoPage {
+        let container = try metadataContainer(data)
+        let rows = try metadataRows(container, sectionID: section)
+        var seen = Set<String>()
+        let items = rows.compactMap { row -> PlexVideoItem? in
+            guard row["type"] as? String == expected, let id = numericIdentifier(row["ratingKey"]),
+                  id.allSatisfy({ $0.isASCII && $0.isNumber }),
+                  let title = string(row["title"], maximum: 400),
+                  parent == nil || row["parentRatingKey"] == nil || numericIdentifier(row["parentRatingKey"]) == parent,
+                  seen.insert(id).inserted else { return nil }
+            let year = integer(row["year"]).map(String.init) ?? ""
+            let index = integer(row["index"])
+            let subtitle = expected == "episode" ? index.map { "Episode \($0)" } ?? "" : year
+            return PlexVideoItem(id: id, type: expected, title: title, subtitle: subtitle,
+                                 summary: string(row["summary"], maximum: 4_000) ?? "",
+                                 thumb: musicArtworkPath(row["thumb"] as? String))
+        }
+        let count = (container["Metadata"] as? [[String: Any]])?.count ?? 0
+        let end = offset + count
+        let more = !items.isEmpty && (integer(container["totalSize"]).map { end < $0 } ?? (count >= size))
+        return PlexVideoPage(items: items, next: more ? end : nil)
+    }
+
+    static func videoParts(_ data: Data, section: String, item: PlexVideoItem,
+                           base: URL, token: String) throws -> [URL] {
+        guard let row = try metadataRows(data, sectionID: section).first(where: {
+            numericIdentifier($0["ratingKey"]) == item.id && $0["type"] as? String == item.type
+        }) else { throw PlexServiceError("This video is unavailable in the selected library.") }
+        return (row["Media"] as? [[String: Any]] ?? []).prefix(16).compactMap { media in
+            guard let parts = media["Part"] as? [[String: Any]], parts.count == 1,
+                  let path = parts[0]["key"] as? String else { return nil }
+            return try? playbackURL(base: base, partPath: path, token: token)
+        }
+    }
+}
+
+extension PlexService {
+    private func videoRequest<T>(server: String, queue: OperationQueue = PlexService.albumPreviewQueue,
+                                 _ body: @escaping (PlexServerRecord, URL, PlexRequestOperation) throws -> T) async throws -> T {
+        let record = try selectedServerAccess()
+        guard record.server.id == server else { throw PlexServiceError("The selected Plex server changed. Try again.") }
+        let operation = PlexRequestOperation()
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                queue.addOperation {
+                    continuation.resume(with: Result {
+                        try self.withConnection(record: record) { base in
+                            try body(record, base, operation)
+                        }
+                    })
+                }
+            }
+        } onCancel: {
+            operation.cancel()
+        }
+    }
+
+    func videoLibraries(server: String, kind: PlexVideoKind) async throws -> [PlexLibrary] {
+        try await videoRequest(server: server) { record, base, operation in
+            let request = try self.serverRequest(base: base, path: "/library/sections", query: [], token: record.token)
+            return try PlexParser.libraries(operation.fetch(request, limit: 2 * 1024 * 1024), type: kind.rawValue)
+        }
+    }
+
+    func videoPage(server: String, kind: PlexVideoKind, section: String, parent: PlexVideoItem?,
+                   query: String, offset: Int) async throws -> PlexVideoPage {
+        try await videoRequest(server: server) { record, base, operation in
+            let size = 60
+            let path = parent.map { "/library/metadata/\($0.id)/children" } ?? "/library/sections/\(section)/all"
+            var filters: [URLQueryItem] = []
+            if parent == nil {
+                filters.append(.init(name: "type", value: kind.plexType))
+                if !query.isEmpty { filters.append(.init(name: "title", value: String(query.prefix(120)))) }
+            }
+            var request = try self.serverRequest(base: base, path: path, query: filters, token: record.token)
+            request.setValue(String(offset), forHTTPHeaderField: "X-Plex-Container-Start")
+            request.setValue(String(size), forHTTPHeaderField: "X-Plex-Container-Size")
+            let expected = parent.map { $0.type == "show" ? "season" : "episode" } ?? kind.rawValue
+            return try PlexParser.videoPage(operation.fetch(request, limit: 8 * 1024 * 1024),
+                                            section: section, expected: expected, parent: parent?.id,
+                                            offset: offset, size: size)
+        }
+    }
+
+    func videoPoster(server: String, path: String) async throws -> Data {
+        guard let path = PlexParser.musicArtworkPath(path) else { throw PlexServiceError("Invalid poster.") }
+        return try await videoRequest(server: server, queue: Self.artworkQueue) { record, base, operation in
+            try self.fetchMusicArtwork(path, base: base, token: record.token, operation: operation)
+        }
+    }
+
+    func videoSource(server: String, section: String, item: PlexVideoItem) async throws -> PlexVideoSource {
+        try await videoRequest(server: server) { record, base, operation in
+            let path = "/library/metadata/\(item.id)"
+            let request = try self.serverRequest(base: base, path: path, query: [], token: record.token)
+            let direct = try PlexParser.videoParts(operation.fetch(request, limit: 8 * 1024 * 1024),
+                                                   section: section, item: item, base: base, token: record.token)
+            let session = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+            let params = ["path": path, "protocol": "hls", "directPlay": "0", "directStream": "0",
+                          "mediaIndex": "0", "session": session, "videoQuality": "100",
+                          "videoResolution": "1920x1080", "maxVideoBitrate": "20000", "subtitles": "burn",
+                          "X-Plex-Client-Identifier": self.clientIdentifier, "X-Plex-Token": record.token,
+                          "X-Plex-Product": "iPlex", "X-Plex-Platform": "iOS", "X-Plex-Client-Profile-Name": "iOS",
+                          "X-Plex-Client-Profile-Extra": PlexVideoManifest.compatibilityProfile]
+            let fallback = try self.serverRequest(base: base, path: PlexVideoManifest.prefix + "start.m3u8",
+                query: params.map { URLQueryItem(name: $0.key, value: $0.value) }, token: record.token)
+            guard let url = fallback.url else { throw PlexServiceError("Couldn’t prepare Plex video playback.") }
+            return PlexVideoSource(direct: direct, fallback: url)
+        }
+    }
+
+    func stopVideo(_ source: URL) {
+        guard var parts = URLComponents(url: source, resolvingAgainstBaseURL: false) else { return }
+        parts.path = PlexVideoManifest.prefix + "stop"
+        parts.queryItems = parts.queryItems?.filter {
+            ["session", "X-Plex-Client-Identifier", "X-Plex-Token"].contains($0.name)
+        }
+        guard let url = parts.url else { return }
+        Self.albumPreviewQueue.addOperation { _ = try? PlexRequestOperation().fetch(URLRequest(url: url), limit: 64 * 1024) }
     }
 }

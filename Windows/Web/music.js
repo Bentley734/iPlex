@@ -355,7 +355,7 @@
     pageEnd.hidden = !readyToPage || pageFailed;
     pageObserver.unobserve(pageEnd);
     if (!pageEnd.hidden) pageObserver.observe(pageEnd);
-    for (const tab of sectionNames) get(tab).setAttribute('aria-pressed', String(kind === tab));
+    for (const tab of sectionNames) get(tab).setAttribute('aria-pressed', String(kind === tab && !document.documentElement.hasAttribute('data-video-open')));
     renderPins();
     renderFeature();
     if (!album) {
@@ -473,6 +473,7 @@
     control.value = value;
   };
   window.macPlexState = state => {
+    window.plexVideoState(state);
     const connected = state.status === 'connected';
     const connecting = state.status === 'connecting';
     get('connect').hidden = connected || connecting;
@@ -1115,7 +1116,10 @@
       setVisibleSections(enabled);
       try { localStorage.setItem(sectionPreference, JSON.stringify(visibleSections)); } catch {}
     };
-    get(tab).onclick = () => selectSection(tab);
+    get(tab).onclick = () => {
+      window.plexVideoExit();
+      selectSection(tab);
+    };
   }
   setVisibleSections(sectionNames);
   try {

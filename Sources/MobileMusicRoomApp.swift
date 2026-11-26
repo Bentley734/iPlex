@@ -23,6 +23,7 @@ private struct MusicLibraryScreen: View {
     @ObservedObject var library: LibraryModel
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
+    @State private var videoSection: PlexVideoKind?
     @State private var showSettings = false
     @AppStorage(LibraryLayout.preferenceKey) private var libraryLayout = LibraryLayout.grid
     @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
@@ -89,7 +90,7 @@ private struct MusicLibraryScreen: View {
                 Spacer()
                 Button { showAppIcons = true } label: { Image(systemName: "app.dashed") }
                     .accessibilityLabel("App Icon")
-                PlexLibrarySwitcher(library: library)
+                if videoSection == nil { PlexLibrarySwitcher(library: library) }
                 Button { showSettings = true } label: { Image(systemName: "gearshape") }
                     .accessibilityLabel("Settings")
 
@@ -100,7 +101,29 @@ private struct MusicLibraryScreen: View {
             #if os(tvOS)
             .focusSection()
             #endif
-            if library.libraryID.isEmpty {
+            if library.servers.contains(where: { $0.id == library.serverID }) {
+                HStack {
+                    Button("Music", systemImage: "music.note") { videoSection = nil }
+                        .tint(videoSection == nil ? accent : .primary)
+                    ForEach(PlexVideoKind.allCases) { kind in
+                        Button(kind.title, systemImage: kind.icon) { videoSection = kind }
+                            .tint(videoSection == kind ? accent : .primary)
+                    }
+                    Spacer()
+                }
+                .buttonStyle(.bordered)
+                .padding(.horizontal, 20).padding(.vertical, 8)
+                #if os(tvOS)
+                .focusSection()
+                #endif
+            }
+            if let videoSection, !library.serverID.isEmpty {
+                PlexVideoBrowser(kind: videoSection, server: library.serverID, service: library.service,
+                                 pauseMusic: library.player.pause)
+                    .id(library.serverID + videoSection.rawValue)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .musicGlass(theme, radius: 22)
+            } else if library.libraryID.isEmpty {
                 connection
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .musicGlass(theme, radius: 22)

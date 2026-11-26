@@ -81,8 +81,11 @@ namespace MusicRoom
         public async Task<WindowsMediaResponse> OpenAsync(Uri uri, string method, string range)
         {
             if (disposed || uri == null || uri.Scheme != "https" || uri.Host != "media.musicroom.invalid" ||
-                !uri.IsDefaultPort || uri.Query.Length != 0 ||
-                !Regex.IsMatch(uri.AbsolutePath, @"^/[a-f0-9]{32}\z"))
+                !uri.IsDefaultPort || uri.Query.Length != 0)
+                return Response(404, "Not Found");
+            if (Regex.IsMatch(uri.AbsolutePath, @"^/video/[a-f0-9]{32}\z"))
+                return await OpenVideo(uri.AbsolutePath.Substring(7), method, range);
+            if (!Regex.IsMatch(uri.AbsolutePath, @"^/[a-f0-9]{32}\z"))
                 return Response(404, "Not Found");
             if (method == "OPTIONS")
                 return Response(204, "No Content");

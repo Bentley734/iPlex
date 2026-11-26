@@ -96,6 +96,7 @@ def main():
         with ZipFile(args.output / "iPlex.Windows.zip", "w", ZIP_DEFLATED) as bundle:
             bundle.write(args.output / "iPlex.exe", "iPlex.exe")
             bundle.write(stage / (DEFAULT_ICON + ".ico"), "Icons/Prismatic Note Light.ico")
+            bundle.write(ROOT / "HLS-js-LICENSE.txt", "Notices/HLS-js-LICENSE.txt")
             for name in ("WebView2-LICENSE.txt", "WebView2-NOTICE.txt"):
                 bundle.write(stage / name, "Notices/" + name)
             for name in ("COPYING.LGPLv2.1", "ThirdParty.txt"):

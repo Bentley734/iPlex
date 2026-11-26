@@ -3,11 +3,11 @@ options:
   createIntermediateGroups: true
 settings:
   SWIFT_VERSION: 5.0
-  MARKETING_VERSION: 0.1.21
-  CURRENT_PROJECT_VERSION: 22
+  MARKETING_VERSION: 0.1.22
+  CURRENT_PROJECT_VERSION: 23
   GENERATE_INFOPLIST_FILE: YES
   INFOPLIST_KEY_CFBundleDisplayName: iPlex
-  INFOPLIST_KEY_NSLocalNetworkUsageDescription: iPlex connects to your Plex music server.
+  INFOPLIST_KEY_NSLocalNetworkUsageDescription: iPlex connects to your Plex Media Server.
 targets:
   MusicRoom-iOS:
     type: application
@@ -36,7 +36,7 @@ targets:
         CFBundleDisplayName: iPlex
         UIBackgroundModes: [audio]
         UILaunchScreen: {}
-        NSLocalNetworkUsageDescription: iPlex connects to your Plex music server.
+        NSLocalNetworkUsageDescription: iPlex connects to your Plex Media Server.
     settings:
       PRODUCT_NAME: iPlex
       PRODUCT_BUNDLE_IDENTIFIER: net.bentley734.musicroom.ios

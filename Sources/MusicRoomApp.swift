@@ -69,6 +69,7 @@ private struct MusicWindow: View {
     @AppStorage(LibraryLayout.preferenceKey) private var libraryLayout = LibraryLayout.grid
     @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
     @AppStorage("LibrarySidebarWidth") private var sidebarPreference = 0
+    @State private var videoSection: PlexVideoKind?
     @GestureState private var sidebarDrag: CGFloat = 0
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @State private var showSettings = false
@@ -198,7 +199,7 @@ private struct MusicWindow: View {
                     .popover(isPresented: $showCompactDeck) {
                         plexifyDeck.frame(width: 250, height: 370)
                     }
-                    librarySearch.frame(width: 230).disabled(model.libraryID.isEmpty)
+                    if videoSection == nil { librarySearch.frame(width: 230).disabled(model.libraryID.isEmpty) }
                 }
                 .padding(.horizontal, 18).padding(.vertical, 8)
                 .background(slate)
@@ -257,6 +258,7 @@ private struct MusicWindow: View {
                                 .padding(.leading, 10).padding(.bottom, 3)
                         }
                         ForEach(model.visibleKinds, id: \.self) { tab($0) }
+                        ForEach(PlexVideoKind.allCases) { videoTab($0) }
                     }
                 }
                 .padding(padding)
@@ -264,7 +266,9 @@ private struct MusicWindow: View {
             .frame(maxHeight: .infinity)
 
             VStack(alignment: .leading, spacing: 10) {
-                PlexLibrarySwitcher(library: model, followsAvailableWidth: true)
+                if videoSection == nil {
+                    PlexLibrarySwitcher(library: model, followsAvailableWidth: true)
+                }
                 settingsButton
             }
             .padding(.horizontal, padding)
@@ -298,6 +302,7 @@ private struct MusicWindow: View {
     private func tab(_ kind: MusicKind) -> some View {
         Button {
             searchTask?.cancel()
+            videoSection = nil
             model.selectKind(kind)
         } label: {
             Label {
@@ -309,16 +314,37 @@ private struct MusicWindow: View {
             .font(.headline)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 11).padding(.vertical, 10)
-            .foregroundStyle(model.kind == kind ? copper : .primary)
-            .background(model.kind == kind ? copper.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 8))
+            .foregroundStyle(videoSection == nil && model.kind == kind ? copper : .primary)
+            .background(videoSection == nil && model.kind == kind ? copper.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
         .disabled(model.libraryID.isEmpty)
     }
 
+    private func videoTab(_ kind: PlexVideoKind) -> some View {
+        Button { videoSection = kind } label: {
+            Label {
+                Text(kind.title)
+            } icon: {
+                Image(systemName: kind.icon).frame(width: 20)
+            }
+            .font(.headline)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 11).padding(.vertical, 10)
+            .foregroundStyle(videoSection == kind ? copper : .primary)
+            .background(videoSection == kind ? copper.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+        .disabled(model.serverID.isEmpty || !model.servers.contains { $0.id == model.serverID })
+    }
+
     private var mainPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if model.libraryID.isEmpty {
+            if let videoSection, !model.serverID.isEmpty {
+                PlexVideoBrowser(kind: videoSection, server: model.serverID, service: model.service,
+                                 pauseMusic: model.player.pause)
+                    .id(model.serverID + videoSection.rawValue)
+            } else if model.libraryID.isEmpty {
                 welcome
             } else {
                 HStack(spacing: 15) {

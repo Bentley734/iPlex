@@ -44,7 +44,7 @@ final class LibraryModel: ObservableObject {
     @Published private(set) var visibleKinds = MusicKind.allCases
     @Published var query = ""
 
-    private let service = PlexService(version: "0.1")
+    let service = PlexService(version: "0.1")
     let player = PlayerController()
     private var operation: Task<Void, Never>?
     private var launchSnapshot: LibrarySnapshot?

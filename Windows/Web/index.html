@@ -2,13 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src https://media.musicroom.invalid; connect-src https://media.musicroom.invalid; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src https://media.musicroom.invalid blob:; connect-src https://media.musicroom.invalid; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>iPlex</title>
   <link rel="icon" href="prismatic-note.ico">
   <link rel="stylesheet" href="style.css">
   <script defer src="playback.js"></script>
   <script defer src="clickwheel.js"></script>
+  <script defer src="hls.light.min.js"></script>
+  <script defer src="video.js"></script>
   <script defer src="music.js"></script>
   <script defer src="wallpaper.js"></script>
 </head>
@@ -29,6 +31,8 @@
       <button id="genres" aria-pressed="false" disabled>Genres</button>
       <button id="tracks" aria-pressed="false" disabled>Tracks</button>
       <button id="playlists" aria-pressed="false" disabled>Playlists</button>
+      <button id="movies" aria-pressed="false" disabled>Movies</button>
+      <button id="television" aria-pressed="false" disabled>TV</button>
     </nav>
     <div class="sidebar-controls">
       <select id="quick-library" aria-label="Switch Music Library" hidden></select>
@@ -69,7 +73,32 @@
         <button id="retry-page" hidden>Retry</button>
       </div>
     </section>
+    <section id="video-browser" hidden>
+      <header>
+        <button id="video-back" type="button" aria-label="Back" hidden>‹</button>
+        <h1 id="video-title">Movies</h1>
+        <input id="video-search" type="search" aria-label="Search videos" placeholder="Search videos" maxlength="120">
+        <select id="video-library" aria-label="Switch Video Library" hidden></select>
+      </header>
+      <div class="content">
+        <p id="video-summary" hidden></p>
+        <div id="video-items" class="video-grid"></div>
+        <p id="video-status" role="status"></p>
+        <button id="video-retry" type="button" hidden>Retry</button>
+        <button id="video-more" type="button" hidden>Load more</button>
+      </div>
+    </section>
   </main>
+  <dialog id="video-dialog" aria-labelledby="video-playing-title">
+    <header>
+      <div><h2 id="video-playing-title"></h2><span id="video-mode" role="status"></span></div>
+      <button id="video-compatibility" type="button" hidden>Use Compatibility Mode</button>
+      <button id="video-done" type="button">Done</button>
+    </header>
+    <video id="video-player" controls playsinline></video>
+    <p id="video-error" role="alert" hidden></p>
+    <p id="video-playing-summary"></p>
+  </dialog>
   <section id="plexify-deck" aria-labelledby="plexify-deck-heading" hidden>
     <h2 id="plexify-deck-heading">Now Playing</h2>
     <div id="plexify-track">Nothing playing</div>

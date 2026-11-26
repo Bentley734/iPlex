@@ -21,7 +21,7 @@
 	<key>CFBundleVersion</key>
 	<string>1</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>iPlex connects to your Plex music server.</string>
+	<string>iPlex connects to your Plex Media Server.</string>
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>audio</string>

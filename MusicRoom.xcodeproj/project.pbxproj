@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		074FFEE30E6DF831BD87E62B /* PlexVideo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21FE99499ADF29BEBF367209 /* PlexVideo.swift */; };
 		0963354B7A8E8B7AC7C52E61 /* wordmark.png in Resources */ = {isa = PBXBuildFile; fileRef = F185419F294F55DB3C3CAE00 /* wordmark.png */; };
 		0D8B9B802C2B23D503C305AE /* MusicAppIconPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B6189D5420E12F096AED5C /* MusicAppIconPicker.swift */; };
 		11A1EFAC56D164FB0A224889 /* PlayerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109D6CF5E45B4DDC6F61EF87 /* PlayerController.swift */; };
@@ -17,6 +18,7 @@
 		37DBDBEFBCA7FA9300B97620 /* MusicSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81F02BA2B14ABC3859F379BD /* MusicSettings.swift */; };
 		3AF66C4880414EBC37880124 /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E789032BCF3A6169CFC2233 /* NowPlayingView.swift */; };
 		41BB757808343F6DE3116ACA /* AlbumCoverCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6581BBFF504F8BAA5B38470 /* AlbumCoverCache.swift */; };
+		41D79EEF812C5A9A994C8244 /* PlexVideoManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFFD17F74980DC97E5F435E4 /* PlexVideoManifest.swift */; };
 		42811EF14C7EB41CB2F0D3CD /* MusicAppIconPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B6189D5420E12F096AED5C /* MusicAppIconPicker.swift */; };
 		44CA82903C2BD4FAF29E8EDC /* PlaybackEqualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BC1D71E65269005100C4E31 /* PlaybackEqualizer.swift */; };
 		454FE1F4FDC5B933B903B4DD /* MusicRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EFA099A27452963E48DAEFD /* MusicRoomApp.swift */; };
@@ -24,6 +26,7 @@
 		4852498FF890C183BB536F7A /* MacAppUpdates.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9C2A0F694BD3960FADA938 /* MacAppUpdates.swift */; };
 		4F8F42D2AB91DCC695B06BD6 /* MacAppUpdates.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9C2A0F694BD3960FADA938 /* MacAppUpdates.swift */; };
 		523B49DEEF64BD699C9746FE /* HeaderMarks in Resources */ = {isa = PBXBuildFile; fileRef = DBB6ACEC51BC04DF53298E15 /* HeaderMarks */; };
+		553366239E97CB54D63B41BB /* PlexVideoManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFFD17F74980DC97E5F435E4 /* PlexVideoManifest.swift */; };
 		559F2534C6897DF20AAC1E02 /* Track.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8712B67A9D2431A2B0160DDC /* Track.swift */; };
 		564AA314BCCD696C8A91607B /* MusicPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CCA42EAE03D88BB3496D33 /* MusicPlatform.swift */; };
 		614CA070E7014A7C66698623 /* MacMiniPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3A4685EF46B49FB6B22D90 /* MacMiniPlayer.swift */; };
@@ -44,6 +47,7 @@
 		B0BBD7ED21A32E626ECC7A08 /* AlbumCoverCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6581BBFF504F8BAA5B38470 /* AlbumCoverCache.swift */; };
 		B14DB919AF1E5EA88CF12FE5 /* AudioAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED8702E61EE0F31C7677EC30 /* AudioAnalysis.swift */; };
 		B7E443953550133C851BC0A2 /* MobileMusicRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97A49FCD6AC086C13007CEB /* MobileMusicRoomApp.swift */; };
+		B7ED9870A8F862FD22A8AAB8 /* PlexVideo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21FE99499ADF29BEBF367209 /* PlexVideo.swift */; };
 		B9FA1CBBF9218AE47683AD83 /* tvOS.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EF99A5BF8FAE5BAC92EC8A5B /* tvOS.xcassets */; };
 		BBE1D9643AC04B20AAFE1C47 /* music-wordmarks.png in Resources */ = {isa = PBXBuildFile; fileRef = 295A13765A52602FCE1765AD /* music-wordmarks.png */; };
 		C0F0713CDBB0212EBBDFA09D /* LibraryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C69FD3E93908A0408008D345 /* LibraryModel.swift */; };
@@ -59,6 +63,7 @@
 		05B2D2D87BA0747B37ECE8A0 /* iOSIconPreviews */ = {isa = PBXFileReference; lastKnownFileType = folder; name = iOSIconPreviews; path = Mobile/iOSIconPreviews; sourceTree = SOURCE_ROOT; };
 		109D6CF5E45B4DDC6F61EF87 /* PlayerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerController.swift; sourceTree = "<group>"; };
 		12CCA42EAE03D88BB3496D33 /* MusicPlatform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicPlatform.swift; sourceTree = "<group>"; };
+		21FE99499ADF29BEBF367209 /* PlexVideo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlexVideo.swift; sourceTree = "<group>"; };
 		295A13765A52602FCE1765AD /* music-wordmarks.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "music-wordmarks.png"; sourceTree = "<group>"; };
 		3BC1D71E65269005100C4E31 /* PlaybackEqualizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackEqualizer.swift; sourceTree = "<group>"; };
 		4EFA099A27452963E48DAEFD /* MusicRoomApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicRoomApp.swift; sourceTree = "<group>"; };
@@ -75,6 +80,7 @@
 		C69FD3E93908A0408008D345 /* LibraryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryModel.swift; sourceTree = "<group>"; };
 		C97A49FCD6AC086C13007CEB /* MobileMusicRoomApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileMusicRoomApp.swift; sourceTree = "<group>"; };
 		C9C23189D2582E8551851186 /* TVIconPreviews */ = {isa = PBXFileReference; lastKnownFileType = folder; name = TVIconPreviews; path = Mobile/TVIconPreviews; sourceTree = SOURCE_ROOT; };
+		CFFD17F74980DC97E5F435E4 /* PlexVideoManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlexVideoManifest.swift; sourceTree = "<group>"; };
 		D6581BBFF504F8BAA5B38470 /* AlbumCoverCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumCoverCache.swift; sourceTree = "<group>"; };
 		DBB6ACEC51BC04DF53298E15 /* HeaderMarks */ = {isa = PBXFileReference; lastKnownFileType = folder; name = HeaderMarks; path = Assets/HeaderMarks; sourceTree = SOURCE_ROOT; };
 		E359008C174456F0E7E13E19 /* GlassBackgrounds */ = {isa = PBXFileReference; lastKnownFileType = folder; name = GlassBackgrounds; path = Assets/GlassBackgrounds; sourceTree = SOURCE_ROOT; };
@@ -146,6 +152,8 @@
 				3BC1D71E65269005100C4E31 /* PlaybackEqualizer.swift */,
 				109D6CF5E45B4DDC6F61EF87 /* PlayerController.swift */,
 				6C780AA4CF17CC09BC5ABE45 /* PlexService.swift */,
+				21FE99499ADF29BEBF367209 /* PlexVideo.swift */,
+				CFFD17F74980DC97E5F435E4 /* PlexVideoManifest.swift */,
 				8712B67A9D2431A2B0160DDC /* Track.swift */,
 			);
 			path = Sources;
@@ -271,6 +279,8 @@
 				44CA82903C2BD4FAF29E8EDC /* PlaybackEqualizer.swift in Sources */,
 				11A1EFAC56D164FB0A224889 /* PlayerController.swift in Sources */,
 				188CBDBB2368F430ACD2DF00 /* PlexService.swift in Sources */,
+				B7ED9870A8F862FD22A8AAB8 /* PlexVideo.swift in Sources */,
+				41D79EEF812C5A9A994C8244 /* PlexVideoManifest.swift in Sources */,
 				559F2534C6897DF20AAC1E02 /* Track.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -295,6 +305,8 @@
 				EC3D3CB23563AC5726D4B22A /* PlaybackEqualizer.swift in Sources */,
 				DB81C391DA990B61427422F0 /* PlayerController.swift in Sources */,
 				9B3C788DCE3EB58EF492A7D2 /* PlexService.swift in Sources */,
+				074FFEE30E6DF831BD87E62B /* PlexVideo.swift in Sources */,
+				553366239E97CB54D63B41BB /* PlexVideoManifest.swift in Sources */,
 				A69490A6AD7CB4C928AF43CD /* Track.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -354,7 +366,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 22;
+				CURRENT_PROJECT_VERSION = 23;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -368,8 +380,8 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex music server.";
-				MARKETING_VERSION = 0.1.21;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
+				MARKETING_VERSION = 0.1.22;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -451,7 +463,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 22;
+				CURRENT_PROJECT_VERSION = 23;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -471,8 +483,8 @@
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
-				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex music server.";
-				MARKETING_VERSION = 0.1.21;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
+				MARKETING_VERSION = 0.1.22;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

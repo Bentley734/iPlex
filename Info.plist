@@ -6,9 +6,9 @@
   <key>CFBundleIdentifier</key><string>net.bentley734.musicroom</string>
   <key>CFBundleName</key><string>iPlex</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>0.1.21</string>
-  <key>CFBundleVersion</key><string>22</string>
+  <key>CFBundleShortVersionString</key><string>0.1.22</string>
+  <key>CFBundleVersion</key><string>23</string>
   <key>LSMinimumSystemVersion</key><string>14.0</string>
-  <key>NSLocalNetworkUsageDescription</key><string>iPlex connects to your Plex music server.</string>
+  <key>NSLocalNetworkUsageDescription</key><string>iPlex connects to your Plex Media Server.</string>
   <key>CFBundleIconFile</key><string>MusicRoom</string>
 </dict></plist>

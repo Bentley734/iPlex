@@ -25,6 +25,7 @@ namespace MusicRoom
         {
             public string id { get; set; }
             public string name { get; set; }
+            public string type { get; set; }
         }
         readonly Dictionary<string, Server> servers = new Dictionary<string, Server>();
         List<Section> sections = new List<Section>();
@@ -144,7 +145,7 @@ namespace MusicRoom
                 status, message, loadingLibraries = loadingSections, libraryMessage = "",
                 refreshAvailable = status == "connected" && phase != "loading" && !loadingSections && selectedSection.Length == 0,
                 serverId = selectedServer, serverName = server != null ? server.Name : "",
-                libraryId = selectedSection, pins = PinSnapshot(), preview,
+                libraryId = selectedSection, pins = PinSnapshot(), preview, videoLibraries = videoSections,
                 servers =
                     servers.Values.OrderBy(s => s.Name)
                         .Select(s => new { id = s.Id, name = s.Name, selected = s.Id == selectedServer })
@@ -300,6 +301,7 @@ namespace MusicRoom
             selectedServer = servers.ContainsKey(previousServer) ? previousServer :
                 servers.Count == 1 ? servers.Keys.Single() : "";
             sections.Clear();
+            ResetVideoLibraries();
             selectedSection = "";
             phase = "";
             if (selectedServer.Length == 0)
@@ -344,7 +346,7 @@ namespace MusicRoom
             if (!servers.TryGetValue(selectedServer, out server))
                 throw Problem("Choose a Plex server first.");
             loadingSections = true;
-            plexMessage = "Finding music libraries…";
+            plexMessage = "Finding Plex libraries…";
             PlexState();
             var list = await WithServer(
                 server,
@@ -355,14 +357,16 @@ namespace MusicRoom
                                                     server.Token, token, 2 * 1024 * 1024, 8)),
                                 "MediaContainer"));
                     return Rows(Get(container, "Directory"))
-                        .Where(r => Str(r, "type") == "artist" &&
+                        .Where(r => (Str(r, "type") == "artist" || Str(r, "type") == "movie" || Str(r, "type") == "show") &&
                                     Regex.IsMatch(Str(r, "key"), @"^[1-9]\d{0,18}\z"))
-                        .Select(r => new Section { id = Str(r, "key"), name = Str(r, "title") })
+                        .Select(r => new Section { id = Str(r, "key"), name = Str(r, "title"), type = Str(r, "type") })
                         .OrderBy(s => s.name)
                         .ToList();
                 },
                 token);
             token.ThrowIfCancellationRequested();
+            videoSections = list.Where(s => s.type != "artist").ToList();
+            list = list.Where(s => s.type == "artist").ToList();
             sections = list;
             var previous = Pref("library." + server.Id);
             selectedSection = list.Any(s => s.id == previous) ? previous :
@@ -659,8 +663,12 @@ namespace MusicRoom
         {
             Server server;
             string relative;
-            if ((method != "GET" && method != "HEAD") || !Regex.IsMatch(handle, @"^[a-f0-9]{32}\z") ||
-                !art.TryGetValue(handle, out relative))
+            if ((method != "GET" && method != "HEAD") || !Regex.IsMatch(handle, @"^[a-f0-9]{32}\z"))
+                return Response(404, "Not Found");
+            Tuple<Server, string> video;
+            if (videoArt.TryGetValue(handle, out video))
+                return await VideoPoster(video.Item1, video.Item2, method);
+            if (!art.TryGetValue(handle, out relative))
                 return Response(404, "Not Found");
             var ready = servers.TryGetValue(selectedServer, out server) && selectedSection.Length > 0;
             string serverID = ready ? selectedServer : Pref("server");
@@ -674,10 +682,7 @@ namespace MusicRoom
                 bool cached = File.Exists(target);
                 if (!cached && !ready) return Response(404, "Not Found");
                 var bytes = cached ? File.ReadAllBytes(target) : await FetchArtwork(server, relative, shutdown.Token);
-                string mime = bytes.Length >= 8 && bytes[0] == 137 && bytes[1] == 80 && bytes[2] == 78 && bytes[3] == 71
-                    ? "image/png" : bytes.Length > 2 && bytes[0] == 255 && bytes[1] == 216 && bytes[2] == 255
-                    ? "image/jpeg" : bytes.Length >= 12 && Encoding.ASCII.GetString(bytes, 0, 4) == "RIFF" &&
-                        Encoding.ASCII.GetString(bytes, 8, 4) == "WEBP" ? "image/webp" : null;
+                string mime = ArtworkMime(bytes);
                 if (!cached && mime != null && SnapshotContainsArtwork(relative))
                 {
                     try { SaveCover(bytes, target); }
@@ -691,6 +696,16 @@ namespace MusicRoom
             }
             catch (Exception) { return Response(503, "Artwork unavailable"); }
             finally { artSlots.Release(); }
+        }
+
+        static string ArtworkMime(byte[] bytes)
+        {
+            if (bytes.Length >= 8 && bytes[0] == 137 && bytes[1] == 80 && bytes[2] == 78 && bytes[3] == 71)
+                return "image/png";
+            if (bytes.Length > 2 && bytes[0] == 255 && bytes[1] == 216 && bytes[2] == 255)
+                return "image/jpeg";
+            return bytes.Length >= 12 && Encoding.ASCII.GetString(bytes, 0, 4) == "RIFF" &&
+                Encoding.ASCII.GetString(bytes, 8, 4) == "WEBP" ? "image/webp" : null;
         }
 
         static readonly Dictionary<string, string> Mime = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
@@ -929,6 +944,8 @@ namespace MusicRoom
                 catch (IOException) { Send("musicError", new { id, message = "Couldn’t save library pins." }); }
                 return;
             }
+            if (action == "videoBrowse" || action == "videoPlay" || action == "videoClose")
+            { await VideoAction(body, action, id); return; }
             if (action == "lyrics") { await LoadLyrics(Str(body, "handle"), id); return; }
             if (action == "albumPreview") { await PreviewAlbum(body, id); return; }
             if (action == "enqueue")
@@ -960,6 +977,7 @@ namespace MusicRoom
                     selectedServer = server;
                     selectedSection = "";
                     sections.Clear();
+                    ResetVideoLibraries();
                     plexPrefs["server"] = server;
                     SavePrefs();
                     await LoadSections(token);
@@ -984,6 +1002,7 @@ namespace MusicRoom
                     SavePrefs();
                     servers.Clear();
                     sections.Clear();
+                    ResetVideoLibraries();
                     PlexState();
                 }
             }
