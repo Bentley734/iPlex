@@ -7,6 +7,7 @@ import struct
 import subprocess
 import tempfile
 from zipfile import ZipFile, ZIP_DEFLATED
+from io import BytesIO
 
 ROOT = Path(__file__).resolve().parent
 ASSETS = ROOT.parent / "Assets"
@@ -64,6 +65,31 @@ def package_vlc(package, architecture, destination):
                 archive.writestr(relative, package.read(name))
 
 
+SQLITE_VERSION = "3540100"
+SQLITE_DIGESTS = {
+    "x86": "97cd8f207ec121e13d3af459e82834a214700659f307603d80814c6bdb19e2d2",
+    "x64": "c2d09c8babb9399277055c057c97a53f1ffd7c5f11d0c1f2118ffdfa39f2daa4",
+    "arm64": "58a563f64ba4c5df34c3ce667175678e2c1df503b264cd600200eb37aa334201",
+}
+
+
+def sqlite_binary(architecture):
+    filename = f"sqlite-dll-win-{architecture}-{SQLITE_VERSION}.zip"
+    local = ROOT.parent / "Dependencies" / filename
+    if local.is_file():
+        package = local.read_bytes()
+    else:
+        package = subprocess.check_output([
+            "curl", "--fail", "--silent", "--show-error", "--location", "--retry", "2",
+            f"https://www.sqlite.org/2026/{filename}",
+        ])
+    if hashlib.sha3_256(package).hexdigest() != SQLITE_DIGESTS[architecture]:
+        raise SystemExit(f"The SQLite package for {architecture} did not match its published SHA3 digest.")
+    with ZipFile(BytesIO(package)) as archive:
+        return archive.read("sqlite3.dll")
+
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     for option in ("sdk", "compiler", "references", "codecs", "output"):
@@ -99,6 +125,9 @@ def main():
                 file = stage / name
                 file.write_bytes(sdk.read(f"runtimes/win-{arch}/native/WebView2Loader.dll"))
                 embed(file, name)
+                sqlite = stage / (arch + ".sqlite3.dll")
+                sqlite.write_bytes(sqlite_binary(arch))
+                embed(sqlite, sqlite.name)
             for name in ("LICENSE.txt", "NOTICE.txt"):
                 (stage / ("WebView2-" + name)).write_bytes(sdk.read(name))
         with ZipFile(args.vlc) as vlc:

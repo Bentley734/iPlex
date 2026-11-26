@@ -15,6 +15,7 @@ namespace MusicRoom
     {
         const string VideoPrefix = "/video/:/transcode/universal/";
         const string VideoOrigin = "https://media.musicroom.invalid/video/";
+        readonly VideoWatchStore videoWatch;
         List<Section> videoSections = new List<Section>();
         readonly Dictionary<string, Tuple<Server, string, string>> videoArt = new Dictionary<string, Tuple<Server, string, string>>();
         readonly Dictionary<string, string> videoArtIds = new Dictionary<string, string>();
@@ -129,6 +130,38 @@ namespace MusicRoom
                 Send("plexVideoError", new { id, message = "Choose a video library first." });
                 return;
             }
+            bool watchAction = action == "videoWatchState" || action == "videoWatchUpdate" || action == "videoWatchClear";
+            if (watchAction && Str(request, "server") != server.Id) return;
+            if (action == "videoWatchState")
+            {
+                SendVideoWatchState(server, library, id);
+                return;
+            }
+            if (action == "videoWatchUpdate" || action == "videoWatchClear")
+            {
+                if (!ItemID.IsMatch(key) || expected != (kind == "movie" ? "movie" : "episode")) return;
+                if (action == "videoWatchClear") videoWatch.Clear(server.Id, library, key);
+                else
+                {
+                    double seconds;
+                    bool watched = Object.Equals(Get(request, "watched"), true);
+                    if (!Double.TryParse(Str(request, "seconds"), NumberStyles.Float, CultureInfo.InvariantCulture, out seconds)
+                        || Double.IsNaN(seconds) || Double.IsInfinity(seconds) || seconds > 2592000 || (!watched && seconds < 5)) return;
+                    var artwork = Str(request, "artwork");
+                    var title = Str(request, "title");
+                    var subtitle = Str(request, "subtitle");
+                    string payload = Json().Serialize(new {
+                        key, type = expected, title = title.Substring(0, Math.Min(200, title.Length)),
+                        subtitle = subtitle.Substring(0, Math.Min(120, subtitle.Length)),
+                        artwork = artwork.Length < 180 && ArtPath.IsMatch(artwork) ? artwork : "",
+                        watched, seconds = watched ? 0 : seconds
+                    });
+                    videoWatch.Save(server.Id, library, key, watched, payload);
+                    if (id == 0) return;
+                }
+                SendVideoWatchState(server, library, id);
+                return;
+            }
             if (action == "videoPlay") ReleaseVideoPlayback();
             else if (videoJob != null) videoJob.Cancel();
 
@@ -167,7 +200,7 @@ namespace MusicRoom
                         key = Str(row, "ratingKey"), type = expected, title = Str(row, "title"),
                         summary = Str(row, "summary"), subtitle = expected == "episode" && Num(row, "index") > 0 ?
                             "Episode " + Str(row, "index") : Str(row, "year"),
-                        artwork = RegisterVideoArt(server, library, ArtworkPath(row, "thumb"))
+                        thumb = ArtworkPath(row, "thumb"), artwork = RegisterVideoArt(server, library, ArtworkPath(row, "thumb"))
                     }).ToArray();
                     int count = Rows(Get(container, "Metadata")).Count();
                     long end = offset + count, total = Num(container, "totalSize");
@@ -224,6 +257,18 @@ namespace MusicRoom
                 if (videoJob == job) videoJob = null;
                 job.Dispose();
             }
+        }
+
+        void SendVideoWatchState(Server server, string library, long id)
+        {
+            var records = videoWatch.Records(server.Id, library).Select(value => {
+                var row = Map(value);
+                var path = Str(row, "artwork");
+                row["thumb"] = path;
+                row["artwork"] = path.Length < 180 && ArtPath.IsMatch(path) ? RegisterVideoArt(server, library, path) : "";
+                return row;
+            }).ToArray();
+            Send("plexVideoWatchState", new { id, records });
         }
 
         static readonly Regex ManifestAttribute = new Regex("(?:^|[:,])(?:URI|SERVER-URI|X-ASSET-URI|X-ASSET-LIST)=\"([^\"]+)\"");

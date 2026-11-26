@@ -136,8 +136,12 @@ namespace MusicRoom
             {
                 var title = WindowsMediaService.Str(request, "title");
                 if (title.Length > 200) title = title.Substring(0, 200);
-                nativeVideo = new NativeVideoWindow(url, title, (result, seconds) => {
-                    nativeVideo = null;
+                double resume;
+                if (!Double.TryParse(WindowsMediaService.Str(request, "resume"),
+                    System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out resume)) resume = 0;
+                if (Double.IsNaN(resume) || resume < 0 || resume > 2592000) resume = 0;
+                nativeVideo = new NativeVideoWindow(url, title, resume, (result, seconds) => {
+                    if (result != "progress" && result != "ended") nativeVideo = null;
                     Emit("plexNativeVideo", new { id, result, seconds });
                 });
                 nativeVideo.Show(this);

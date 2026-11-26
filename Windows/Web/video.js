@@ -13,6 +13,9 @@
   const video = get('video-player');
   const mode = get('video-mode');
   const error = get('video-error');
+  const watchToggle = get('video-watch-toggle');
+  const watchShelf = get('continue-video');
+  const watchItems = get('continue-video-items');
   const alternate = get('video-compatibility');
   const tabs = new Map([['movie', get('movies')], ['show', get('television')]]);
   const titles = {movie:'Movies', show:'TV Shows'};
@@ -20,6 +23,80 @@
   let state, kind = '', library = '', pending = 0, parent = [], next = null, busy = false, timer;
   let source, hls, candidates = [], usingFallback = false, resumeAt = 0, listOffset = 0, failed = false;
   const rendered = new Set();
+  let watchRecords = new Map(), watchSequence = 0, activeItem, activeScope, lastReport = 0;
+  let lastSaved = 0, awaitingSeek = false, nativeActive = false;
+
+  function watchContext() { return {kind, library, server:state?.serverId}; }
+
+  function refreshWatch() {
+    if (!library || !kind) return;
+    host({action:'videoWatchState', id:++watchSequence, ...watchContext()});
+  }
+
+  function watchTime(seconds) {
+    const total = Math.floor(seconds);
+    const hours = Math.floor(total / 3600);
+    return (hours ? hours + ':' : '') + String(Math.floor(total / 60) % 60).padStart(hours ? 2 : 1, '0') +
+      ':' + String(total % 60).padStart(2, '0');
+  }
+
+  function renderWatch() {
+    watchShelf.hidden = Boolean(parent.length || search.value.trim());
+    for (const tile of tiles.children) {
+      const watched = Boolean(watchRecords.get(tile.dataset.item)?.watched);
+      tile.classList.toggle('watched-video', watched);
+      const badge = tile.querySelector('.watched-badge');
+      if (badge) badge.hidden = !watched;
+    }
+    watchToggle.textContent = watchRecords.get(activeItem?.key)?.watched ? 'Mark Unwatched' : 'Mark Watched';
+    const recent = [...watchRecords.values()].filter(row => !row.watched && row.seconds >= 5).slice(0,24);
+    watchShelf.hidden ||= recent.length === 0;
+    watchItems.replaceChildren(...recent.map(row => {
+      const tile = document.createElement('button');
+      tile.type = 'button';
+      tile.className = 'video-resume';
+      if (/^\/art\/[a-f0-9]{32}$/.test(row.artwork)) {
+        const thumbnail = document.createElement('img');
+        thumbnail.alt = '';
+        thumbnail.src = row.artwork;
+        tile.append(thumbnail);
+      }
+      const title = document.createElement('strong');
+      title.textContent = row.title;
+      const resume = document.createElement('small');
+      resume.textContent = 'Resume at ' + watchTime(row.seconds);
+      tile.append(title, resume);
+      tile.onclick = () => open(row);
+      return tile;
+    }));
+  }
+
+  window.plexVideoWatchState = reply => {
+    if (!kind || reply.id !== watchSequence) return;
+    watchRecords = new Map((reply.records || []).map(row => [row.key, row]));
+    renderWatch();
+  };
+
+  function saveWatch(seconds, watched = false, refresh = false) {
+    if (!activeItem || !activeScope || (!watched && (!Number.isFinite(seconds) || seconds < 5))) return;
+    if (watchRecords.get(activeItem.key)?.watched && !watched) return;
+    const row = {...activeItem, watched, seconds:watched ? 0 : seconds};
+    watchRecords.set(row.key, row);
+    lastSaved = row.seconds;
+    host({action:'videoWatchUpdate', id:refresh ? ++watchSequence : 0, ...activeScope,
+      item:row.key, type:row.type, title:row.title, subtitle:row.subtitle,
+      artwork:row.thumb, seconds:row.seconds, watched});
+    if (refresh) renderWatch();
+  }
+
+  watchToggle.onclick = () => {
+    if (!activeItem || !activeScope) return;
+    if (watchRecords.get(activeItem.key)?.watched) {
+      watchRecords.delete(activeItem.key);
+      host({action:'videoWatchClear', id:++watchSequence, ...activeScope, item:activeItem.key, type:activeItem.type});
+      renderWatch();
+    } else saveWatch(0, true, true);
+  };
 
   function preference(type) { return 'musicroom-video-library.' + state.serverId + '.' + type; }
   window.plexVideoCacheSelection = () => ({
@@ -40,12 +117,16 @@
     const available = (state.videoLibraries || []).filter(row => row.type === kind);
     const preferred = localStorage.getItem(preference(kind));
     const restored = available.find(row => row.id === preferred)?.id || available[0]?.id || '';
-    if (library !== restored) parent = [];
+    if (library !== restored) {
+      parent = [];
+      watchRecords.clear();
+    }
     library = restored;
     picker.replaceChildren(...available.map(row => new Option(row.name, row.id)));
     picker.value = library;
     picker.hidden = available.length === 0;
     browse();
+    refreshWatch();
   }
 
   window.plexVideoState = value => {
@@ -58,6 +139,8 @@
         JSON.stringify(previous?.videoLibraries) !== JSON.stringify(state.videoLibraries)) {
       if (previous?.serverId !== state.serverId) {
         if (dialog.open) dialog.close();
+        watchRecords.clear();
+        ++watchSequence;
         parent = [];
       }
       configure();
@@ -73,6 +156,8 @@
   window.plexVideoExit = () => {
     if (!kind) return;
     kind = '';
+    watchRecords.clear();
+    ++watchSequence;
     ++pending;
     clearTimeout(timer);
     if (dialog.open) dialog.close();
@@ -85,6 +170,7 @@
   for (const [type, tab] of tabs) tab.onclick = () => {
     if (!state?.serverId || kind === type) return;
     kind = type;
+    watchRecords.clear();
     parent = [];
     search.value = '';
     present();
@@ -110,6 +196,7 @@
     summary.hidden = !summary.textContent;
     tiles.classList.toggle('video-episodes', current?.type === 'season');
     loadMore.hidden = true;
+    renderWatch();
     const id = ++pending;
     if (!library) {
       status.textContent = state.loadingLibraries ? 'Finding Plex libraries…' :
@@ -142,6 +229,7 @@
       const tile = document.createElement('button');
       tile.type = 'button';
       tile.className = 'video-tile';
+      tile.dataset.item = row.key;
       const poster = document.createElement('span');
       poster.className = 'video-poster';
       const typeIcon = document.createElement('span');
@@ -165,6 +253,11 @@
         subtitle.textContent = row.subtitle;
         labels.append(subtitle);
       }
+      const badge = document.createElement('small');
+      badge.className = 'watched-badge';
+      badge.textContent = 'Watched';
+      badge.hidden = !watchRecords.get(row.key)?.watched;
+      labels.append(badge);
       tile.append(poster, labels);
       tile.onclick = () => {
         if (row.type === 'movie' || row.type === 'episode') open(row);
@@ -180,9 +273,16 @@
     source = null;
     failed = false;
     usingFallback = false;
-    resumeAt = 0;
+    nativeActive = false;
+    activeItem = item;
+    activeScope = watchContext();
+    resumeAt = watchRecords.get(item.key)?.seconds || 0;
+    lastSaved = resumeAt;
+    lastReport = Date.now();
+    awaitingSeek = resumeAt >= 5;
+    renderWatch();
     get('video-playing-title').textContent = item.title;
-    get('video-playing-summary').textContent = item.summary;
+    get('video-playing-summary').textContent = item.summary || '';
     mode.textContent = 'Preparing video…';
     error.hidden = true;
     alternate.hidden = true;
@@ -206,15 +306,17 @@
     const candidate = candidates.shift();
     if (!candidate) { compatibility(); return; }
     if (candidate.native) {
+      nativeActive = true;
       video.removeAttribute('src');
       video.load();
       video.hidden = true;
       mode.textContent = 'Direct Play · VLC';
       alternate.hidden = true;
       window.windowsPlayback.action({action:'pause'});
-      host({action:'videoNative', id:pending, url:candidate.url, title:get('video-playing-title').textContent});
+      host({action:'videoNative', id:pending, url:candidate.url, title:get('video-playing-title').textContent, resume:lastSaved});
       return;
     }
+    nativeActive = false;
     mode.textContent = 'Direct Play';
     alternate.hidden = false;
     video.src = candidate.url;
@@ -225,7 +327,10 @@
   function compatibility(position) {
     if (usingFallback || !source?.hls) { showError('Plex couldn’t start this video. Check transcoding on your Plex server.'); return; }
     usingFallback = true;
-    resumeAt = Number.isFinite(position) ? position : Number.isFinite(video.currentTime) ? video.currentTime : 0;
+    nativeActive = false;
+    resumeAt = Number.isFinite(position) && position >= 5 ? position :
+      Number.isFinite(video.currentTime) && video.currentTime >= 5 ? video.currentTime : lastSaved;
+    awaitingSeek = resumeAt >= 5;
     mode.textContent = 'Plex Transcode';
     alternate.hidden = true;
     video.removeAttribute('src');
@@ -249,12 +354,32 @@
   alternate.onclick = () => compatibility();
   window.plexNativeVideo = reply => {
     if (!dialog.open || reply.id !== pending) return;
-    if (reply.result === 'closed') dialog.close();
-    else if (reply.result === 'fallback') compatibility(reply.seconds);
-    else direct();
+    if (reply.result === 'progress') { saveWatch(reply.seconds); return; }
+    if (reply.result === 'ended') { saveWatch(0, true, true); return; }
+    if (reply.result === 'closed') {
+      saveWatch(reply.seconds);
+      dialog.close();
+    } else if (reply.result === 'fallback') {
+      saveWatch(reply.seconds);
+      compatibility(reply.seconds);
+    } else {
+      nativeActive = false;
+      direct();
+    }
   };
   video.addEventListener('loadedmetadata', () => {
-    if (usingFallback && resumeAt > 0 && resumeAt < video.duration) video.currentTime = resumeAt;
+    if (awaitingSeek && resumeAt < video.duration) video.currentTime = resumeAt;
+    else awaitingSeek = false;
+  });
+  video.addEventListener('seeked', () => { awaitingSeek = false; });
+  video.addEventListener('timeupdate', () => {
+    if (!nativeActive && !awaitingSeek && Date.now() - lastReport >= 5000) {
+      lastReport = Date.now();
+      saveWatch(video.currentTime);
+    }
+  });
+  video.addEventListener('ended', () => {
+    if (dialog.open && !nativeActive && !failed) saveWatch(0, true, true);
   });
   video.addEventListener('play', () => window.windowsPlayback.action({action:'pause'}));
   video.addEventListener('error', () => {
@@ -264,6 +389,8 @@
   });
   get('video-done').onclick = () => dialog.close();
   dialog.addEventListener('close', () => {
+    if (!nativeActive && !awaitingSeek && !failed) saveWatch(video.currentTime);
+    activeItem = activeScope = null;
     ++pending;
     video.pause();
     if (hls) { hls.destroy(); hls = null; }
@@ -271,6 +398,7 @@
     video.removeAttribute('src');
     video.load();
     host({action:'videoClose'});
+    refreshWatch();
   });
 
   function showError(message) {

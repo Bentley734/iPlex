@@ -6,8 +6,8 @@ using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Windows.Forms;
 
-[assembly: AssemblyVersion("0.1.24.0")]
-[assembly: AssemblyFileVersion("0.1.24.0")]
+[assembly: AssemblyVersion("0.1.25.0")]
+[assembly: AssemblyFileVersion("0.1.25.0")]
 [assembly: AssemblyTitle("iPlex")]
 [assembly: AssemblyProduct("iPlex")]
 
@@ -42,6 +42,7 @@ namespace MusicRoom
                     string path;
                     return Assemblies.TryGetValue(new AssemblyName(e.Name).Name, out path) ? Assembly.LoadFrom(path) : null;
                 };
+                VideoWatchStore.Load(Materialize(arch + ".sqlite3.dll", VideoWatchStore.Dll));
                 Run(Path.GetDirectoryName(loader), updateAcknowledgment);
             }
             catch (Exception)

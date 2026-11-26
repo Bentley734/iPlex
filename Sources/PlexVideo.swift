@@ -18,7 +18,7 @@ enum PlexVideoKind: String, CaseIterable, Identifiable {
     }
 }
 
-struct PlexVideoItem: Identifiable, Equatable {
+struct PlexVideoItem: Identifiable, Equatable, Codable {
     let id: String
     let type: String
     let title: String
@@ -65,6 +65,8 @@ struct PlexVideoBrowser: View {
     @State private var discoveryRetry = 0
     @State private var generation = UUID()
     @State private var presentation: PlexVideoItem?
+    @State private var recent = [VideoWatchRecord]()
+    @State private var watchedItems = Set<String>()
 
     private var preference: String { kind.libraryPreference(server: server) }
     private var parent: PlexVideoItem? { trail.last }
@@ -96,6 +98,7 @@ struct PlexVideoBrowser: View {
                 Text(summary).font(.callout).foregroundStyle(.secondary).lineLimit(3)
             }
             ScrollView {
+                if parent == nil, query.isEmpty, !recent.isEmpty { continueWatching }
                 if episodes {
                     LazyVStack(alignment: .leading, spacing: 10) {
                         ForEach(items) { item in
@@ -104,9 +107,10 @@ struct PlexVideoBrowser: View {
                                     poster(item).frame(width: 100, height: 62)
                                     labels(item)
                                     Spacer()
-                                    Image(systemName: "play.circle")
+                                    Image(systemName: watchedItems.contains(item.id) ? "checkmark.circle.fill" : "play.circle")
                                 }.frame(maxWidth: .infinity, alignment: .leading)
                             }.buttonStyle(.bordered)
+                                .contextMenu { watchActions(item) }
                         }
                     }
                 } else {
@@ -118,8 +122,15 @@ struct PlexVideoBrowser: View {
                             } label: {
                                 VStack(alignment: .leading, spacing: 8) {
                                     poster(item).aspectRatio(2 / 3, contentMode: .fit)
-                                    labels(item)
+                                    HStack {
+                                        labels(item)
+                                        if watchedItems.contains(item.id) {
+                                            Image(systemName: "checkmark.circle.fill").accessibilityLabel("Watched")
+                                        }
+                                    }
                                 }
+                            }.contextMenu {
+                                if item.type == "movie" { watchActions(item) }
                             }
                         }
                     }
@@ -158,11 +169,58 @@ struct PlexVideoBrowser: View {
         .onChange(of: selection) { _, value in
             if !value.isEmpty { UserDefaults.standard.set(value, forKey: preference) }
             trail = []
+            refreshWatchState()
         }
-        .sheet(item: $presentation) { item in
+        .sheet(item: $presentation, onDismiss: refreshWatchState) { item in
             PlexVideoPlayback(title: item.title, server: server, section: selection, item: item,
                              service: service, pauseMusic: pauseMusic)
         }
+    }
+
+    private var continueWatching: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Continue Watching").font(.title2.bold())
+            ScrollView(.horizontal) {
+                LazyHStack(alignment: .top, spacing: 16) {
+                    ForEach(recent, id: \.item.id) { record in
+                        Button { presentation = record.item } label: {
+                            VStack(alignment: .leading, spacing: 5) {
+                                poster(record.item).frame(width: 150, height: 86)
+                                labels(record.item)
+                                Text("Resume at " + videoTime(record.seconds))
+                                    .font(.caption).foregroundStyle(.secondary)
+                            }.frame(width: 150, alignment: .leading)
+                        }.contextMenu { watchActions(record.item) }
+                    }
+                }
+            }
+        }.padding(.bottom, 18)
+    }
+
+    @ViewBuilder
+    private func watchActions(_ item: PlexVideoItem) -> some View {
+        if watchedItems.contains(item.id) {
+            Button("Mark Unwatched") {
+                VideoWatchStore.shared.clear(server: server, library: selection, id: item.id)
+                refreshWatchState()
+            }
+        } else {
+            Button("Mark Watched") {
+                VideoWatchStore.shared.update(server: server, library: selection, item: item, seconds: 0, watched: true)
+                refreshWatchState()
+            }
+            if recent.contains(where: { $0.item.id == item.id }) {
+                Button("Remove from Continue Watching") {
+                    VideoWatchStore.shared.clear(server: server, library: selection, id: item.id)
+                    refreshWatchState()
+                }
+            }
+        }
+    }
+
+    private func refreshWatchState() {
+        recent = VideoWatchStore.shared.recent(server: server, library: selection)
+        watchedItems = VideoWatchStore.shared.watchedIDs(server: server, library: selection)
     }
 
     private var posterWidth: CGFloat {
@@ -214,6 +272,7 @@ struct PlexVideoBrowser: View {
             let previous = Set(items.map(\.id))
             items.append(contentsOf: page.items.filter { !previous.contains($0.id) })
             next = page.next
+            refreshWatchState()
         } catch {
             if !Task.isCancelled && generation == current { message = error.localizedDescription }
         }
@@ -266,6 +325,10 @@ private struct PlexVideoPlayback: View {
     @State private var native: URL?
     @State private var pending = true
     @State private var resumeAt = CMTime.zero
+    @State private var lastSaved = 0.0
+    @State private var watched = false
+    @State private var hasPrepared = false
+    @State private var avReady = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -281,8 +344,8 @@ private struct PlexVideoPlayback: View {
             } else if pending {
                 ProgressView("Preparing video…").frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let native {
-                NativeVideoPlayer(url: native) { seconds in
-                    resumeAt = CMTime(seconds: seconds, preferredTimescale: 1_000)
+                NativeVideoPlayer(url: native, startAt: resumeAt.seconds, progress: saveProgress) { seconds in
+                    resumeAt = CMTime(seconds: seconds >= 5 ? seconds : lastSaved, preferredTimescale: 1_000)
                     forceTranscode = true
                 }.id(native)
             } else {
@@ -299,7 +362,18 @@ private struct PlexVideoPlayback: View {
             guard let failed = event.object as? AVPlayerItem, failed === player.currentItem else { return }
             playbackFailed()
         }
+        .task {
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(5)) } catch { return }
+                if avReady { saveProgress(player.currentTime().seconds, false) }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemDidPlayToEndTime)) { event in
+            guard let ended = event.object as? AVPlayerItem, ended === player.currentItem else { return }
+            saveProgress(0, true)
+        }
         .onDisappear {
+            if avReady { saveProgress(player.currentTime().seconds, false) }
             player.pause()
             player.replaceCurrentItem(with: nil)
             relay = nil
@@ -307,8 +381,16 @@ private struct PlexVideoPlayback: View {
         }
     }
 
+    private func saveProgress(_ seconds: Double, _ ended: Bool) {
+        guard !watched, ended || (seconds.isFinite && seconds >= 5) else { return }
+        lastSaved = seconds
+        watched = ended
+        VideoWatchStore.shared.update(server: server, library: section, item: item, seconds: seconds, watched: ended)
+    }
+
     private func switchToCompatibility() {
-        resumeAt = player.currentTime()
+        let seconds = player.currentTime().seconds
+        resumeAt = CMTime(seconds: seconds >= 5 ? seconds : lastSaved, preferredTimescale: 1_000)
         forceTranscode = true
     }
 
@@ -331,6 +413,13 @@ private struct PlexVideoPlayback: View {
     private func prepare() async {
         pending = true
         failure = nil
+        avReady = false
+        if !hasPrepared {
+            hasPrepared = true
+            let record = VideoWatchStore.shared.record(server: server, library: section, id: item.id)
+            lastSaved = record?.canResume == true ? record?.seconds ?? 0 : 0
+            resumeAt = CMTime(seconds: lastSaved, preferredTimescale: 1_000)
+        }
         player.pause()
         player.replaceCurrentItem(with: nil)
         native = nil
@@ -371,19 +460,29 @@ private struct PlexVideoPlayback: View {
             pauseMusic()
             player.replaceCurrentItem(with: playback)
             pending = false
-            player.play()
             let statuses = playback.publisher(for: \.status).values
             for await status in statuses {
                 guard !Task.isCancelled, playback === player.currentItem else { return }
                 if status == .failed { playbackFailed(); return }
-                if status == .readyToPlay, forceTranscode, resumeAt.isNumeric, resumeAt.seconds > 0 {
-                    let position = resumeAt
-                    resumeAt = .zero
-                    await player.seek(to: position)
+                if status == .readyToPlay {
+                    if resumeAt.isNumeric, resumeAt.seconds > 0 {
+                        let position = resumeAt
+                        resumeAt = .zero
+                        if !playback.duration.isNumeric || position < playback.duration { await player.seek(to: position) }
+                    }
+                    guard !Task.isCancelled, playback === player.currentItem else { return }
+                    avReady = true
+                    player.play()
                 }
             }
         } catch {
             if !Task.isCancelled { failure = error.localizedDescription; pending = false }
         }
     }
+}
+
+private func videoTime(_ seconds: Double) -> String {
+    let total = Int(max(0, seconds))
+    if total >= 3_600 { return String(format: "%d:%02d:%02d", total / 3_600, total / 60 % 60, total % 60) }
+    return String(format: "%d:%02d", total / 60, total % 60)
 }

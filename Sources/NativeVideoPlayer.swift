@@ -9,6 +9,8 @@ import TVVLCKit
 
 struct NativeVideoPlayer: View {
     let url: URL
+    let startAt: Double
+    let progress: (Double, Bool) -> Void
     let fallback: (Double) -> Void
 
     @State private var player = VLCMediaPlayer(options: ["--quiet", "--no-interact"])
@@ -57,17 +59,25 @@ struct NativeVideoPlayer: View {
         .onPlayPauseCommand(perform: toggle)
         #endif
         .task(id: url) { await play() }
-        .onDisappear { player.stop(); player.media = nil }
+        .onDisappear {
+            if ready { progress(current, ended) }
+            player.stop()
+            player.media = nil
+        }
     }
 
     private func play() async {
         player.media = VLCMedia(url: url)
         player.play()
         let start = ContinuousClock.now
+        var lastReport = start
+        var awaitingSeek = startAt >= 5
         while !Task.isCancelled {
             switch player.state {
             case .playing, .paused: ready = true
-            case .ended: ended = true
+            case .ended:
+                if !ended { progress(current, true) }
+                ended = true
             case .error:
                 fallback(current)
                 return
@@ -78,7 +88,15 @@ struct NativeVideoPlayer: View {
             let length = Double(player.media?.length.value?.intValue ?? 0) / 1_000
             if length > 0 { duration = length }
             seekable = player.isSeekable
+            if awaitingSeek, ready, seekable, duration > 0 {
+                awaitingSeek = false
+                if startAt < duration { seek(startAt) }
+            }
             playing = player.isPlaying
+            if ready, !awaitingSeek, !ended, ContinuousClock.now - lastReport >= .seconds(5) {
+                lastReport = ContinuousClock.now
+                progress(current, false)
+            }
             if !ready && ContinuousClock.now - start > .seconds(30) {
                 fallback(current)
                 return

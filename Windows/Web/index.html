@@ -86,6 +86,10 @@
         <select id="video-library" aria-label="Switch Video Library" hidden></select>
       </header>
       <div class="content">
+        <section id="continue-video" aria-labelledby="continue-video-heading" hidden>
+          <h2 id="continue-video-heading">Continue Watching</h2>
+          <div id="continue-video-items"></div>
+        </section>
         <p id="video-summary" hidden></p>
         <div id="video-items" class="video-grid"></div>
         <p id="video-status" role="status"></p>
@@ -98,6 +102,7 @@
     <header>
       <div><h2 id="video-playing-title"></h2><span id="video-mode" role="status"></span></div>
       <button id="video-compatibility" type="button" hidden>Use Compatibility Mode</button>
+      <button id="video-watch-toggle" type="button">Mark Watched</button>
       <button id="video-done" type="button">Done</button>
     </header>
     <video id="video-player" controls playsinline></video>

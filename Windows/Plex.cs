@@ -944,7 +944,8 @@ namespace MusicRoom
                 catch (IOException) { Send("musicError", new { id, message = "Couldn’t save library pins." }); }
                 return;
             }
-            if (action == "videoBrowse" || action == "videoPlay" || action == "videoClose")
+            if (action == "videoBrowse" || action == "videoPlay" || action == "videoClose" ||
+                action == "videoWatchState" || action == "videoWatchUpdate" || action == "videoWatchClear")
             { await VideoAction(body, action, id); return; }
             if (action == "lyrics") { await LoadLyrics(Str(body, "handle"), id); return; }
             if (action == "albumPreview") { await PreviewAlbum(body, id); return; }

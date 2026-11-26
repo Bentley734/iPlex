@@ -127,6 +127,7 @@ namespace MusicRoom
     {
         readonly Uri source;
         readonly Action<string, double> completion;
+        readonly double startAt;
         readonly NativeVideoRuntime vlc;
         readonly Panel surface = new Panel { BackColor = Color.Black, Dock = DockStyle.Fill };
         readonly Button toggle = new Button { Text = "Pause", Width = 85 };
@@ -134,14 +135,15 @@ namespace MusicRoom
         readonly Label elapsed = new Label { AutoSize = true, ForeColor = Color.White, Padding = new Padding(4, 9, 4, 0) };
         readonly Timer clock = new Timer { Interval = 250 };
         IntPtr instance, player;
-        DateTime deadline;
+        DateTime deadline, nextReport;
         long position, duration;
-        bool ready, scrubbing, stopping;
+        bool ready, scrubbing, stopping, startedAtPosition, endedReported;
         string result = "closed";
 
-        internal NativeVideoWindow(Uri source, string title, Action<string, double> completion)
+        internal NativeVideoWindow(Uri source, string title, double startAt, Action<string, double> completion)
         {
             this.source = source;
+            this.startAt = startAt;
             this.completion = completion;
             vlc = NativeVideoRuntime.Load();
             Text = title;
@@ -197,6 +199,7 @@ namespace MusicRoom
                 vlc.Window(player, surface.Handle);
                 if (vlc.Play(player) != 0) throw new InvalidOperationException();
                 deadline = DateTime.UtcNow.AddSeconds(30);
+                nextReport = DateTime.UtcNow.AddSeconds(5);
                 clock.Start();
             }
             catch (Exception) { result = "failed"; Close(); }
@@ -217,6 +220,21 @@ namespace MusicRoom
             duration = Math.Max(0, vlc.Length(player));
             if (state == 6 && duration > 0) position = duration;
             timeline.Enabled = duration > 0 && vlc.Seekable(player) != 0;
+            if (!startedAtPosition && ready && timeline.Enabled)
+            {
+                startedAtPosition = true;
+                if (startAt >= 5 && startAt * 1000 < duration) SetPosition((long)(startAt * 1000));
+            }
+            if (state == 6 && !endedReported)
+            {
+                endedReported = true;
+                completion("ended", 0);
+            }
+            else if (ready && !endedReported && DateTime.UtcNow >= nextReport && (startedAtPosition || startAt < 5))
+            {
+                nextReport = DateTime.UtcNow.AddSeconds(5);
+                completion("progress", position / 1000.0);
+            }
             if (!scrubbing && duration > 0)
                 timeline.Value = (int)Math.Min(timeline.Maximum, position * timeline.Maximum / duration);
             elapsed.Text = ready ? Format(position) + " / " + Format(duration) : "Opening video…";
@@ -262,7 +280,7 @@ namespace MusicRoom
         protected override void OnFormClosed(FormClosedEventArgs args)
         {
             base.OnFormClosed(args);
-            completion(result, position / 1000.0);
+            completion(result, ready && (startedAtPosition || startAt < 5) ? position / 1000.0 : 0);
         }
 
         protected override void Dispose(bool disposing)

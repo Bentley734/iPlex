@@ -27,6 +27,7 @@ namespace MusicRoom
             this.root = root;
             this.emit = emit;
             Directory.CreateDirectory(root);
+            videoWatch = new VideoWatchStore(root);
             ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
             http = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false, UseCookies = false });
             http.Timeout = Timeout.InfiniteTimeSpan;
@@ -138,6 +139,7 @@ namespace MusicRoom
         public void Dispose()
         {
             disposed = true;
+            videoWatch.Dispose();
             shutdown.Cancel();
             http.Dispose();
             ReleaseHandles();
