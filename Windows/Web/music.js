@@ -3,7 +3,11 @@
   const get = id => document.getElementById(id);
   const host = body => window.chrome.webview.postMessage(body);
   const player = window.windowsPlayback;
-  let server = '', library = '', kind = 'albums', artist = null, album = null, playing = null;
+  const sectionNames = ['albums', 'artists', 'genres', 'tracks', 'playlists'];
+  const sectionLabel = name => name[0].toUpperCase() + name.slice(1);
+  const sectionPreference = 'musicroom-visible-sections';
+  let visibleSections = sectionNames;
+  let server = '', library = '', kind = 'albums', group = null, album = null, playing = null;
   let tracks = [], entries = [], request = 0, playRequest = 0, offset = 0, busy = false, timer;
   let hasMore = false;
   let paging = false;
@@ -66,11 +70,12 @@
     paging = append;
     pageFailed = false;
     album = null;
+    refreshAfterAlbum = false;
     if (!append) {
       offset = 0;
       entries = [];
       listingIDs.clear();
-      listingQuery = get('search').value;
+      listingQuery = group ? '' : get('search').value;
       hasMore = false;
       get('grid').replaceChildren();
     }
@@ -80,13 +85,13 @@
     requestPage();
   }
   function requestPage() {
-    host({action:'browse', id:++request, kind, query:listingQuery, artist:artist?.id, offset,
+    host({action:'browse', id:++request, kind, query:listingQuery, group:group?.id, offset,
           pageSize:pageSize === 'all' ? 120 : Number(pageSize)});
   }
   function open(item) {
     clearTimeout(timer);
-    if (item.kind === 'artist') {
-      artist = item;
+    if (item.kind === 'artist' || item.kind === 'genre') {
+      group = item;
       browse();
       return;
     }
@@ -99,9 +104,11 @@
     host({action:'album', id:++request, album:item.id});
   }
   function render() {
-    get('title').textContent = album?.title || artist?.title || (kind === 'albums' ? 'Albums' : 'Artists');
-    get('search').hidden = Boolean(artist || album);
-    get('back').hidden = !artist && !album;
+    get('title').textContent = album?.title || group?.title || sectionLabel(kind);
+    get('search').hidden = Boolean(group || album);
+    get('search').placeholder = 'Search ' + kind;
+    get('search').setAttribute('aria-label', 'Search ' + kind);
+    get('back').hidden = !group && !album;
     get('grid').hidden = Boolean(album);
     get('details').hidden = !album;
     const readyToPage = !album && hasMore && !busy;
@@ -109,24 +116,28 @@
     pageEnd.hidden = !readyToPage || pageFailed;
     pageObserver.unobserve(pageEnd);
     if (!pageEnd.hidden) pageObserver.observe(pageEnd);
-    get('albums').setAttribute('aria-pressed', String(kind === 'albums'));
-    get('artists').setAttribute('aria-pressed', String(kind === 'artists'));
+    for (const tab of sectionNames) get(tab).setAttribute('aria-pressed', String(kind === tab));
     renderFeature();
     if (!album) {
       const grid = get('grid');
-      grid.append(...entries.slice(grid.childElementCount).map(item => {
+      grid.classList.toggle('track-list', kind === 'tracks' && !group);
+      const added = document.createDocumentFragment();
+      for (const item of entries.slice(grid.childElementCount)) {
         const tile = button('', () => open(item), 'tile');
-        tile.append(cover(item), node('strong', item.title));
-        if (item.artist) tile.append(node('small', item.artist));
-        return tile;
-      }));
+        const text = node('div', '', 'tile-text');
+        text.append(node('strong', item.title));
+        if (item.artist) text.append(node('small', item.artist));
+        tile.append(cover(item), text);
+        added.append(tile);
+      }
+      grid.append(added);
       return;
     }
     const heading = node('div', '', 'album-heading');
     const metadata = node('div');
-    metadata.append(node('h2', album.artist || 'Album'),
+    metadata.append(node('h2', album.artist || sectionLabel(album.kind)),
       node('p', [album.year > 0 ? album.year : '', album.genre].filter(Boolean).join(' · ')));
-    const play = button('Play Album', () => playAlbum(0), 'primary');
+    const play = button('Play ' + sectionLabel(album.kind), () => playAlbum(0), 'primary');
     play.disabled = tracks.length === 0;
     metadata.append(play);
     heading.append(cover(album), metadata);
@@ -140,7 +151,7 @@
   }
   function renderFeature() {
     const feature = get('plexify-feature');
-    const item = selectedTheme === 'plexify' && !album && !artist && !get('search').value.trim() ? entries[0] : null;
+    const item = selectedTheme === 'plexify' && !album && !group && ['albums', 'artists'].includes(kind) && !get('search').value.trim() ? entries[0] : null;
     feature.hidden = !item;
     const key = JSON.stringify([item?.id, item?.title, item?.kind, item?.artwork]);
     if (key === featureKey) return;
@@ -191,7 +202,7 @@
     if (reply.id !== request || !album) return;
     tracks = reply.tracks;
     busy = false;
-    status(tracks.length ? '' : 'This album has no directly playable tracks.');
+    status(tracks.length ? '' : 'This item has no directly playable tracks.');
     render();
   };
   window.musicError = reply => {
@@ -212,6 +223,7 @@
     const connecting = state.status === 'connecting';
     get('disconnect').hidden = !connected;
     get('connect').hidden = connected || connecting;
+    get('refresh-plex').hidden = !state.refreshAvailable;
     get('cancel').hidden = !connecting;
     get('connection').hidden = !connected;
     get('library-label').hidden = !state.libraries.length;
@@ -219,8 +231,7 @@
     get('connection-status').textContent = state.message;
     options(get('server'), state.servers, state.serverId, 'Choose server');
     options(get('library'), state.libraries, state.libraryId, 'Choose library');
-    get('albums').disabled = !state.libraryId;
-    get('artists').disabled = !state.libraryId;
+    for (const tab of sectionNames) get(tab).disabled = !state.libraryId;
     get('browser').hidden = !state.libraryId;
     get('welcome').hidden = Boolean(state.libraryId);
     if (server !== state.serverId || library !== state.libraryId) {
@@ -228,7 +239,7 @@
       library = state.libraryId;
       window.musicCoverCache({running:false, message:''});
       ++request;
-      playing = album = artist = pendingAlbum = null;
+      playing = album = group = pendingAlbum = null;
       player.reset();
       if (library) browse();
     }
@@ -284,6 +295,7 @@
     }
   }
   get('connect').onclick = () => host({action:'connect'});
+  get('refresh-plex').onclick = () => host({action:'servers'});
   get('settings').onclick = () => get('settings-page').showModal();
   get('close-settings').onclick = () => get('settings-page').close();
   get('app-update').onclick = () => host({action:'updateApp'});
@@ -407,10 +419,34 @@
   get('cancel').onclick = () => host({action:'cancel'});
   get('server').onchange = event => { if (event.target.value) host({action:'selectServer', server:event.target.value}); };
   get('library').onchange = event => { if (event.target.value) host({action:'selectLibrary', library:event.target.value}); };
-  get('icon').onchange = event => {
-    try { localStorage.setItem('musicroom-icon', event.target.value); } catch {}
-    host({action:'icon', choice:event.target.value});
-  };
+  const iconChoices = Array.from(get('icon-choices').querySelectorAll('button'));
+  function chooseIcon(value) {
+    const choice = iconChoices.find(option => option.value === value) || iconChoices[0];
+    for (const option of iconChoices) option.setAttribute('aria-pressed', String(option === choice));
+    try { localStorage.setItem('musicroom-icon', choice.value); } catch {}
+    host({action:'icon', choice:choice.value});
+  }
+  for (const choice of iconChoices) choice.onclick = () => chooseIcon(choice.value);
+  const sectionToggles = new Map();
+  for (const tab of sectionNames) {
+    const label = node('label', sectionLabel(tab));
+    const input = document.createElement('input');
+    input.type = 'checkbox';
+    label.prepend(input);
+    get('library-sections').append(label);
+    sectionToggles.set(tab, input);
+    input.onchange = () => {
+      const enabled = sectionNames.filter(name => sectionToggles.get(name).checked);
+      setVisibleSections(enabled);
+      try { localStorage.setItem(sectionPreference, JSON.stringify(visibleSections)); } catch {}
+    };
+    get(tab).onclick = () => selectSection(tab);
+  }
+  setVisibleSections(sectionNames);
+  try {
+    const saved = JSON.parse(localStorage.getItem(sectionPreference));
+    if (Array.isArray(saved)) setVisibleSections(saved);
+  } catch {}
   try {
     selectPageSize(localStorage.getItem('musicroom-library-page-size'));
     chooseTheme(localStorage.getItem('musicroom-theme'));
@@ -420,19 +456,9 @@
     chooseHeaderLogoSize(localStorage.getItem('musicroom-header-logo-size'));
     const eq = JSON.parse(localStorage.getItem('musicroom-eq')) || {};
     for (const band of bands) get(band).value = Math.max(-10, Math.min(10, Number(eq[band]) || 0));
-    const icon = localStorage.getItem('musicroom-icon');
-    if (['groove', 'prism', 'signal', 'clickwheel'].includes(icon)) {
-      get('icon').value = icon;
-      host({action:'icon', choice:icon});
-    }
+    chooseIcon(localStorage.getItem('musicroom-icon'));
   } catch {}
   updateEQ();
-  for (const tab of ['albums', 'artists']) get(tab).onclick = () => {
-    clearTimeout(timer);
-    kind = tab;
-    artist = null;
-    browse();
-  };
   get('search').oninput = () => {
     clearTimeout(timer);
     timer = setTimeout(() => browse(), 300);
@@ -443,12 +469,29 @@
       if (refreshAfterAlbum) { refreshAfterAlbum = false; browse(); }
       else render();
     }
-    else { artist = null; browse(); }
+    else { group = null; browse(); }
   };
   get('retry-page').onclick = () => browse(true);
   for (const control of ['previous', 'toggle', 'next']) get(control).onclick = () => player.action({action:control});
   get('seek').oninput = event => player.action({action:'seek', seconds:event.target.value});
   host({action:'status'});
+  function selectSection(section) {
+    clearTimeout(timer);
+    kind = section;
+    group = null;
+    if (library) browse();
+    else render();
+  }
+  function setVisibleSections(sections) {
+    const enabled = sectionNames.filter(tab => sections.includes(tab));
+    if (enabled.length) visibleSections = enabled;
+    for (const [tab, input] of sectionToggles) {
+      input.checked = visibleSections.includes(tab);
+      input.disabled = input.checked && visibleSections.length === 1;
+      get(tab).hidden = !input.checked;
+    }
+    if (!visibleSections.includes(kind)) selectSection(visibleSections[0]);
+  }
   function selectPageSize(value) {
     pageSize = ['30', '60', '120', 'all'].includes(value) ? value : '60';
     get('library-page-size').value = pageSize;

@@ -11,7 +11,10 @@ struct MobileMusicRoomApp: App {
             MusicLibraryScreen(library: library)
                 .preferredColorScheme(theme.scheme)
                 .tint(theme.accent)
-                .task { library.restore() }
+                .task {
+                    library.restore()
+                    await MusicAppIconPicker.resetUnavailableIcon()
+                }
         }
     }
 }
@@ -146,50 +149,55 @@ private struct MusicLibraryScreen: View {
 
     private var browser: some View {
         VStack(alignment: .leading, spacing: 14) {
-            if library.selectedAlbum == nil && library.selectedArtist == nil {
-                HStack {
-                    ForEach(MusicKind.allCases, id: \.self) { kind in
-                        Button(kind.rawValue) {
-                            search?.cancel()
-                            library.kind = kind
-                            library.browse()
-                        }
-                        .buttonStyle(.bordered)
-                        .tint(library.kind == kind ? theme.accent : Color.gray)
-                        .accessibilityAddTraits(library.kind == kind ? .isSelected : [])
-                    }
-                    TextField("Search " + library.kind.rawValue.lowercased(), text: $library.query)
-                        .textFieldStyle(.plain)
-                        .submitLabel(.search)
-                        .padding(10).background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
-                }
+            if library.selectedDetail == nil && library.selectedGroup == nil {
+                #if os(tvOS)
+                HStack { sectionButtons }
+                #else
+                ScrollView(.horizontal) {
+                    HStack { sectionButtons }
+                }.scrollIndicators(.hidden)
+                #endif
+                TextField("Search " + library.kind.rawValue.lowercased(), text: $library.query)
+                    .textFieldStyle(.plain)
+                    .submitLabel(.search)
+                    .padding(10).background(Color.primary.opacity(0.08), in: RoundedRectangle(cornerRadius: 9))
             } else {
                 Button {
-                    if library.selectedAlbum != nil { library.closeAlbum() }
+                    if library.selectedDetail != nil { library.closeDetail() }
                     else { library.browse() }
                 } label: { Label("Back", systemImage: "chevron.left") }
             }
             if let message = library.message { Text(message).foregroundStyle(.secondary) }
             ScrollView {
-                if let album = library.selectedAlbum { albumDetails(album) }
+                if let album = library.selectedDetail { albumDetails(album) }
                 else {
-                    if theme == .plexify && library.selectedArtist == nil
+                    if theme == .plexify && library.selectedGroup == nil && [.albums, .artists].contains(library.kind)
                         && library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                        let entry = library.entries.first {
                         PlexifyFeature(item: entry, library: library) { library.open(entry) }
                             .padding(.bottom, 13)
                     }
-                    if let artist = library.selectedArtist {
+                    if let artist = library.selectedGroup {
                         Text(artist.title).font(.largeTitle.bold()).padding(.bottom, 16)
                     }
                     if !library.busy && library.entries.isEmpty { Text("No matches in this library.").foregroundStyle(.secondary) }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: columnWidth), spacing: 20)], spacing: 20) {
+                    let trackList = library.kind == .tracks && library.selectedGroup == nil
+                    LazyVGrid(columns: [GridItem(trackList ? .flexible() : .adaptive(minimum: columnWidth), spacing: 20)],
+                              spacing: trackList ? 8 : 20) {
                         ForEach(library.entries) { entry in
                             Button { search?.cancel(); library.open(entry) } label: {
-                                VStack(alignment: .leading, spacing: 7) {
-                                    MusicArtwork(item: entry, library: library).aspectRatio(1, contentMode: .fit)
-                                    Text(entry.title).font(.headline).lineLimit(1)
-                                    if !entry.artist.isEmpty { Text(entry.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                                let layout = trackList ? AnyLayout(HStackLayout(spacing: 12)) :
+                                    AnyLayout(VStackLayout(alignment: .leading, spacing: 7))
+                                layout {
+                                    MusicArtwork(item: entry, library: library)
+                                        .aspectRatio(1, contentMode: .fit)
+                                        .frame(width: trackList ? 46 : nil, height: trackList ? 46 : nil)
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(entry.title).font(.headline).lineLimit(1)
+                                        if !entry.artist.isEmpty {
+                                            Text(entry.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                                        }
+                                    }
                                 }.frame(maxWidth: .infinity, alignment: .leading)
                             }
                             #if os(tvOS)
@@ -206,15 +214,27 @@ private struct MusicLibraryScreen: View {
                     }
                 }
                 if library.busy { ProgressView().padding() }
-                if library.more && !library.busy && library.selectedAlbum == nil && library.message != nil {
+                if library.more && !library.busy && library.selectedDetail == nil && library.message != nil {
                     Button("Retry", action: library.loadMore).padding()
                 }
             }.contentMargins(.horizontal, 8, for: .scrollContent)
         }.padding(14)
     }
 
+    private var sectionButtons: some View {
+        ForEach(library.visibleKinds, id: \.self) { kind in
+            Button(kind.rawValue) {
+                search?.cancel()
+                library.selectKind(kind)
+            }
+            .buttonStyle(.bordered)
+            .tint(library.kind == kind ? theme.accent : Color.gray)
+            .accessibilityAddTraits(library.kind == kind ? .isSelected : [])
+        }
+    }
+
     private func albumDetails(_ album: MusicEntry) -> some View {
-        VStack(alignment: .leading, spacing: 14) {
+        LazyVStack(alignment: .leading, spacing: 14) {
             HStack(alignment: .center, spacing: 18) {
                 MusicArtwork(item: album, library: library).frame(width: columnWidth, height: columnWidth)
                 VStack(alignment: .leading, spacing: 8) {
@@ -222,7 +242,7 @@ private struct MusicLibraryScreen: View {
                     Text(album.artist)
                     let description = [album.year.map(String.init), album.genres.first].compactMap { $0 }.joined(separator: " · ")
                     if !description.isEmpty { Text(description).foregroundStyle(.secondary) }
-                    Button("Play Album") { library.play(at: 0) }
+                    Button(album.kind.playLabel) { library.play(at: 0) }
                         .buttonStyle(.borderedProminent).disabled(library.tracks.isEmpty)
                 }
                 Spacer(minLength: 0)
@@ -290,7 +310,7 @@ private struct MusicArtwork: View {
     var body: some View {
         Color.white.opacity(0.08).overlay {
             PlexArtwork(item: item, library: library) {
-                Image(systemName: item.kind == .albums ? "opticaldisc" : "person.crop.circle").foregroundStyle(.secondary)
+                Image(systemName: item.kind.symbol).foregroundStyle(.secondary)
             }
         }
         .clipShape(RoundedRectangle(cornerRadius: 10))

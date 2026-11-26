@@ -91,6 +91,8 @@ struct MusicSettings: View {
     @Environment(\.dismiss) private var dismiss
     #if os(macOS)
     @EnvironmentObject private var updates: MacAppUpdates
+    #else
+    @State private var showAppIcons = false
     #endif
 
     var body: some View {
@@ -129,12 +131,33 @@ struct MusicSettings: View {
                     }
                     HeaderBrand(mark: headerMark, theme: theme, width: 170, height: 42)
                         .accessibilityHidden(true)
+                    Divider()
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("App Icon").font(.headline)
+                        #if os(macOS)
+                        MacAppIconGrid()
+                        #else
+                        Button("Choose App Icon") { showAppIcons = true }
+                        #endif
+                    }
+                    Divider()
                     Picker("Results per Page", selection: $pageSize) {
                         ForEach(LibraryPageSize.allCases) { size in
                             Text(size.label).tag(size)
                         }
                     }
                     .onChange(of: pageSize) { _, _ in library.refreshPageSize() }
+                    Divider()
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Library Sections").font(.headline)
+                        ForEach(MusicKind.allCases, id: \.self) { kind in
+                            Toggle(kind.rawValue, isOn: Binding(
+                                get: { library.visibleKinds.contains(kind) },
+                                set: { library.setVisibility(kind, visible: $0) }
+                            ))
+                            .disabled(library.visibleKinds == [kind])
+                        }
+                    }
                     Divider()
                     VStack(alignment: .leading, spacing: 10) {
                         Text("App Updates").font(.headline)
@@ -186,6 +209,9 @@ struct MusicSettings: View {
         .padding(30)
         #if os(macOS)
         .frame(width: 490, height: 560)
+        #endif
+        #if os(iOS) || os(tvOS)
+        .sheet(isPresented: $showAppIcons) { MusicAppIconPicker() }
         #endif
         .background(theme.backdrop)
         .tint(theme.accent)

@@ -2,7 +2,7 @@
 
 iPlex is an independent music player for Plex libraries on macOS, Windows, iPhone, iPad, and Apple TV.
 
-Browse your library by artist or album, play tracks with Plex artwork and metadata, and choose a player theme. The Classic iPod and iPod Video themes include click-wheel controls. Settings include an equalizer and **Cache Library Artwork**, which downloads album covers and artist pictures from the selected Plex library.
+Browse artists, albums, genres, tracks, and playlists with Plex artwork and metadata. Choose which sections appear in Settings, where you can also preview and select an app icon. The Classic iPod and iPod Video themes include click-wheel controls. Settings include an equalizer and **Cache Library Artwork**, which downloads album covers and artist pictures from the selected Plex library.
 
 ## Install
 

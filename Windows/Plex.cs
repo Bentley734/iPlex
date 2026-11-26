@@ -4,6 +4,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -32,6 +33,8 @@ namespace MusicRoom
         string account = "", selectedServer = "", selectedSection = "", plexMessage = "", phase = "",
                clientID = "";
         bool initialized, loadingSections;
+        bool sessionOnly;
+        const string PlexProduct = "iPlex";
         string TokenFile
         {
             get {
@@ -104,8 +107,9 @@ namespace MusicRoom
                     account = Encoding.UTF8.GetString(ProtectedData.Unprotect(
                         File.ReadAllBytes(TokenFile), null, DataProtectionScope.CurrentUser));
                 }
-                catch (CryptographicException)
+                catch (Exception error)
                 {
+                    if (!CredentialStorageUnavailable(error)) throw;
                     plexMessage = "Connect Plex again to authorize this Windows account.";
                 }
             }
@@ -114,6 +118,11 @@ namespace MusicRoom
         static bool ValidToken(string s)
         {
             return !String.IsNullOrEmpty(s) && s.Length <= 8192 && s.All(c => c >= 33 && c <= 126);
+        }
+        static bool CredentialStorageUnavailable(Exception error)
+        {
+            return error is CryptographicException || error is IOException || error is UnauthorizedAccessException ||
+                   error is PlatformNotSupportedException;
         }
         void PlexState()
         {
@@ -125,10 +134,13 @@ namespace MusicRoom
             if (String.IsNullOrEmpty(message))
                 message = account.Length > 0 ? "Connected to Plex."
                                              : "Connect to your Plex music library.";
+            if (sessionOnly && account.Length > 0)
+                message += " Windows could not save this sign-in. It will last until iPlex closes.";
             Server server;
             servers.TryGetValue(selectedServer, out server);
             Send("macPlexState", new {
                 status, message, loadingLibraries = loadingSections, libraryMessage = "",
+                refreshAvailable = status == "connected" && phase != "loading" && !loadingSections && selectedSection.Length == 0,
                 serverId = selectedServer, serverName = server != null ? server.Name : "",
                 libraryId = selectedSection,
                 servers =
@@ -143,12 +155,14 @@ namespace MusicRoom
         {
             var req = new HttpRequestMessage(method, uri);
             req.Headers.Add("Accept", "application/json");
-            req.Headers.Add("X-Plex-Product", "iPlex");
+            req.Headers.Add("X-Plex-Product", PlexProduct);
             req.Headers.Add("X-Plex-Version", typeof(WindowsMediaService).Assembly.GetName().Version.ToString(3));
             req.Headers.Add("X-Plex-Platform", "Windows");
             req.Headers.Add("X-Plex-Client-Identifier", clientID);
             req.Headers.Add("X-Plex-Device", "Windows");
-            req.Headers.Add("X-Plex-Device-Name", "iPlex");
+            req.Headers.Add("X-Plex-Device-Name", PlexProduct);
+            if (uri.Host == "plex.tv" && uri.AbsolutePath.StartsWith("/api/v2/pins", StringComparison.Ordinal))
+                req.Headers.CacheControl = new CacheControlHeaderValue { NoCache = true, NoStore = true };
             if (!String.IsNullOrEmpty(token))
                 req.Headers.Add("X-Plex-Token", token);
             return req;
@@ -173,23 +187,62 @@ namespace MusicRoom
                 throw Problem("Plex returned an invalid sign-in code.");
             OpenSignIn("https://app.plex.tv/auth#?clientID=" + Uri.EscapeDataString(clientID) +
                        "&code=" + Uri.EscapeDataString(code) +
-                       "&context%5Bdevice%5D%5Bproduct%5D=Music%20Room");
-            DateTime expires = DateTime.UtcNow.AddMinutes(5);
+                       "&context%5Bdevice%5D%5Bproduct%5D=" + Uri.EscapeDataString(PlexProduct));
+            long lifetime = Num(pin, "expiresIn");
+            DateTime expires = DateTime.UtcNow.AddSeconds(lifetime > 0 ? Math.Min(lifetime, 900) : 300);
+            var address = new Uri("https://plex.tv/api/v2/pins/" + id.ToString(CultureInfo.InvariantCulture));
             while (DateTime.UtcNow < expires)
             {
-                await Task.Delay(3000, token);
-                var result = Map(await FetchPlex(HttpMethod.Get, new Uri("https://plex.tv/api/v2/pins/" + id),
-                                                 null, token));
+                await Task.Delay(2000, token);
+                Dictionary<string, object> result;
+                try
+                {
+                    result = Map(await FetchPlex(HttpMethod.Get, address, null, token, 256 * 1024, 10));
+                }
+                catch (OperationCanceledException)
+                {
+                    token.ThrowIfCancellationRequested();
+                    plexMessage = "Plex took too long to reply. Retrying sign-in…";
+                    PlexState();
+                    continue;
+                }
+                catch (HttpRequestException)
+                {
+                    plexMessage = "Could not check the Plex link. Retrying…";
+                    PlexState();
+                    continue;
+                }
+                catch (InvalidDataException error)
+                {
+                    if (error.Message == "The service returned HTTP 404." ||
+                        error.Message == "The service returned HTTP 410.") break;
+                    throw;
+                }
+                if (Num(result, "id") != id)
+                    throw Problem("Plex returned an unrelated sign-in response. Choose Connect Plex to try again.");
                 var secret = Str(result, "authToken");
                 if (String.IsNullOrEmpty(secret))
+                {
+                    if (Get(result, "expiresIn") != null && Num(result, "expiresIn") <= 0) break;
+                    plexMessage = "Finish linking in your browser. iPlex checks for approval automatically.";
+                    PlexState();
                     continue;
+                }
                 if (!ValidToken(secret))
                     throw Problem("Plex returned an invalid credential.");
                 token.ThrowIfCancellationRequested();
-                Atomic(TokenFile, ProtectedData.Protect(Encoding.UTF8.GetBytes(secret), null,
-                                                        DataProtectionScope.CurrentUser));
+                sessionOnly = false;
+                try
+                {
+                    Atomic(TokenFile, ProtectedData.Protect(Encoding.UTF8.GetBytes(secret), null,
+                                                            DataProtectionScope.CurrentUser));
+                }
+                catch (Exception error)
+                {
+                    if (!CredentialStorageUnavailable(error)) throw;
+                    sessionOnly = true;
+                }
                 account = secret;
-                phase = "";
                 await LoadServers(token);
                 return;
             }
@@ -210,6 +263,7 @@ namespace MusicRoom
         {
             if (!ValidToken(account))
                 throw Problem("Connect Plex first.");
+            phase = "loading";
             plexMessage = "Finding Plex servers…";
             PlexState();
             var entries = Rows(await FetchPlex(
@@ -242,7 +296,7 @@ namespace MusicRoom
                 servers[kv.Key] = kv.Value;
             string previousServer = Pref("server");
             selectedServer = servers.ContainsKey(previousServer) ? previousServer :
-                previousServer.Length == 0 && servers.Count == 1 ? servers.Keys.Single() : "";
+                servers.Count == 1 ? servers.Keys.Single() : "";
             sections.Clear();
             selectedSection = "";
             phase = "";
@@ -310,7 +364,7 @@ namespace MusicRoom
             sections = list;
             var previous = Pref("library." + server.Id);
             selectedSection = list.Any(s => s.id == previous) ? previous :
-                previous.Length == 0 && list.Count == 1 ? list[0].id : "";
+                list.Count == 1 ? list[0].id : "";
             loadingSections = false;
             plexMessage = list.Count == 0         ? "No music libraries found on this server."
                           : selectedSection == "" ? "Choose a music library."
@@ -321,7 +375,7 @@ namespace MusicRoom
         {
             var c = Map(Get(Map(result), "MediaContainer"));
             Func<Dictionary<string, object>, bool> belongs = r =>
-                !r.ContainsKey("librarySectionID") || Str(r, "librarySectionID") == section;
+                section == null || !r.ContainsKey("librarySectionID") || Str(r, "librarySectionID") == section;
             if (!belongs(c))
                 return Enumerable.Empty<Dictionary<string, object>>();
             return Rows(Get(c, "Metadata"))
@@ -340,7 +394,7 @@ namespace MusicRoom
                    !d.Split('/').Any(x => x == "." || x == "..");
         }
         static readonly Regex ItemID = new Regex(@"^[1-9][0-9]{0,19}\z");
-        static readonly Regex ArtPath = new Regex(@"^/library/metadata/[0-9]+/thumb(?:/[0-9]+)?\z");
+        static readonly Regex ArtPath = new Regex(@"^(?:/library/metadata/[0-9]+/thumb|/playlists/[0-9]+/composite)(?:/[0-9]+)?\z");
         sealed class LibraryItem
         {
             internal string Kind, Title;
@@ -368,43 +422,84 @@ namespace MusicRoom
             Server server;
             if (!servers.TryGetValue(selectedServer, out server) || selectedSection.Length == 0)
                 throw Problem("Choose a Plex music library.");
-            bool artists = Str(request, "kind") == "artists";
+            string category = Str(request, "kind");
+            string type, expected;
+            switch (category)
+            {
+                case "artists": type = "8"; expected = "artist"; break;
+                case "tracks": type = "10"; expected = "track"; break;
+                case "playlists": type = "15"; expected = "playlist"; break;
+                case "genres": type = "9"; expected = "genre"; break;
+                default: type = "9"; expected = "album"; break;
+            }
             long start = Math.Min(Math.Max(0, Num(request, "offset")), 1000000);
             long requestedSize = Num(request, "pageSize");
-            long size = requestedSize == 30 || requestedSize == 120 ? requestedSize : 60;
-            string artist = Str(request, "artist");
+            int size = requestedSize == 30 || requestedSize == 120 ? (int)requestedSize : 60;
+            string group = Str(request, "group");
             string query = Str(request, "query").Trim();
             string section = selectedSection;
-            var endpoint = "/library/sections/" + section + "/all?type=" + (artists ? "8" : "9") + "&sort=titleSort%3Aasc";
-            if (artist.Length != 0)
+            string sectionPath = "/library/sections/" + section;
+            bool localPaging = false;
+            string endpoint;
+            if (group.Length != 0)
             {
                 LibraryItem record;
-                if (!ItemID.IsMatch(artist) || !items.TryGetValue(artist, out record) || record.Kind != "artist")
-                    throw Problem("Choose an artist from the library.");
-                endpoint = "/library/metadata/" + artist + "/children?";
-                artists = false;
+                if (!items.TryGetValue(group, out record) || (record.Kind != "artist" && record.Kind != "genre"))
+                    throw Problem("Choose a genre or artist from the library.");
+                expected = "album";
+                endpoint = record.Kind == "artist" ? "/library/metadata/" + group + "/children?" :
+                    sectionPath + "/all?type=9&sort=titleSort%3Aasc&genre=" + group.Substring("genre:".Length);
             }
-            else if (!String.IsNullOrEmpty(query))
-                endpoint += "&title=" + Uri.EscapeDataString(query.Substring(0, Math.Min(query.Length, 120)));
-            endpoint += "&X-Plex-Container-Start=" + start + "&X-Plex-Container-Size=" + size;
+            else if (category == "genres" || category == "playlists")
+            {
+                localPaging = true;
+                endpoint = category == "genres" ? sectionPath + "/genre?type=9" :
+                    "/playlists?type=15&playlistType=audio&sectionID=" + section;
+            }
+            else
+            {
+                endpoint = sectionPath + "/all?type=" + type + "&sort=titleSort%3Aasc";
+                if (!String.IsNullOrEmpty(query))
+                    endpoint += "&title=" + Uri.EscapeDataString(query.Substring(0, Math.Min(query.Length, 120)));
+            }
+            if (!localPaging) endpoint += "&X-Plex-Container-Start=" + start + "&X-Plex-Container-Size=" + size;
             var payload = await WithServer(server, url =>
                 FetchPlex(HttpMethod.Get, new Uri(url, endpoint), server.Token, token, 8 * 1024 * 1024), token);
             token.ThrowIfCancellationRequested();
-            var rows = Metadata(payload, section).ToArray();
-            long total = Num(Map(Get(Map(payload), "MediaContainer")), "totalSize");
+            var container = Map(Get(Map(payload), "MediaContainer"));
+            var rows = (expected == "genre" ? Rows(Get(container, "Directory")) :
+                Metadata(payload, expected == "playlist" ? null : section)).ToArray();
+            long total = Num(container, "totalSize");
             var results = new List<object>();
             var seen = new HashSet<string>();
+            int matches = 0;
+            if (localPaging) rows = rows.OrderBy(row => Str(row, "title"), StringComparer.CurrentCultureIgnoreCase).ToArray();
             foreach (var row in rows)
             {
                 string key = Str(row, "ratingKey");
                 string title = Str(row, "title");
                 string kind = Str(row, "type");
-                if (!ItemID.IsMatch(key) || title.Length == 0 || title.Length > 300 ||
-                    kind != (artists ? "artist" : "album") || !seen.Add(key)) continue;
+                if (expected == "genre")
+                {
+                    kind = expected;
+                    key = Str(row, "key");
+                    var path = Regex.Match(key, "^" + sectionPath + @"/all\?(?:[^&]+&)*genre=([0-9]+)(?:&|$)");
+                    if (path.Success) key = path.Groups[1].Value;
+                }
+                if (!ItemID.IsMatch(key) || title.Length == 0 || title.Length > 300 || kind != expected ||
+                    (kind == "playlist" && Str(row, "playlistType") != "audio") || !seen.Add(key)) continue;
+                if (localPaging)
+                {
+                    if (title.IndexOf(query, StringComparison.CurrentCultureIgnoreCase) < 0) continue;
+                    int position = matches++;
+                    if (position < start || results.Count >= size) continue;
+                }
+                if (kind == "genre") key = "genre:" + key;
                 items[key] = new LibraryItem { Kind = kind, Title = title };
                 string artwork = "";
-                string thumb = Str(row, "thumb");
-                if (thumb.Length < 180 && ArtPath.IsMatch(thumb))
+                string thumb = new[] { "thumb", "parentThumb", "composite" }.Select(field => Str(row, field))
+                    .FirstOrDefault(value => value.Length < 180 && ArtPath.IsMatch(value));
+                if (thumb != null)
                 {
                     string handle;
                     if (!artIDs.TryGetValue(thumb, out handle))
@@ -415,11 +510,12 @@ namespace MusicRoom
                     }
                     artwork = "/art/" + handle;
                 }
-                results.Add(new { id = key, title, kind, artwork, artist = Str(row, "parentTitle"), year = Num(row, "year"),
+                results.Add(new { id = key, title, kind, artwork, artist = Str(row, kind == "track" ? "grandparentTitle" : "parentTitle"), year = Num(row, "year"),
                     genre = Rows(Get(row, "Genre")).Select(genre => Str(genre, "tag")).FirstOrDefault() ?? "" });
             }
-            long next = start + rows.Length;
-            bool more = results.Count > 0 && next <= 1000000 && (total > 0 ? next < total : rows.Length >= size);
+            long next = start + (localPaging ? results.Count : rows.Length);
+            bool more = results.Count > 0 && next <= 1000000 &&
+                (localPaging ? next < matches : total > 0 ? next < total : rows.Length >= size);
             Send("musicEntries", new { id, entries = results, next, more });
         }
 
@@ -459,33 +555,55 @@ namespace MusicRoom
             string key = Str(request, "album");
             Server server;
             LibraryItem item;
-            if (!ItemID.IsMatch(key) || !items.TryGetValue(key, out item) || item.Kind != "album" ||
+            if (!ItemID.IsMatch(key) || !items.TryGetValue(key, out item) ||
+                (item.Kind != "album" && item.Kind != "playlist" && item.Kind != "track") ||
                 !servers.TryGetValue(selectedServer, out server) || selectedSection.Length == 0)
-                throw Problem("Choose an album from the library.");
+                throw Problem("Choose an album, playlist, or track from the library.");
             string section = selectedSection;
+            bool playlist = item.Kind == "playlist";
+            bool album = item.Kind == "album";
+            string path = playlist ? "/playlists/" + key + "/items" :
+                "/library/metadata/" + key + (album ? "/children" : "");
             var tracks = await WithServer(server, async url =>
             {
-                var rows = Metadata(await FetchPlex(HttpMethod.Get, new Uri(url, "/library/metadata/" + key + "/children"),
-                    server.Token, token, 8 * 1024 * 1024), section)
-                    .Where(row => Str(row, "type") == "track" && (!row.ContainsKey("parentRatingKey") || Str(row, "parentRatingKey") == key))
-                    .OrderBy(row => Num(row, "parentIndex")).ThenBy(row => Num(row, "index"));
+                const int batch = 200, playlistLimit = 10000;
+                int start = 0;
                 var found = new List<MediaTrack>();
-                foreach (var row in rows)
+                var seen = new HashSet<string>();
+                bool more;
+                do
                 {
-                    if (found.Count >= 250) break;
-                    var parts = Rows(Get(row, "Media")).Take(16).SelectMany(media => Rows(Get(media, "Part")).Take(16));
-                    foreach (var part in parts)
+                    string endpoint = playlist ? path + "?X-Plex-Container-Start=" + start + "&X-Plex-Container-Size=" + batch : path;
+                    var payload = await FetchPlex(HttpMethod.Get, new Uri(url, endpoint), server.Token, token, 8 * 1024 * 1024);
+                    var rows = Metadata(payload, playlist ? null : section).ToArray();
+                    var ordered = album ? rows.OrderBy(row => Num(row, "parentIndex")).ThenBy(row => Num(row, "index")) :
+                        (IEnumerable<Dictionary<string, object>>)rows;
+                    foreach (var row in ordered)
                     {
-                        string path = Str(part, "key"), mime;
-                        if (!PartPath(path) || !Mime.TryGetValue(Path.GetExtension(path), out mime)) continue;
-                        long duration = Num(row, "duration");
-                        found.Add(new MediaTrack { number = found.Count + 1, title = Str(row, "title"),
-                            durationSeconds = duration > 0 ? (double?)duration / 1000 : null,
-                            remote = new Uri(url, path), token = server.Token, mime = mime,
-                            directMp4 = Str(part, "audioCodec") == "aac" || Str(row, "audioCodec") == "aac" });
-                        break;
+                        if (album && found.Count >= 250) break;
+                        string trackKey = Str(row, "ratingKey");
+                        if (Str(row, "type") != "track" || !ItemID.IsMatch(trackKey) ||
+                            (album && row.ContainsKey("parentRatingKey") && Str(row, "parentRatingKey") != key) ||
+                            (!album && !playlist && trackKey != key) || (!playlist && !seen.Add(trackKey))) continue;
+                        var parts = Rows(Get(row, "Media")).Take(16).SelectMany(media => Rows(Get(media, "Part")).Take(16));
+                        foreach (var part in parts)
+                        {
+                            string partPath = Str(part, "key"), mime;
+                            if (!PartPath(partPath) || !Mime.TryGetValue(Path.GetExtension(partPath), out mime)) continue;
+                            long duration = Num(row, "duration");
+                            found.Add(new MediaTrack { number = found.Count + 1, title = Str(row, "title"),
+                                durationSeconds = duration > 0 ? (double?)duration / 1000 : null,
+                                remote = new Uri(url, partPath), token = server.Token, mime = mime,
+                                directMp4 = Str(part, "audioCodec") == "aac" || Str(row, "audioCodec") == "aac" });
+                            break;
+                        }
                     }
-                }
+                    start += rows.Length;
+                    long total = Num(Map(Get(Map(payload), "MediaContainer")), "totalSize");
+                    more = playlist && rows.Length > 0 && (total > 0 ? start < total : rows.Length >= batch);
+                    if (playlist && (start > playlistLimit || (more && start >= playlistLimit)))
+                        throw Problem("This playlist exceeds the 10,000-track playback limit.");
+                } while (more);
                 return found;
             }, token);
             token.ThrowIfCancellationRequested();
@@ -499,7 +617,7 @@ namespace MusicRoom
         {
             long index = Num(body, "index");
             if (Str(body, "album") != albumID || index < 0 || index >= albumTracks.Count)
-                throw Problem("Open the album before playing it.");
+                throw Problem("Open the library item before playing it.");
             var entries = new List<object>();
             lock (handles)
             {
@@ -575,24 +693,34 @@ namespace MusicRoom
                     ClearMusic();
                     if (File.Exists(TokenFile)) File.Delete(TokenFile);
                     account = selectedServer = selectedSection = plexMessage = phase = "";
+                    sessionOnly = false;
                     servers.Clear();
                     sections.Clear();
                     PlexState();
                 }
             }
-            catch (OperationCanceledException) { }
+            catch (OperationCanceledException)
+            {
+                if (!token.IsCancellationRequested)
+                    ReportPlexError(action, id, "Plex did not respond in time. Try again.");
+            }
             catch (Exception error)
             {
                 if (token.IsCancellationRequested) return;
                 string message = error is InvalidDataException ? error.Message : "Couldn’t reach Plex. Check your connection and try again.";
-                if (action == "browse" || action == "album" || action == "play") Send("musicError", new { id, message });
-                else { phase = "error"; plexMessage = message; loadingSections = false; PlexState(); }
+                ReportPlexError(action, id, message);
             }
             finally
             {
                 if (plexJob == job) plexJob = null;
                 job.Dispose();
             }
+        }
+
+        void ReportPlexError(string action, long id, string message)
+        {
+            if (action == "browse" || action == "album" || action == "play") Send("musicError", new { id, message });
+            else { phase = "error"; plexMessage = message; loadingSections = false; PlexState(); }
         }
     }
 }

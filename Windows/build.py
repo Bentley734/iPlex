@@ -11,6 +11,12 @@ from zipfile import ZipFile, ZIP_DEFLATED
 ROOT = Path(__file__).resolve().parent
 ASSETS = ROOT.parent / "Assets"
 SDK_DIGEST = "5ea526bbd728adda0da4d31219267e96460494a427e4894c4e09d9f320f4b9aa"
+DEFAULT_ICON = "prismatic-note"
+ICONS = (
+    DEFAULT_ICON, "prismatic-note-dark", "music-gradient", "music-wordmark", "music-crimson",
+    "music-monochrome", "music-orange", "music-artists", "music-pink", "napster",
+    "napster-mono", "spotify", "plex",
+)
 
 
 def make_icon(png, destination):
@@ -71,23 +77,23 @@ def main():
             for p in sorted((ROOT / "Web").glob("*")):
                 if p.is_file() and p.suffix in (".js", ".html", ".css"):
                     web.write(p, p.name)
-            for name in ("groove", "prism", "signal", "clickwheel"):
+            for name in ICONS:
                 icon = stage / (name + ".ico")
                 make_icon(ASSETS / (name + ".png"), icon)
                 web.write(icon, icon.name)
-            for name in ("groove.png", "wordmark.png", "music-wordmarks.png"):
+            for name in (DEFAULT_ICON + ".png", "wordmark.png", "music-wordmarks.png"):
                 web.write(ASSETS / name, name)
             for mark in sorted((ASSETS / "HeaderMarks").glob("*.png")):
                 web.write(mark, "HeaderMarks/" + mark.name)
         embed(site, "site.zip")
-        flags.append("/win32icon:" + str(stage / "groove.ico"))
+        flags.append("/win32icon:" + str(stage / (DEFAULT_ICON + ".ico")))
         command = [str(args.compiler)]
         if args.compiler.suffix == ".dll":
             command.insert(0, os.environ.get("DOTNET_HOST_PATH", "dotnet"))
         subprocess.run(command + flags + [str(p) for p in sorted(ROOT.glob("*.cs"))], check=True)
         with ZipFile(args.output / "iPlex.Windows.zip", "w", ZIP_DEFLATED) as bundle:
             bundle.write(args.output / "iPlex.exe", "iPlex.exe")
-            bundle.write(stage / "clickwheel.ico", "Icons/Classic Click Wheel.ico")
+            bundle.write(stage / (DEFAULT_ICON + ".ico"), "Icons/Prismatic Note Light.ico")
             for name in ("WebView2-LICENSE.txt", "WebView2-NOTICE.txt"):
                 bundle.write(stage / name, "Notices/" + name)
             for name in ("COPYING.LGPLv2.1", "ThirdParty.txt"):

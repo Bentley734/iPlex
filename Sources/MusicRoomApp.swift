@@ -7,7 +7,7 @@ struct MusicRoomApp: App {
     @StateObject private var model = LibraryModel()
     @StateObject private var updates = MacAppUpdates()
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
-    @AppStorage("IconStyle") private var iconStyle = "groove"
+    @AppStorage(AppIconChoice.preferenceKey) private var iconStyle = AppIconChoice.defaultChoice.rawValue
 
     init() { MacAppUpdates.recordLaunchingProcess() }
 
@@ -38,8 +38,9 @@ struct MusicRoomApp: App {
     }
 
     private func applyIcon() {
-        if let file = Bundle.main.url(forResource: iconStyle, withExtension: "png"),
-           let icon = NSImage(contentsOf: file) {
+        let choice = AppIconChoice(rawValue: iconStyle) ?? .defaultChoice
+        if iconStyle != choice.rawValue { iconStyle = choice.rawValue }
+        if let icon = choice.macImage {
             NSApplication.shared.applicationIconImage = icon
         }
     }
@@ -159,52 +160,51 @@ private struct MusicWindow: View {
     }
 
     private var sidebar: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            if !plexify { HeaderBrand(mark: headerMark, theme: theme, width: 155, height: 46) }
-            if graphite {
-                librarySearch
-                    .disabled(model.libraryID.isEmpty)
-            }
-            VStack(alignment: .leading, spacing: 6) {
-                if graphite || plexify {
-                    Text("Plex library")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
-                        .padding(.leading, 10).padding(.bottom, 3)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                if !plexify { HeaderBrand(mark: headerMark, theme: theme, width: 155, height: 46) }
+                if graphite {
+                    librarySearch
+                        .disabled(model.libraryID.isEmpty)
                 }
-                tab(.albums, icon: graphite ? "opticaldisc" : "square.stack")
-                tab(.artists, icon: graphite ? "person.crop.rectangle.stack" : "person.2")
-            }
-            if model.connected {
-                VStack(alignment: .leading, spacing: 10) {
-                    if !model.servers.isEmpty {
-                        Picker("Server", selection: Binding(get: { model.serverID }, set: model.chooseServer)) {
-                            Text("Choose server").tag("")
-                            ForEach(model.servers, id: \.id) { Text($0.name).tag($0.id) }
+                VStack(alignment: .leading, spacing: 6) {
+                    if graphite || plexify {
+                        Text("Plex library")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .padding(.leading, 10).padding(.bottom, 3)
+                    }
+                    ForEach(model.visibleKinds, id: \.self) { tab($0) }
+                }
+                if model.connected {
+                    VStack(alignment: .leading, spacing: 10) {
+                        if !model.servers.isEmpty {
+                            Picker("Server", selection: Binding(get: { model.serverID }, set: model.chooseServer)) {
+                                Text("Choose server").tag("")
+                                ForEach(model.servers, id: \.id) { Text($0.name).tag($0.id) }
+                            }
+                        }
+                        if !model.libraries.isEmpty {
+                            Picker("Library", selection: Binding(get: { model.libraryID }, set: model.chooseLibrary)) {
+                                Text("Choose library").tag("")
+                                ForEach(model.libraries, id: \.id) { Text($0.name).tag($0.id) }
+                            }
                         }
                     }
-                    if !model.libraries.isEmpty {
-                        Picker("Library", selection: Binding(get: { model.libraryID }, set: model.chooseLibrary)) {
-                            Text("Choose library").tag("")
-                            ForEach(model.libraries, id: \.id) { Text($0.name).tag($0.id) }
-                        }
-                    }
+                    .labelsHidden()
                 }
-                .labelsHidden()
+                if !graphite && !plexify { settingsButton }
+                if graphite {
+                    Divider()
+                    settingsButton
+                }
+                if model.connected {
+                    Button("Disconnect Plex", action: model.disconnect)
+                        .buttonStyle(.plain).foregroundStyle(.secondary)
+                }
             }
-            if !graphite && !plexify { settingsButton }
-            Spacer()
-            if graphite {
-                Divider()
-                settingsButton
-            }
-            if model.connected {
-                Button("Disconnect Plex", action: model.disconnect)
-                    .buttonStyle(.plain).foregroundStyle(.secondary)
-            }
+            .padding(graphite || plexify ? 16 : 24)
         }
-        .padding(graphite || plexify ? 16 : 24)
-        .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(slate)
     }
 
@@ -224,13 +224,12 @@ private struct MusicWindow: View {
         .background(graphite || plexify ? .white.opacity(0.06) : slate, in: RoundedRectangle(cornerRadius: 8))
     }
 
-    private func tab(_ kind: MusicKind, icon: String) -> some View {
+    private func tab(_ kind: MusicKind) -> some View {
         Button {
             searchTask?.cancel()
-            model.kind = kind
-            model.browse()
+            model.selectKind(kind)
         } label: {
-            Label(kind.rawValue, systemImage: icon)
+            Label(kind.rawValue, systemImage: kind.symbol)
                 .font(.headline)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 11).padding(.vertical, 10)
@@ -247,18 +246,18 @@ private struct MusicWindow: View {
                 welcome
             } else {
                 HStack(spacing: 15) {
-                    if model.selectedAlbum != nil || model.selectedArtist != nil {
+                    if model.selectedDetail != nil || model.selectedGroup != nil {
                         Button {
-                            if model.selectedAlbum != nil { model.closeAlbum() }
+                            if model.selectedDetail != nil { model.closeDetail() }
                             else { model.browse() }
                         } label: { Image(systemName: "chevron.left") }
                         .accessibilityLabel("Back")
                     }
-                    Text(model.selectedAlbum?.title ?? model.selectedArtist?.title ?? model.kind.rawValue)
+                    Text(model.selectedDetail?.title ?? model.selectedGroup?.title ?? model.kind.rawValue)
                         .font(.system(size: graphite ? 38 : 31, weight: .bold, design: graphite ? .rounded : .default))
                         .lineLimit(1)
                     Spacer()
-                    if !graphite && !plexify && model.selectedAlbum == nil && model.selectedArtist == nil {
+                    if !graphite && !plexify && model.selectedDetail == nil && model.selectedGroup == nil {
                         librarySearch.frame(width: 205)
                     }
                 }
@@ -266,7 +265,7 @@ private struct MusicWindow: View {
                 if let message = model.message {
                     Text(message).font(.callout).foregroundStyle(copper).padding(.horizontal, 28).padding(.bottom, 12)
                 }
-                if let album = model.selectedAlbum { albumDetail(album) }
+                if let album = model.selectedDetail { albumDetail(album) }
                 else { grid }
             }
         }
@@ -375,12 +374,12 @@ private struct MusicWindow: View {
 
     private var grid: some View {
         ScrollView {
-            if plexify && model.selectedArtist == nil && model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+            if plexify && model.selectedGroup == nil && [.albums, .artists].contains(model.kind) && model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                let entry = model.entries.first {
                 PlexifyFeature(item: entry, library: model) { model.open(entry) }
                     .padding(.horizontal, 28).padding(.bottom, 15)
             }
-            if graphite && model.kind == .albums && model.selectedArtist == nil &&
+            if graphite && model.kind == .albums && model.selectedGroup == nil &&
                 model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                let album = model.entries.first {
                 studioFeature(album)
@@ -389,16 +388,22 @@ private struct MusicWindow: View {
             if !model.busy && model.entries.isEmpty {
                 Text("No matches in this library.").foregroundStyle(.secondary).padding(26)
             }
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: graphite ? 133 : 145, maximum: 190), spacing: 21)],
-                      alignment: .leading, spacing: 24) {
+            let trackList = model.kind == .tracks && model.selectedGroup == nil
+            LazyVGrid(columns: [GridItem(trackList ? .flexible() : .adaptive(minimum: graphite ? 133 : 145, maximum: 190), spacing: 21)],
+                      alignment: .leading, spacing: trackList ? 8 : 24) {
                 ForEach(model.entries) { entry in
                     Button { searchTask?.cancel(); model.open(entry) } label: {
-                        VStack(alignment: .leading, spacing: 7) {
+                        let layout = trackList ? AnyLayout(HStackLayout(spacing: 12)) :
+                            AnyLayout(VStackLayout(alignment: .leading, spacing: 7))
+                        layout {
                             CoverArt(item: entry, model: model)
                                 .aspectRatio(1, contentMode: .fit)
-                            Text(entry.title).font(.headline).lineLimit(1)
-                            if !entry.artist.isEmpty {
-                                Text(entry.artist).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+                                .frame(width: trackList ? 46 : nil, height: trackList ? 46 : nil)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(entry.title).font(.headline).lineLimit(1)
+                                if !entry.artist.isEmpty {
+                                    Text(entry.artist).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+                                }
                             }
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -422,14 +427,14 @@ private struct MusicWindow: View {
 
     private func albumDetail(_ album: MusicEntry) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 18) {
+            LazyVStack(alignment: .leading, spacing: 18) {
                 HStack(alignment: .bottom, spacing: 22) {
                     CoverArt(item: album, model: model).frame(width: 156, height: 156)
                     VStack(alignment: .leading, spacing: 9) {
-                        Text(album.artist.isEmpty ? "Album" : album.artist).font(.title3.weight(.semibold))
+                        Text(album.artist.isEmpty ? album.kind.plexName.capitalized : album.artist).font(.title3.weight(.semibold))
                         let info = [album.year.map(String.init), album.genres.first].compactMap { $0 }
                         if !info.isEmpty { Text(info.joined(separator: " · ")).foregroundStyle(.secondary) }
-                        Button { model.play(at: 0) } label: { Label("Play Album", systemImage: "play.fill") }
+                        Button { model.play(at: 0) } label: { Label(album.kind.playLabel, systemImage: "play.fill") }
                             .buttonStyle(.borderedProminent).disabled(model.tracks.isEmpty)
                     }
                 }
@@ -570,7 +575,7 @@ private struct CoverArt: View {
         Color.white.opacity(0.055)
             .overlay {
                 PlexArtwork(item: item, library: model) {
-                    Image(systemName: item.kind == .albums ? "opticaldisc" : "person.crop.circle")
+                    Image(systemName: item.kind.symbol)
                         .font(.system(size: 28, weight: .light)).foregroundStyle(.secondary)
                 }
             }

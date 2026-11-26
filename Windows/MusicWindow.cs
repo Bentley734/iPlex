@@ -49,7 +49,7 @@ namespace MusicRoom
                     assets.Add("/" + entry.FullName, buffer.ToArray());
                 }
             }
-            UseIcon("groove");
+            UseIcon("prismatic-note");
             media = new WindowsMediaService(DesktopBootstrap.Profile, Emit);
             media.GetLosslessDecoder = () =>
             {
@@ -143,8 +143,7 @@ namespace MusicRoom
                 if (action == "icon")
                 {
                     string choice = WindowsMediaService.Str(request, "choice");
-                    if (choice == "groove" || choice == "prism" || choice == "signal" || choice == "clickwheel")
-                        UseIcon(choice);
+                    UseIcon(choice);
                 }
                 else if (action == "openFloatingPlayer" || action == "closeFloatingPlayer")
                     BeginInvoke(new Action(() => { if (!closing) SetFloatingPlayer(action == "openFloatingPlayer"); }));

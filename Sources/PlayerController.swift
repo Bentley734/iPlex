@@ -258,11 +258,11 @@ final class PlayerController {
     // Native-only bridge for PlexService results. WebKit never supplies these URLs.
     func loadRemoteTracks(_ supplied: [LiveTrack], collection: String, artist: String = "",
                           artwork: MusicImage? = nil, startTrack: Int = 0, autoplay: Bool = true,
-                          resume: DesktopResumePosition? = nil) {
+                          resume: DesktopResumePosition? = nil, maximumTracks: Int = 250) {
         onMain { [weak self] in
             guard let self = self else { return }
             do {
-                let tracks = try PlexParser.validatedPlaybackTracks(supplied)
+                let tracks = try PlexParser.validatedPlaybackTracks(supplied, maximum: maximumTracks)
                 self.albumArtist = artist
                 self.albumArtwork = artwork.map { cover in MPMediaItemArtwork(boundsSize: cover.size) { _ in cover } }
                 self.loadPreparedTracks(tracks, collection: collection,

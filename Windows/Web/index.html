@@ -5,7 +5,7 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src https://media.musicroom.invalid; connect-src https://media.musicroom.invalid; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>iPlex</title>
-  <link rel="icon" href="groove.ico">
+  <link rel="icon" href="prismatic-note.ico">
   <link rel="stylesheet" href="style.css">
   <script defer src="playback.js"></script>
   <script defer src="clickwheel.js"></script>
@@ -21,28 +21,26 @@
     <nav aria-label="Library">
       <button id="albums" aria-pressed="true" disabled>Albums</button>
       <button id="artists" aria-pressed="false" disabled>Artists</button>
+      <button id="genres" aria-pressed="false" disabled>Genres</button>
+      <button id="tracks" aria-pressed="false" disabled>Tracks</button>
+      <button id="playlists" aria-pressed="false" disabled>Playlists</button>
     </nav>
     <div id="connection" hidden>
       <label>Server<select id="server"></select></label>
       <label id="library-label">Music library<select id="library"></select></label>
     </div>
     <div class="preferences">
-      <label>Window icon<select id="icon">
-        <option value="groove">Copper Groove</option>
-        <option value="prism">Prism</option>
-        <option value="signal">Teal Signal</option>
-        <option value="clickwheel">Classic Click Wheel</option>
-      </select></label>
       <button id="settings" type="button">Settings</button>
       <button id="disconnect" hidden>Disconnect Plex</button>
     </div>
   </aside>
   <main>
     <section id="welcome">
-      <img src="groove.png" alt="" width="74" height="74">
+      <img src="prismatic-note.png" alt="" width="74" height="74">
       <h1 id="welcome-title">Connect to Plex</h1>
       <p id="connection-status" role="status">Browse and play music from your Plex server.</p>
       <button class="primary" id="connect">Connect Plex</button>
+      <button id="refresh-plex" type="button" hidden>Refresh Plex Servers</button>
       <button id="cancel" hidden>Cancel</button>
     </section>
     <section id="browser" hidden>
@@ -168,6 +166,24 @@
         <canvas class="wordmark music-wordmark" hidden></canvas>
       </div>
     </section>
+    <section>
+      <h2>Window Icon</h2>
+      <div id="icon-choices" class="icon-choices">
+        <button type="button" value="prismatic-note" aria-pressed="true"><img src="prismatic-note.ico" alt=""><span>Prismatic Note Light</span></button>
+        <button type="button" value="prismatic-note-dark" aria-pressed="false"><img src="prismatic-note-dark.ico" alt=""><span>Prismatic Note Dark</span></button>
+        <button type="button" value="music-gradient" aria-pressed="false"><img src="music-gradient.ico" alt=""><span>Gradient Note</span></button>
+        <button type="button" value="music-wordmark" aria-pressed="false"><img src="music-wordmark.ico" alt=""><span>Music Wordmark</span></button>
+        <button type="button" value="music-crimson" aria-pressed="false"><img src="music-crimson.ico" alt=""><span>Crimson Note</span></button>
+        <button type="button" value="music-monochrome" aria-pressed="false"><img src="music-monochrome.ico" alt=""><span>Monochrome Note</span></button>
+        <button type="button" value="music-orange" aria-pressed="false"><img src="music-orange.ico" alt=""><span>Retro Orange</span></button>
+        <button type="button" value="music-artists" aria-pressed="false"><img src="music-artists.ico" alt=""><span>Artists Gradient</span></button>
+        <button type="button" value="music-pink" aria-pressed="false"><img src="music-pink.ico" alt=""><span>Pink Note</span></button>
+        <button type="button" value="napster" aria-pressed="false"><img src="napster.ico" alt=""><span>Napster</span></button>
+        <button type="button" value="napster-mono" aria-pressed="false"><img src="napster-mono.ico" alt=""><span>Napster Monochrome</span></button>
+        <button type="button" value="spotify" aria-pressed="false"><img src="spotify.ico" alt=""><span>Spotify</span></button>
+        <button type="button" value="plex" aria-pressed="false"><img src="plex.ico" alt=""><span>Plex</span></button>
+      </div>
+    </section>
     <label class="theme-choice">Results per Page
       <select id="library-page-size">
         <option value="30">30</option>
@@ -176,6 +192,10 @@
         <option value="all">All</option>
       </select>
     </label>
+    <section>
+      <h2>Library Sections</h2>
+      <div id="library-sections" class="library-sections"></div>
+    </section>
     <section>
       <div class="settings-head">
         <h2>Equalizer</h2>

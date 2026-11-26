@@ -18,8 +18,8 @@ final class LibraryModel: ObservableObject {
     @Published private(set) var serverID = ""
     @Published private(set) var libraryID = ""
     @Published private(set) var entries: [MusicEntry] = []
-    @Published private(set) var selectedArtist: MusicEntry?
-    @Published private(set) var selectedAlbum: MusicEntry?
+    @Published private(set) var selectedGroup: MusicEntry?
+    @Published private(set) var selectedDetail: MusicEntry?
     @Published private(set) var tracks: [LiveTrack] = []
     @Published private(set) var playingAlbum: MusicEntry?
     @Published private(set) var playingTracks: [LiveTrack] = []
@@ -35,7 +35,8 @@ final class LibraryModel: ObservableObject {
     @Published private(set) var cachingCovers = false
     @Published private(set) var coverCacheStatus = ""
     @Published var message: String?
-    @Published var kind: MusicKind = .albums
+    @Published private(set) var kind: MusicKind = .albums
+    @Published private(set) var visibleKinds = MusicKind.allCases
     @Published var query = ""
 
     private let service = PlexService(version: "0.1")
@@ -77,6 +78,13 @@ final class LibraryModel: ObservableObject {
         artwork.countLimit = 100
         connected = service.status.connected
         let defaults = UserDefaults.standard
+        if let saved = defaults.stringArray(forKey: "VisibleMusicSections") {
+            let enabled = MusicKind.allCases.filter { saved.contains($0.rawValue) }
+            if let first = enabled.first {
+                visibleKinds = enabled
+                kind = first
+            }
+        }
         if let values = defaults.array(forKey: "PlaybackEqualizer") as? [Double], values.count == 3 {
             equalizer = PlaybackEQSettings(bass: values[0], mid: values[1], treble: values[2])
             player.setEqualizer(equalizer)
@@ -193,8 +201,8 @@ final class LibraryModel: ObservableObject {
     private func resetLibrary() {
         stopCachingCovers()
         coverCacheStatus = ""
-        selectedArtist = nil
-        selectedAlbum = nil
+        selectedGroup = nil
+        selectedDetail = nil
         entries = []
         tracks = []
         playingAlbum = nil
@@ -215,18 +223,34 @@ final class LibraryModel: ObservableObject {
         }
     }
 
+    func selectKind(_ section: MusicKind) {
+        guard visibleKinds.contains(section) else { return }
+        kind = section
+        browse()
+    }
+
+    func setVisibility(_ section: MusicKind, visible: Bool) {
+        let enabled = MusicKind.allCases.filter {
+            $0 == section ? visible : visibleKinds.contains($0)
+        }
+        guard let first = enabled.first, enabled != visibleKinds else { return }
+        visibleKinds = enabled
+        UserDefaults.standard.set(enabled.map(\.rawValue), forKey: "VisibleMusicSections")
+        if !enabled.contains(kind) { selectKind(first) }
+    }
+
     func browse() {
         guard !libraryID.isEmpty else { return }
         refreshAfterAlbum = false
-        selectedArtist = nil
-        selectedAlbum = nil
+        selectedGroup = nil
+        selectedDetail = nil
         tracks = []
         perform { try await self.loadEntries(append: false) }
     }
 
     func refreshPageSize() {
         guard !libraryID.isEmpty else { return }
-        if selectedAlbum == nil { perform { try await self.loadEntries(append: false) } }
+        if selectedDetail == nil { perform { try await self.loadEntries(append: false) } }
         else { refreshAfterAlbum = true }
     }
 
@@ -236,24 +260,24 @@ final class LibraryModel: ObservableObject {
     }
 
     func open(_ entry: MusicEntry) {
-        if entry.kind == .artists {
-            selectedArtist = entry
-            selectedAlbum = nil
+        if entry.kind.isGroup {
+            selectedGroup = entry
+            selectedDetail = nil
             perform { try await self.loadEntries(append: false) }
         } else {
-            selectedAlbum = entry
+            selectedDetail = entry
             tracks = []
             perform {
-                let found = try await self.request { self.service.musicTracks(album: entry, completion: $0) }
+                let found = try await self.request { self.service.musicTracks(entry: entry, completion: $0) }
                 try Task.checkCancellation()
                 self.tracks = found
             }
         }
     }
 
-    func closeAlbum() {
+    func closeDetail() {
         cancel()
-        selectedAlbum = nil
+        selectedDetail = nil
         tracks = []
         if refreshAfterAlbum {
             refreshAfterAlbum = false
@@ -262,12 +286,13 @@ final class LibraryModel: ObservableObject {
     }
 
     func play(at index: Int) {
-        guard let album = selectedAlbum, tracks.indices.contains(index) else { return }
+        guard let album = selectedDetail, tracks.indices.contains(index) else { return }
         let key = artworkKey(for: album)
         playingAlbum = album
         playingTracks = tracks
         playingArtwork = key.flatMap { artwork.object(forKey: $0.path as NSString) }
-        player.loadRemoteTracks(tracks, collection: album.title, artist: album.artist, artwork: playingArtwork, startTrack: index)
+        player.loadRemoteTracks(tracks, collection: album.title, artist: album.artist, artwork: playingArtwork, startTrack: index,
+                                maximumTracks: album.kind == .playlists ? PlexParser.musicPlaylistLimit : 250)
         if playingArtwork == nil, let key {
             fetchImage(for: key) { [weak self] image in
                 guard let self, let image, let playingAlbum = self.playingAlbum,
@@ -362,17 +387,18 @@ final class LibraryModel: ObservableObject {
         if !append {
             more = false
             listingQuery = query
+            entries = []
         }
-        let artist = selectedArtist
-        let requestedKind: MusicKind = artist == nil ? kind : .albums
-        let requestedQuery = listingQuery
+        let group = selectedGroup
+        let requestedKind: MusicKind = group == nil ? kind : .albums
+        let requestedQuery = group == nil ? listingQuery.trimmingCharacters(in: .whitespacesAndNewlines) : ""
         var accumulated = append ? entries : []
         var seen = Set(accumulated.map(\.id))
         var hasMore: Bool
         repeat {
             let result = try await request {
                 service.musicEntries(kind: requestedKind, query: requestedQuery, offset: start,
-                                     limit: setting.batch, artist: artist, completion: $0)
+                                     limit: setting.batch, group: group, completion: $0)
             }
             try Task.checkCancellation()
             let unique = result.items.filter { seen.insert($0.id).inserted }

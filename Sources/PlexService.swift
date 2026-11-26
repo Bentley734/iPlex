@@ -475,13 +475,13 @@ enum PlexParser {
         return try match(allowUnversioned: allowUnversionedAlbum)
     }
 
-    static func validatedPlaybackTracks(_ supplied: [LiveTrack]) throws -> [LiveTrack] {
-        guard !supplied.isEmpty, supplied.count <= 250 else {
-            throw PlexServiceError("A Plex recording must contain between 1 and 250 tracks.")
+    static func validatedPlaybackTracks(_ supplied: [LiveTrack], maximum: Int = 250) throws -> [LiveTrack] {
+        guard !supplied.isEmpty, supplied.count <= maximum else {
+            throw PlexServiceError("A Plex recording must contain between 1 and \(maximum) tracks.")
         }
         var numbers = Set<Int>()
         return try supplied.map { track in
-            guard track.number > 0, track.number <= 999, numbers.insert(track.number).inserted else {
+            guard track.number > 0, track.number <= max(999, maximum), numbers.insert(track.number).inserted else {
                 throw PlexServiceError("The Plex recording contains a duplicate or invalid track number.")
             }
             let title = track.title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1445,8 +1445,48 @@ enum MusicKind: String, CaseIterable {
     case albums = "Albums"
     case artists = "Artists"
 
-    var plexName: String { self == .albums ? "album" : "artist" }
-    var plexType: String { self == .albums ? "9" : "8" }
+    case genres = "Genres"
+    case tracks = "Tracks"
+    case playlists = "Playlists"
+
+    var plexName: String {
+        switch self {
+        case .albums: "album"
+        case .artists: "artist"
+        case .genres: "genre"
+        case .tracks: "track"
+        case .playlists: "playlist"
+        }
+    }
+
+    var plexType: String {
+        switch self {
+        case .artists: "8"
+        case .tracks: "10"
+        case .playlists: "15"
+        case .albums, .genres: "9"
+        }
+    }
+
+    var symbol: String {
+        switch self {
+        case .albums: "opticaldisc"
+        case .artists: "person.2"
+        case .genres: "tag"
+        case .tracks: "music.note"
+        case .playlists: "music.note.list"
+        }
+    }
+
+    var isGroup: Bool { self == .artists || self == .genres }
+
+    var playLabel: String {
+        switch self {
+        case .playlists: "Play Playlist"
+        case .tracks: "Play Track"
+        default: "Play Album"
+        }
+    }
 }
 
 struct MusicEntry: Identifiable, Hashable {
@@ -1463,35 +1503,57 @@ extension PlexParser {
     static func musicEntries(_ data: Data, kind: MusicKind, section: String) throws
         -> (items: [MusicEntry], rawCount: Int, totalSize: Int?) {
         let container = try metadataContainer(data)
-        let rows = try metadataRows(container, sectionID: section)
+        let rows = kind == .genres ? (container["Directory"] as? [[String: Any]] ?? []) :
+            try metadataRows(container, sectionID: kind == .playlists ? nil : section)
         var seen = Set<String>()
         let items = rows.compactMap { row -> MusicEntry? in
-            guard row["type"] as? String == kind.plexName,
-                  let id = numericIdentifier(row["ratingKey"]), seen.insert(id).inserted,
+            let id: String?
+            if kind == .genres {
+                let key = row["key"] as? String ?? ""
+                let path = URLComponents(string: key)
+                let genre = path?.path == "/library/sections/\(section)/all"
+                    ? path?.queryItems?.first { $0.name == "genre" }?.value : nil
+                id = numericIdentifier(genre ?? row["key"])
+            } else {
+                guard row["type"] as? String == kind.plexName,
+                      kind != .playlists || row["playlistType"] as? String == "audio" else { return nil }
+                id = numericIdentifier(row["ratingKey"])
+            }
+            guard let id, seen.insert(id).inserted,
                   let title = string(row["title"], maximum: 300) else { return nil }
-            return MusicEntry(id: id, title: title, artist: string(row["parentTitle"], maximum: 300) ?? "",
+            let artist = row[kind == .tracks ? "grandparentTitle" : "parentTitle"]
+            let artwork = [row["thumb"], row["parentThumb"], row["composite"]]
+                .lazy.compactMap { musicArtworkPath($0 as? String) }.first
+            return MusicEntry(id: id, title: title, artist: string(artist, maximum: 300) ?? "",
                               year: integer(row["year"]),
                               genres: (row["Genre"] as? [[String: Any]] ?? []).prefix(8).compactMap { string($0["tag"], maximum: 80) },
-                              artworkPath: musicArtworkPath(row["thumb"] as? String), kind: kind)
+                              artworkPath: artwork, kind: kind)
         }
         return (items, rows.count, integer(container["totalSize"]))
     }
 
     static func musicArtworkPath(_ value: String?) -> String? {
         guard let value, value.count < 180,
-              value.range(of: #"^/library/metadata/[0-9]+/thumb(?:/[0-9]+)?$"#, options: .regularExpression) != nil else { return nil }
+              value.range(of: #"^(?:/library/metadata/[0-9]+/thumb|/playlists/[0-9]+/composite)(?:/[0-9]+)?$"#, options: .regularExpression) != nil else { return nil }
         return value
     }
 
-    static func musicTracks(_ data: Data, albumID: String, section: String, base: URL, token: String) throws -> [LiveTrack] {
-        let rows = try metadataRows(data, sectionID: section)
-        guard rows.count <= 250 else { throw PlexServiceError("This album has too many tracks for the current player.") }
+    static let musicPlaylistLimit = 10_000
+
+    static func musicTrackPage(_ data: Data, entry: MusicEntry, section: String, base: URL, token: String, offset: Int = 0)
+        throws -> (tracks: [LiveTrack], rawCount: Int, totalSize: Int?) {
+        let container = try metadataContainer(data)
+        let rows = try metadataRows(container, sectionID: entry.kind == .playlists ? nil : section)
+        if entry.kind == .albums && rows.count > 250 {
+            throw PlexServiceError("This album has too many tracks for the current player.")
+        }
         var seen = Set<String>()
         var tracks = [(disc: Int, index: Int, title: String, duration: Double?, url: URL)]()
-        for (offset, row) in rows.enumerated() {
-            guard row["type"] as? String == "track",
-                  row["parentRatingKey"] == nil || numericIdentifier(row["parentRatingKey"]) == albumID,
-                  let id = numericIdentifier(row["ratingKey"]), seen.insert(id).inserted,
+        for (position, row) in rows.enumerated() {
+            guard row["type"] as? String == "track", let id = numericIdentifier(row["ratingKey"]),
+                  entry.kind != .albums || row["parentRatingKey"] == nil || numericIdentifier(row["parentRatingKey"]) == entry.id,
+                  entry.kind != .tracks || id == entry.id,
+                  entry.kind == .playlists || seen.insert(id).inserted,
                   let title = string(row["title"], maximum: 300),
                   let media = row["Media"] as? [[String: Any]], media.count <= 16 else { continue }
             let options = media.flatMap { Array(($0["Part"] as? [[String: Any]] ?? []).prefix(16)) }
@@ -1501,21 +1563,22 @@ extension PlexParser {
                 return try? playbackURL(base: base, partPath: path, token: token)
             }.first
             guard let url else { continue }
-            tracks.append((integer(row["parentIndex"]) ?? 1, integer(row["index"]) ?? (offset + 1),
+            tracks.append((integer(row["parentIndex"]) ?? 1, integer(row["index"]) ?? (position + 1),
                            title, milliseconds(row["duration"]), url))
         }
-        let sorted = tracks.enumerated().sorted {
-            ($0.element.disc, $0.element.index, $0.offset) < ($1.element.disc, $1.element.index, $1.offset)
+        if entry.kind == .albums {
+            tracks = tracks.enumerated().sorted {
+                ($0.element.disc, $0.element.index, $0.offset) < ($1.element.disc, $1.element.index, $1.offset)
+            }.map(\.element)
         }
-        guard !sorted.isEmpty else { throw PlexServiceError("This album has no tracks the player can stream directly.") }
-        return try validatedPlaybackTracks(sorted.enumerated().map { offset, row in
-            LiveTrack(number: offset + 1, title: row.element.title, duration: row.element.duration, url: row.element.url)
-        })
+        return (tracks.enumerated().map { index, row in
+            LiveTrack(number: offset + index + 1, title: row.title, duration: row.duration, url: row.url)
+        }, rows.count, integer(container["totalSize"]))
     }
 }
 
 extension PlexService {
-    func musicEntries(kind: MusicKind, query: String, offset: Int, limit: Int, artist: MusicEntry? = nil,
+    func musicEntries(kind: MusicKind, query: String, offset: Int, limit: Int, group: MusicEntry? = nil,
                       completion: @escaping (Result<(items: [MusicEntry], rawCount: Int, hasMore: Bool), Error>) -> Void) {
         inMusicLibrary(phase: "Browsing library", completion: completion) { base, section, token, operation in
             var parameters: [URLQueryItem] = [
@@ -1523,31 +1586,70 @@ extension PlexService {
                 .init(name: "X-Plex-Container-Size", value: String(limit))
             ]
             let path: String
-            if let artist, artist.kind == .artists, artist.id.allSatisfy({ $0.isASCII && $0.isNumber }) {
-                path = "/library/metadata/\(artist.id)/children"
+            let localPaging = kind == .genres || kind == .playlists
+            if let group, group.kind == .artists {
+                path = "/library/metadata/\(group.id)/children"
+            } else if kind == .genres {
+                path = "/library/sections/\(section)/genre"
+                parameters = [.init(name: "type", value: kind.plexType)]
+            } else if kind == .playlists {
+                path = "/playlists"
+                parameters = [.init(name: "type", value: kind.plexType),
+                              .init(name: "sectionID", value: section),
+                              .init(name: "playlistType", value: "audio")]
             } else {
                 path = "/library/sections/\(section)/all"
                 parameters.append(.init(name: "type", value: kind.plexType))
                 parameters.append(.init(name: "sort", value: "titleSort:asc"))
+                if let group, group.kind == .genres { parameters.append(.init(name: "genre", value: group.id)) }
                 if !query.isEmpty { parameters.append(.init(name: "title", value: String(query.prefix(120)))) }
             }
             let data = try operation.fetch(self.serverRequest(base: base, path: path, query: parameters, token: token),
                                            limit: 8 * 1024 * 1024)
             let page = try PlexParser.musicEntries(data, kind: kind, section: section)
+            if localPaging {
+                let matches = page.items.filter { query.isEmpty || $0.title.localizedCaseInsensitiveContains(query) }
+                    .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+                let items = Array(matches.dropFirst(offset).prefix(limit))
+                return (items, items.count, offset + items.count < matches.count)
+            }
             return (page.items, page.rawCount,
                     page.totalSize.map { offset + page.rawCount < $0 } ?? (page.rawCount >= limit))
         }
     }
 
-    func musicTracks(album: MusicEntry, completion: @escaping (Result<[LiveTrack], Error>) -> Void) {
-        guard album.kind == .albums, album.id.allSatisfy({ $0.isASCII && $0.isNumber }) else {
-            completion(.failure(PlexServiceError("The album identifier is invalid.")))
+    func musicTracks(entry: MusicEntry, completion: @escaping (Result<[LiveTrack], Error>) -> Void) {
+        guard !entry.kind.isGroup, !entry.id.isEmpty, entry.id.allSatisfy({ $0.isASCII && $0.isNumber }) else {
+            completion(.failure(PlexServiceError("The library item identifier is invalid.")))
             return
         }
         inMusicLibrary(phase: "Loading tracks", completion: completion) { base, section, token, operation in
-            let endpoint = try self.serverRequest(base: base, path: "/library/metadata/\(album.id)/children", query: [], token: token)
-            return try PlexParser.musicTracks(operation.fetch(endpoint, limit: 8 * 1024 * 1024),
-                                              albumID: album.id, section: section, base: base, token: token)
+            let playlist = entry.kind == .playlists
+            let path = playlist ? "/playlists/\(entry.id)/items" :
+                "/library/metadata/\(entry.id)" + (entry.kind == .albums ? "/children" : "")
+            let batch = 200
+            var start = 0
+            var tracks: [LiveTrack] = []
+            var hasMore: Bool
+            repeat {
+                let query: [URLQueryItem] = playlist ? [
+                    .init(name: "X-Plex-Container-Start", value: String(start)),
+                    .init(name: "X-Plex-Container-Size", value: String(batch))
+                ] : []
+                let endpoint = try self.serverRequest(base: base, path: path, query: query, token: token)
+                let page = try PlexParser.musicTrackPage(operation.fetch(endpoint, limit: 8 * 1024 * 1024),
+                                                         entry: entry, section: section, base: base, token: token,
+                                                         offset: tracks.count)
+                tracks.append(contentsOf: page.tracks)
+                start += page.rawCount
+                hasMore = playlist && page.rawCount > 0 &&
+                    (page.totalSize.map { start < $0 } ?? (page.rawCount >= batch))
+                if playlist && (start > PlexParser.musicPlaylistLimit || (hasMore && start >= PlexParser.musicPlaylistLimit)) {
+                    throw PlexServiceError("This playlist exceeds the 10,000-track playback limit.")
+                }
+            } while hasMore
+            guard !tracks.isEmpty else { throw PlexServiceError("This item has no tracks the player can stream directly.") }
+            return try PlexParser.validatedPlaybackTracks(tracks, maximum: playlist ? PlexParser.musicPlaylistLimit : 250)
         }
     }
 
