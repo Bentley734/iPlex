@@ -74,7 +74,7 @@
     <header class="now-playing-header">
       <button id="close-now-playing" type="button">‹ Library</button>
       <h1 id="now-playing-heading">Now Playing</h1>
-      <button id="jump-now-queue" type="button">Queue</button>
+      <button id="jump-now-queue" type="button" aria-controls="now-queue" aria-expanded="false">Queue</button>
     </header>
     <div class="now-playing-scroll">
       <div class="now-playing-hero">
@@ -96,8 +96,8 @@
           </label>
         </div>
       </div>
-      <section id="now-queue" aria-labelledby="now-queue-heading">
-        <h2 id="now-queue-heading" tabindex="-1">Queue</h2>
+      <section id="now-queue" aria-labelledby="now-queue-heading" hidden>
+        <h2 id="now-queue-heading" tabindex="-1">Up Next</h2>
         <ol id="now-queue-list"></ol>
       </section>
     </div>

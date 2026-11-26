@@ -70,6 +70,9 @@ private struct MusicWindow: View {
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @State private var showSettings = false
     @State private var showNowPlaying = false
+    @State private var nowPlayingWindowNumber: Int?
+    @State private var enteredFullScreenForPlayback = false
+    @State private var enteringPlaybackFullScreen = false
     @State private var showVolume = false
     @State private var showPlexifyDeck = true
     @State private var showCompactDeck = false
@@ -81,38 +84,28 @@ private struct MusicWindow: View {
     private var plexify: Bool { theme == .plexify }
 
     var body: some View {
-        Group {
-            if plexify {
-                plexifyWorkspace
-            } else if graphite {
-                HStack(spacing: 0) {
-                    sidebar.frame(width: 206)
-                    Divider()
-                    VStack(spacing: 0) {
-                        mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
-                        graphiteTransport
-                            .padding(.horizontal, 23).padding(.bottom, 17).padding(.top, 7)
-                    }
-                }
-            } else {
-                VStack(spacing: 0) {
-                    HStack(spacing: 0) {
-                        sidebar.frame(width: 216)
-                        Rectangle().fill(Color.primary.opacity(0.12)).frame(width: 1)
-                        mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                    Rectangle().fill(Color.primary.opacity(0.12)).frame(height: 1)
-                    transport
-                }
+        ZStack {
+            libraryContent
+                .accessibilityHidden(showNowPlaying)
+                .allowsHitTesting(!showNowPlaying)
+            if showNowPlaying {
+                NowPlayingView(library: model, close: closeNowPlaying)
             }
         }
         .background(theme.backdrop(using: palette))
         .sheet(isPresented: $showSettings) { MusicSettings(library: model) }
-        .sheet(isPresented: $showNowPlaying) {
-            NowPlayingView(library: model) { showNowPlaying = false }
-                .frame(minWidth: 700, idealWidth: 830, minHeight: 470, idealHeight: 620)
-        }
         .tint(copper)
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didEnterFullScreenNotification)) { note in
+            guard let window = note.object as? NSWindow, window.windowNumber == nowPlayingWindowNumber else { return }
+            enteringPlaybackFullScreen = false
+            if !showNowPlaying { restoreLibraryWindow(window) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didExitFullScreenNotification)) { note in
+            guard let window = note.object as? NSWindow, window.windowNumber == nowPlayingWindowNumber else { return }
+            showNowPlaying = false
+            enteredFullScreenForPlayback = false
+            nowPlayingWindowNumber = nil
+        }
         .onChange(of: model.query) { _, _ in
             searchTask?.cancel()
             searchTask = Task {
@@ -120,6 +113,57 @@ private struct MusicWindow: View {
                 if !Task.isCancelled { model.browse() }
             }
         }
+    }
+
+    @ViewBuilder private var libraryContent: some View {
+        if plexify {
+            plexifyWorkspace
+        } else if graphite {
+            HStack(spacing: 0) {
+                sidebar.frame(width: 206)
+                Divider()
+                VStack(spacing: 0) {
+                    mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    graphiteTransport
+                        .padding(.horizontal, 23).padding(.bottom, 17).padding(.top, 7)
+                }
+            }
+        } else {
+            VStack(spacing: 0) {
+                HStack(spacing: 0) {
+                    sidebar.frame(width: 216)
+                    Rectangle().fill(Color.primary.opacity(0.12)).frame(width: 1)
+                    mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
+                Rectangle().fill(Color.primary.opacity(0.12)).frame(height: 1)
+                transport
+            }
+        }
+    }
+
+    private func openNowPlaying() {
+        showNowPlaying = true
+        guard let window = NSApp.keyWindow else { return }
+        nowPlayingWindowNumber = window.windowNumber
+        enteredFullScreenForPlayback = !window.styleMask.contains(.fullScreen)
+        if enteredFullScreenForPlayback {
+            enteringPlaybackFullScreen = true
+            window.toggleFullScreen(nil)
+        }
+    }
+
+    private func closeNowPlaying() {
+        showNowPlaying = false
+        let window = NSApp.windows.first { $0.windowNumber == nowPlayingWindowNumber }
+        if let window, !enteringPlaybackFullScreen { restoreLibraryWindow(window) }
+    }
+
+    private func restoreLibraryWindow(_ window: NSWindow) {
+        if enteredFullScreenForPlayback && window.styleMask.contains(.fullScreen) {
+            window.toggleFullScreen(nil)
+        }
+        enteredFullScreenForPlayback = false
+        nowPlayingWindowNumber = nil
     }
 
     private var plexifyWorkspace: some View {
@@ -497,7 +541,7 @@ private struct MusicWindow: View {
     }
 
     private var nowPlayingButton: some View {
-        Button("Now Playing", systemImage: "waveform") { showNowPlaying = true }
+        Button("Now Playing", systemImage: "waveform", action: openNowPlaying)
             .disabled(model.playingAlbum == nil)
     }
 

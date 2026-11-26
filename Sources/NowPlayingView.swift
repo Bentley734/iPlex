@@ -4,6 +4,7 @@ struct NowPlayingView: View {
     @ObservedObject var library: LibraryModel
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
+    @State private var showingQueue = false
     let close: () -> Void
 
     private var palette: ArtworkPalette? { artworkColors ? library.playingPalette : nil }
@@ -19,55 +20,86 @@ struct NowPlayingView: View {
     var body: some View {
         GeometryReader { geometry in
             let wide = geometry.size.width >= 650
+            let inset = wide ? min(68, geometry.size.width * 0.045) : 24
             let coverWidth = wide
-                ? min(360, geometry.size.width * 0.40, geometry.size.height * 0.62)
-                : min(320, geometry.size.width - 48)
-            ScrollViewReader { scroll in
-                VStack(spacing: 0) {
-                    HStack {
-                        Button("Library", systemImage: "chevron.backward", action: close)
-                            #if !os(tvOS)
-                            .keyboardShortcut(.cancelAction)
-                            #endif
-                        Spacer()
-                        Text("Now Playing").font(.headline)
-                        Spacer()
-                        Button("Queue", systemImage: "list.bullet") { scroll.scrollTo("queue", anchor: .top) }
-                            .disabled(library.playingTracks.isEmpty)
-                    }
-                    .buttonStyle(.bordered)
-                    .padding(.vertical, 12)
-                    .musicGlass(theme, radius: 18)
-                    ScrollView {
-                        if let album = library.playingAlbum {
-                            let layout = wide ? AnyLayout(HStackLayout(alignment: .center, spacing: 36)) :
-                                AnyLayout(VStackLayout(alignment: .center, spacing: 23))
-                            layout {
-                                artwork(album)
-                                    .frame(width: max(1, coverWidth), height: max(1, coverWidth))
-                                playback(album)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                ? min(680, geometry.size.width * 0.47, max(220, geometry.size.height - 164))
+                : min(460, geometry.size.width - inset * 2, max(210, geometry.size.height * 0.53))
+            VStack(spacing: 0) {
+                header
+                    .padding(.horizontal, inset)
+                GeometryReader { available in
+                    if showingQueue {
+                        ScrollViewReader { scroll in
+                            ScrollView {
+                                queue
+                                    .frame(maxWidth: 850)
+                                    .padding(.horizontal, inset)
+                                    .frame(maxWidth: .infinity)
                             }
-                            .padding(.vertical, 20)
-                            queue.id("queue")
-                        } else {
-                            Text("Nothing playing")
-                                .foregroundStyle(.secondary)
-                                .frame(maxWidth: .infinity)
-                                .padding(32)
+                            .onAppear {
+                                if let index = library.state.index { scroll.scrollTo(index, anchor: .center) }
+                            }
+                        }
+                    } else {
+                        ScrollView {
+                            if let album = library.playingAlbum {
+                                let layout = wide
+                                    ? AnyLayout(HStackLayout(alignment: .center, spacing: min(78, geometry.size.width * 0.055)))
+                                    : AnyLayout(VStackLayout(alignment: .center, spacing: 26))
+                                layout {
+                                    artwork(album)
+                                        .frame(width: max(1, coverWidth), height: max(1, coverWidth))
+                                    playback(album)
+                                        .frame(maxWidth: 510, alignment: .leading)
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .padding(.horizontal, inset)
+                                .padding(.vertical, wide ? 30 : 22)
+                                .frame(maxWidth: 1400)
+                                .frame(maxWidth: .infinity, minHeight: available.size.height)
+                            } else {
+                                Text("Nothing playing")
+                                    .foregroundStyle(.secondary)
+                                    .frame(maxWidth: .infinity, minHeight: available.size.height)
+                            }
                         }
                     }
                 }
-                .frame(maxWidth: 1200)
-                .padding(.horizontal, wide ? 32 : 20)
-                .frame(maxWidth: .infinity)
             }
         }
-        .background(theme.backdrop(using: palette).ignoresSafeArea())
+        .background {
+            theme.backdrop(using: palette)
+                .overlay {
+                    RadialGradient(colors: [accent.opacity(0.17), .clear], center: .topLeading,
+                                   startRadius: 0, endRadius: 950)
+                }
+                .ignoresSafeArea()
+        }
         .tint(accent)
         #if os(tvOS)
         .onExitCommand(perform: close)
         #endif
+    }
+
+    private var header: some View {
+        HStack {
+            Button("Library", systemImage: "chevron.backward", action: close)
+                #if !os(tvOS)
+                .keyboardShortcut(.cancelAction)
+                #endif
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Text(showingQueue ? "Up Next" : "Now Playing")
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+            Button(showingQueue ? "Player" : "Queue",
+                   systemImage: showingQueue ? "waveform" : "list.bullet") { showingQueue.toggle() }
+                .disabled(library.playingTracks.isEmpty)
+                .frame(maxWidth: .infinity, alignment: .trailing)
+        }
+        .lineLimit(1)
+        .buttonStyle(.bordered)
+        .padding(.vertical, 16)
+        .overlay(alignment: .bottom) { Divider().opacity(0.5) }
     }
 
     private func artwork(_ album: MusicEntry) -> some View {
@@ -159,7 +191,6 @@ struct NowPlayingView: View {
 
     private var queue: some View {
         LazyVStack(alignment: .leading, spacing: 5) {
-            Text("Queue").font(.title2.bold()).accessibilityAddTraits(.isHeader).padding(.bottom, 6)
             ForEach(library.playingTracks.indices, id: \.self) { index in
                 let track = library.playingTracks[index]
                 let current = index == library.state.index
@@ -191,9 +222,10 @@ struct NowPlayingView: View {
                 .buttonStyle(.plain)
                 #endif
                 .accessibilityAddTraits(current ? .isSelected : [])
+                .id(index)
             }
         }
-        .padding(.bottom, 20)
+        .padding(.vertical, 20)
     }
 
     private func clock(_ seconds: Double) -> String {

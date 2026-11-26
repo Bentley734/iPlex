@@ -147,6 +147,8 @@ namespace MusicRoom
                 }
                 else if (action == "openFloatingPlayer" || action == "closeFloatingPlayer")
                     BeginInvoke(new Action(() => { if (!closing) SetFloatingPlayer(action == "openFloatingPlayer"); }));
+                else if (action == "openNowPlaying" || action == "closeNowPlaying")
+                    BeginInvoke(new Action(() => { if (!closing) SetNowPlayingFullScreen(action == "openNowPlaying"); }));
                 else if (action == "dragFloatingPlayer")
                     BeginInvoke(new Action(() => { if (!closing && floatingPlayer) DragFloatingPlayer(); }));
                 else if (action == "updateApp") await UpdateApp();

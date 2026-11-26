@@ -318,36 +318,40 @@ button:hover:enabled { border-color:var(--copper); }
 .wheel-adjustments output { min-width:73px; text-align:center; font:650 11px ui-monospace,monospace; }
 
 #now-playing {
-  width:min(890px,calc(100vw - 42px)); max-height:calc(100vh - 42px);
-  padding:0; border:1px solid var(--line); border-radius:22px; color:var(--text);
-  background:radial-gradient(ellipse at 18% 0%,var(--raised),transparent 74%),var(--ink);
-  box-shadow:0 28px 80px #0007; overflow:hidden;
+  inset:0; margin:0; width:100vw; height:100vh; max-width:none; max-height:none;
+  padding:0; border:0; color:var(--text); overflow:hidden;
+  background:radial-gradient(ellipse at 15% 12%,var(--raised),transparent 74%),var(--ink);
 }
+#now-playing[open] { display:flex; flex-direction:column; }
 :root[data-artwork-colors] #now-playing {
-  background:radial-gradient(ellipse at 18% 0%,var(--artwork-wash),transparent 74%),var(--ink);
+  background:radial-gradient(ellipse at 15% 12%,var(--artwork-wash),transparent 74%),var(--ink);
 }
-#now-playing::backdrop { background:#080d18b0; backdrop-filter:blur(9px); }
 .now-playing-header {
-  display:grid; grid-template-columns:1fr auto 1fr; gap:12px; align-items:center;
-  padding:14px 23px; border-bottom:1px solid var(--line);
+  flex-shrink:0; display:grid; grid-template-columns:1fr auto 1fr; gap:14px; align-items:center;
+  padding:16px clamp(20px,4vw,68px); border-bottom:1px solid var(--line);
 }
-.now-playing-header h1 { margin:0; font-size:1.14rem; }
+.now-playing-header h1 { margin:0; font-size:1.18rem; }
 .now-playing-header button:first-child { justify-self:start; }
 .now-playing-header button:last-child { justify-self:end; }
-.now-playing-scroll { overflow:auto; max-height:calc(100vh - 111px); padding:22px 26px 24px; }
-.now-playing-hero { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); align-items:center; gap:32px; }
-#now-art { width:100%; max-width:360px; justify-self:center; }
-#now-art .cover { border-radius:17px; box-shadow:0 10px 32px #0005; }
-.now-playing-controls { min-width:0; overflow-wrap:anywhere; }
-#now-title { margin:0 0 4px; font-size:clamp(22px,3.3vw,36px); line-height:1.15; }
+.now-playing-scroll { overflow:auto; flex:1; min-height:0; }
+.now-playing-hero {
+  display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); align-items:center;
+  justify-items:center; gap:clamp(22px,5vw,76px); max-width:1400px; min-height:100%; margin:auto;
+  padding:30px clamp(22px,4vw,68px);
+}
+#now-art { width:100%; max-width:min(680px,calc(100vh - 166px)); }
+#now-art .cover { border-radius:23px; box-shadow:0 18px 54px #0005; }
+.now-playing-controls { width:100%; max-width:510px; min-width:0; overflow-wrap:anywhere; }
+#now-queue { max-width:900px; margin:auto; padding:18px clamp(20px,4vw,46px) 32px; }
+#now-title { margin:0 0 4px; font-size:clamp(26px,4vw,54px); line-height:1.15; }
 #now-artist, #now-album { margin:4px 0; color:var(--muted); }
 #now-status { color:var(--copper); }
 #now-seek { display:block; width:100%; margin:18px 0 3px; }
 #now-seek, #now-volume { accent-color:var(--copper); }
 .now-playing-times { display:flex; justify-content:space-between; color:var(--muted); font-size:.85rem; font-variant-numeric:tabular-nums; }
 .now-playing-transport { display:flex; justify-content:center; align-items:center; gap:12px; margin:14px 0; }
-.now-playing-transport button { min-width:46px; }
-.now-playing-transport .primary { min-width:63px; font-size:1.15rem; }
+.now-playing-transport button { min-width:52px; min-height:45px; }
+.now-playing-transport .primary { min-width:74px; min-height:56px; border-radius:14px; font-size:1.35rem; }
 .now-playing-volume { display:grid; grid-template-columns:auto minmax(0,1fr); align-items:center; gap:14px; color:var(--muted); }
 #now-queue-heading { margin:23px 0 9px; font-size:1.16rem; }
 #now-queue-list { list-style:none; margin:0; padding:0; display:grid; gap:5px; }
@@ -362,5 +366,5 @@ button:hover:enabled { border-color:var(--copper); }
 .now-queue-length { justify-self:end; }
 @media (max-width:680px) {
   .now-playing-hero { grid-template-columns:1fr; gap:20px; }
-  #now-art { max-width:min(290px,65vw); }
+  #now-art { max-width:min(440px,76vw,52vh); }
 }

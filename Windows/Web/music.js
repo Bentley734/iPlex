@@ -403,14 +403,27 @@
     }
   }
   const nowPlaying = get('now-playing');
+  function showNowQueue(show) {
+    get('now-queue').hidden = !show;
+    nowPlaying.querySelector('.now-playing-hero').hidden = show;
+    const toggle = get('jump-now-queue');
+    toggle.textContent = show ? 'Player' : 'Queue';
+    toggle.setAttribute('aria-expanded', String(show));
+    nowPlaying.querySelector('.now-playing-scroll').scrollTop = 0;
+    if (show) get('now-queue-heading').focus();
+  }
   get('show-now-playing').onclick = () => {
     if (!playing || nowPlaying.open) return;
     renderNowPlaying(playbackState);
     nowPlaying.showModal();
-    nowPlaying.querySelector('.now-playing-scroll').scrollTop = 0;
+    showNowQueue(false);
+    host({action:'openNowPlaying'});
   };
+  nowPlaying.addEventListener('close', () => {
+    if (!nowPlaying.open) host({action:'closeNowPlaying'});
+  });
   get('close-now-playing').onclick = () => nowPlaying.close();
-  get('jump-now-queue').onclick = () => get('now-queue-heading').focus();
+  get('jump-now-queue').onclick = () => showNowQueue(get('now-queue').hidden);
   get('now-prev').onclick = () => player.action({action:'previous'});
   get('now-play').onclick = () => player.action({action:'toggle'});
   get('now-next').onclick = () => player.action({action:'next'});
