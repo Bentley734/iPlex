@@ -127,6 +127,50 @@ struct HeaderBrand: View {
     }
 }
 
+struct PlexifyFeature: View {
+    let item: MusicEntry
+    let library: LibraryModel
+    let open: () -> Void
+
+    var body: some View {
+        Button(action: open) {
+            HStack(spacing: 18) {
+                Color.white.opacity(0.10).overlay {
+                    PlexArtwork(item: item, library: library) {
+                        Image(systemName: item.kind == .albums ? "opticaldisc" : "person.crop.circle")
+                            .font(.title).foregroundStyle(MusicTheme.plexify.accent)
+                    }
+                }
+                .frame(width: 92, height: 92)
+                .clipShape(.rect(cornerRadius: 6))
+                VStack(alignment: .leading, spacing: 5) {
+                    Text("From your library")
+                        .font(.caption.weight(.semibold)).foregroundStyle(MusicTheme.plexify.accent)
+                    Text(item.title).font(.title2.weight(.bold)).lineLimit(2)
+                    if !item.artist.isEmpty {
+                        Text(item.artist).font(.callout).foregroundStyle(.secondary).lineLimit(1)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "arrow.up.right").accessibilityHidden(true)
+                    .foregroundStyle(MusicTheme.plexify.accent)
+            }
+            .padding(16)
+            .background {
+                LinearGradient(colors: [Color(red: 0.10, green: 0.25, blue: 0.30), MusicTheme.plexify.surface],
+                               startPoint: .bottomLeading, endPoint: .topTrailing)
+            }
+            .clipShape(.rect(cornerRadius: 12))
+            .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(0.15)) }
+        }
+        #if os(tvOS)
+        .buttonStyle(.card)
+        #else
+        .buttonStyle(.plain)
+        #endif
+    }
+}
+
 struct PlexArtwork<Placeholder: View>: View {
     let item: MusicEntry
     let library: LibraryModel

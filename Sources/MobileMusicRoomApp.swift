@@ -22,11 +22,12 @@ private struct MusicLibraryScreen: View {
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
     @State private var showSettings = false
     @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
+    @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @State private var showAppIcons = false
     @State private var showPlayer = false
     @State private var search: Task<Void, Never>?
 
-    private var showsClickWheel: Bool { showPlayer && theme.usesClickWheel }
+    private var selectedMiniPlayer: MiniPlayerStyle? { miniPlayerStyle.resolve(for: theme) }
 
     private var columnWidth: CGFloat {
         #if os(tvOS)
@@ -38,20 +39,20 @@ private struct MusicLibraryScreen: View {
 
     var body: some View {
         ZStack {
-            if showsClickWheel {
+            if showPlayer, let style = selectedMiniPlayer {
                 Color.black.ignoresSafeArea()
-                ClickWheelPlayer(library: library, theme: theme) { showPlayer = false }
+                MiniPlayerContent(library: library, style: style) { showPlayer = false }
             } else {
                 libraryScreen
             }
         }
         #if os(iOS)
-        .statusBarHidden(showsClickWheel)
+        .statusBarHidden(showPlayer && selectedMiniPlayer != nil)
         #endif
         .sheet(isPresented: $showSettings) { MusicSettings(library: library) }
         .sheet(isPresented: $showConnection) { connection.padding(26) }
         .sheet(isPresented: $showAppIcons) { MusicAppIconPicker() }
-        .sheet(isPresented: Binding(get: { showPlayer && !theme.usesClickWheel },
+        .sheet(isPresented: Binding(get: { showPlayer && selectedMiniPlayer == nil },
                                     set: { showPlayer = $0 })) { nowPlaying.padding(24) }
         .onChange(of: library.query) { _, _ in
             search?.cancel()
@@ -172,6 +173,12 @@ private struct MusicLibraryScreen: View {
             ScrollView {
                 if let album = library.selectedAlbum { albumDetails(album) }
                 else {
+                    if theme == .plexify && library.selectedArtist == nil
+                        && library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                       let entry = library.entries.first {
+                        PlexifyFeature(item: entry, library: library) { library.open(entry) }
+                            .padding(.bottom, 13)
+                    }
                     if let artist = library.selectedArtist {
                         Text(artist.title).font(.largeTitle.bold()).padding(.bottom, 16)
                     }
@@ -231,7 +238,8 @@ private struct MusicLibraryScreen: View {
     private var nowPlaying: some View {
         VStack(spacing: 18) {
             if let album = library.playingAlbum {
-                MusicArtwork(item: album, library: library).frame(width: columnWidth, height: columnWidth)
+                let artworkSize = theme == .plexify ? columnWidth * 1.3 : columnWidth
+                MusicArtwork(item: album, library: library).frame(width: artworkSize, height: artworkSize)
                 Text(library.state.title).font(.title.bold())
                 Text([album.artist, album.title].filter { !$0.isEmpty }.joined(separator: " · ")).foregroundStyle(.secondary)
                 if !library.state.message.isEmpty { Text(library.state.message) }
@@ -249,6 +257,15 @@ private struct MusicLibraryScreen: View {
                     Button("Next", systemImage: "forward.fill", action: library.player.next)
                         .labelStyle(.iconOnly).disabled(!library.state.next)
                 }.buttonStyle(.bordered)
+                if theme == .plexify, let next = library.state.nextTitle {
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text("Up Next").font(.caption.weight(.semibold)).foregroundStyle(theme.accent)
+                        Text(next).lineLimit(2)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(14)
+                    .background(theme.surface, in: RoundedRectangle(cornerRadius: 10))
+                }
             }
             Button("Done") { showPlayer = false }
         }.frame(maxWidth: 500)

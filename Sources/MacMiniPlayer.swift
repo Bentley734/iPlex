@@ -8,7 +8,7 @@ final class MacMiniPlayer: NSObject, NSWindowDelegate {
     private weak var libraryWindow: NSWindow?
     private var lastFrame: NSRect?
 
-    func show(library: LibraryModel, theme: MusicTheme, hiding window: NSWindow) {
+    func show(library: LibraryModel, style: MiniPlayerStyle, hiding window: NSWindow) {
         guard panel == nil else { panel?.makeKeyAndOrderFront(nil); return }
         let size = NSSize(width: 365, height: 478)
         let screen = window.screen ?? NSScreen.main
@@ -35,8 +35,8 @@ final class MacMiniPlayer: NSObject, NSWindowDelegate {
         panel.isMovableByWindowBackground = true
         panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
         let host = NSHostingView(rootView:
-            ClickWheelPlayer(library: library, theme: theme) { [weak self] in self?.panel?.close() }
-                .preferredColorScheme(theme.scheme)
+            MiniPlayerContent(library: library, style: style) { [weak self] in self?.panel?.close() }
+                .preferredColorScheme(style == .classic ? .light : .dark)
                 .overlay(alignment: .top) {
                     MiniPlayerDragArea().frame(height: 16).accessibilityHidden(true)
                 }

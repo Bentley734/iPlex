@@ -1,8 +1,111 @@
 import SwiftUI
 
+struct MiniPlayerContent: View {
+    @ObservedObject var library: LibraryModel
+    let style: MiniPlayerStyle
+    let close: () -> Void
+
+    var body: some View {
+        if style == .queue {
+            QueueMiniPlayer(library: library, close: close)
+        } else {
+            ClickWheelPlayer(library: library,
+                             theme: style == .video || style == .videoBlack ? .video : .classic,
+                             blackShell: style == .classicBlack || style == .videoBlack, close: close)
+        }
+    }
+}
+
+private struct QueueMiniPlayer: View {
+    @ObservedObject var library: LibraryModel
+    let close: () -> Void
+    private let accent = Color(red: 0.35, green: 0.79, blue: 0.92)
+
+    var body: some View {
+        VStack(spacing: 8) {
+            HStack {
+                Text("Now Playing").font(.headline)
+                Spacer()
+                Button("Back to Library", systemImage: "xmark", action: close).labelStyle(.iconOnly)
+            }
+            if let album = library.playingAlbum {
+                Color.white.opacity(0.09).overlay {
+                    PlexArtwork(item: album, library: library) {
+                        Image(systemName: "opticaldisc").font(.largeTitle).foregroundStyle(accent)
+                    }
+                }
+                .frame(width: 112, height: 112).clipShape(.rect(cornerRadius: 8))
+                Text(library.state.title.isEmpty ? album.title : library.state.title)
+                    .font(.headline).lineLimit(1)
+                Text([album.artist, album.title].filter { !$0.isEmpty }.joined(separator: " · "))
+                    .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            }
+            HStack(spacing: 18) {
+                Button("Previous", systemImage: "backward.fill", action: library.player.previous)
+                    .disabled(!library.state.previous)
+                Button(library.state.playing ? "Pause" : "Play",
+                       systemImage: library.state.playing ? "pause.fill" : "play.fill", action: library.player.toggle)
+                    .disabled(library.playingAlbum == nil)
+                Button("Next", systemImage: "forward.fill", action: library.player.next)
+                    .disabled(!library.state.next)
+            }
+            .labelStyle(.iconOnly).buttonStyle(.bordered)
+            ProgressView(value: min(max(0, library.state.elapsed), max(1, library.state.duration)),
+                         total: max(1, library.state.duration))
+                .accessibilityLabel("Playback position")
+            Text("Queue").font(.headline).frame(maxWidth: .infinity, alignment: .leading)
+            ScrollViewReader { scroll in
+                ScrollView {
+                    LazyVStack(spacing: 2) {
+                        ForEach(Array(library.playingTracks.enumerated()), id: \.offset) { index, track in
+                            let current = index == library.state.index
+                            Button {
+                                library.player.selectTrack(index)
+                            } label: {
+                                HStack(spacing: 9) {
+                                    if current { Image(systemName: "speaker.wave.2.fill") }
+                                    else { Text(String(index + 1)).monospacedDigit() }
+                                    Text(track.title).lineLimit(1)
+                                    Spacer()
+                                }
+                                .padding(7)
+                                .foregroundStyle(current ? accent : .primary)
+                                .background(current ? accent.opacity(0.15) : .clear, in: RoundedRectangle(cornerRadius: 5))
+                                .contentShape(Rectangle())
+                            }
+                            #if os(tvOS)
+                            .buttonStyle(.bordered)
+                            #else
+                            .buttonStyle(.plain)
+                            #endif
+                            .accessibilityAddTraits(current ? .isSelected : [])
+                            .id(index)
+                        }
+                    }
+                }
+                .onChange(of: library.state.index, initial: true) { _, index in
+                    if let index { scroll.scrollTo(index, anchor: .center) }
+                }
+            }
+        }
+        .padding(20)
+        .frame(maxWidth: 520, maxHeight: 550)
+        .background(.linearGradient(colors: [Color(red: 0.18, green: 0.22, blue: 0.27), Color(white: 0.09)],
+                                    startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 20))
+        .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(.white.opacity(0.18)) }
+        .preferredColorScheme(.dark)
+        .tint(accent)
+        #if os(tvOS)
+        .onExitCommand(perform: close)
+        #endif
+        .onChange(of: library.playingAlbum?.id) { _, id in if id == nil { close() } }
+    }
+}
+
 struct ClickWheelPlayer: View {
     @ObservedObject var library: LibraryModel
     let theme: MusicTheme
+    let blackShell: Bool
     let close: () -> Void
 
     private enum Key: Hashable { case menu, previous, center, next, play }
@@ -13,7 +116,12 @@ struct ClickWheelPlayer: View {
     @State private var previewPosition: Double?
 
     private var video: Bool { theme == .video }
-    private var shellInk: Color { video ? .white : Color(red: 0.17, green: 0.21, blue: 0.26) }
+    private var shellInk: Color { video || blackShell ? .white : Color(red: 0.17, green: 0.21, blue: 0.26) }
+    private var shellColors: [Color] {
+        if blackShell { return [Color(white: 0.20), Color(white: 0.075), .black] }
+        if video { return [Color(white: 0.23), Color(red: 0.085, green: 0.09, blue: 0.106), .black] }
+        return [Color(white: 0.99), Color(red: 0.86, green: 0.88, blue: 0.88), Color(white: 0.73)]
+    }
     private var displayInk: Color { video ? Color(red: 0.91, green: 0.96, blue: 1) : Color(red: 0.13, green: 0.24, blue: 0.19) }
     private var displayAccent: Color { video ? Color(red: 0.52, green: 0.83, blue: 1) : Color(red: 0.21, green: 0.38, blue: 0.30) }
     private var duration: Double { library.state.duration.isFinite ? max(0, library.state.duration) : 0 }
@@ -39,13 +147,11 @@ struct ClickWheelPlayer: View {
             #endif
             .background {
                 RoundedRectangle(cornerRadius: 35)
-                    .fill(LinearGradient(colors: video ?
-                        [Color(white: 0.23), Color(red: 0.085, green: 0.09, blue: 0.106), .black] :
-                        [Color(white: 0.99), Color(red: 0.86, green: 0.88, blue: 0.88), Color(white: 0.73)],
+                    .fill(LinearGradient(colors: shellColors,
                                          startPoint: .topLeading, endPoint: .bottomTrailing))
                     .overlay {
                         RoundedRectangle(cornerRadius: 35)
-                            .strokeBorder(.white.opacity(video ? 0.22 : 0.8), lineWidth: 1)
+                            .strokeBorder(.white.opacity(video || blackShell ? 0.22 : 0.8), lineWidth: 1)
                     }
                     .shadow(color: .black.opacity(0.28), radius: 18, x: 0, y: 8)
             }
@@ -111,7 +217,7 @@ struct ClickWheelPlayer: View {
                 .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(displayAccent.opacity(0.5), lineWidth: 1) }
         }
         .padding(video ? 7 : 4)
-        .background(video ? Color(white: 0.035) : Color(white: 0.43), in: RoundedRectangle(cornerRadius: 16))
+        .background(video || blackShell ? Color(white: 0.035) : Color(white: 0.43), in: RoundedRectangle(cornerRadius: 16))
     }
 
     private func cover(size: CGFloat) -> some View {
@@ -136,7 +242,7 @@ struct ClickWheelPlayer: View {
         let offset = size * 0.36
         let circle = ZStack {
             Circle()
-                .fill(LinearGradient(colors: video ? [Color(white: 0.21), Color(white: 0.06)] :
+                .fill(LinearGradient(colors: video || blackShell ? [Color(white: 0.21), Color(white: 0.06)] :
                         [Color(white: 0.99), Color(white: 0.86)], startPoint: .top, endPoint: .bottom))
                 .overlay { Circle().strokeBorder(shellInk.opacity(0.35), lineWidth: 1) }
             key(.menu, text: "MENU", label: "Back to Library", size: size, action: close)

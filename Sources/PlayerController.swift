@@ -639,6 +639,7 @@ final class PlayerController {
             "canPrevious": !tracks.isEmpty, "canNext": index + 1 < tracks.count
         ]
         if tracks.indices.contains(index) {
+            if tracks.indices.contains(index + 1) { event["nextTitle"] = tracks[index + 1].title }
             event["trackNumber"] = tracks[index].number
             event["title"] = tracks[index].title
         }

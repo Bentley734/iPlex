@@ -53,14 +53,19 @@
       <div class="content" id="scroll">
         <p id="message" role="status" hidden></p>
         <section id="details" hidden></section>
+        <section id="plexify-feature" aria-label="From your library" hidden></section>
         <div id="grid" class="grid"></div>
         <button id="more" hidden>Load More</button>
       </div>
     </section>
   </main>
+  <section id="plexify-deck" aria-labelledby="plexify-deck-heading" hidden>
+    <h2 id="plexify-deck-heading">Now Playing</h2>
+    <div id="plexify-track">Nothing playing</div>
+  </section>
   <footer aria-label="Now playing">
     <div class="playing" id="playing">Nothing playing</div>
-    <button id="open-wheel" type="button" hidden>Now Playing</button>
+    <button id="open-wheel" type="button" hidden>Mini-player</button>
     <div class="controls">
       <button id="previous" aria-label="Previous track" disabled>⏮</button>
       <button class="primary" id="toggle" aria-label="Play" disabled>▶</button>
@@ -68,10 +73,13 @@
     </div>
     <input id="seek" aria-label="Playback position" type="range" min="0" max="1" value="0" disabled>
     <time id="elapsed">0:00</time>
+    <button id="plexify-deck-toggle" type="button" aria-controls="plexify-deck" aria-expanded="false" hidden>Now Playing</button>
   </footer>
   <dialog id="wheel-player" aria-labelledby="wheel-heading">
     <div class="device-screen">
-      <div class="screen-top"><h1 id="wheel-heading">Now Playing</h1><span id="wheel-track"></span></div>
+      <div class="screen-top"><h1 id="wheel-heading">Now Playing</h1><span id="wheel-track"></span>
+        <button id="queue-close" type="button" aria-label="Back to Library" hidden>✕</button>
+      </div>
       <div class="screen-track">
         <div id="wheel-cover"></div>
         <div><strong id="wheel-title"></strong><small id="wheel-subtitle"></small></div>
@@ -92,6 +100,15 @@
       <output id="wheel-mode">VOL 100%</output>
       <button id="wheel-plus" type="button" aria-label="Increase playback volume">+</button>
     </div>
+    <section id="mini-queue" aria-labelledby="mini-queue-heading" hidden>
+      <div class="queue-controls">
+        <button id="queue-prev" type="button" aria-label="Previous track">⏮</button>
+        <button id="queue-play" type="button" aria-label="Play">▶</button>
+        <button id="queue-next" type="button" aria-label="Next track">⏭</button>
+      </div>
+      <h2 id="mini-queue-heading">Queue</h2>
+      <ol id="mini-queue-list"></ol>
+    </section>
   </dialog>
   <dialog id="settings-page" aria-labelledby="settings-heading">
     <div class="settings-head">
@@ -103,6 +120,17 @@
         <option value="copper">Copper Groove</option>
         <option value="classic">Classic iPod</option>
         <option value="video">iPod Video</option>
+        <option value="plexify">Plexify</option>
+      </select>
+    </label>
+    <label class="theme-choice">Mini-player
+      <select id="mini-player-style">
+        <option value="automatic">Automatic</option>
+        <option value="classic">Classic iPod</option>
+        <option value="classicBlack">Classic iPod Black</option>
+        <option value="video">iPod Video</option>
+        <option value="videoBlack">iPod Video Black</option>
+        <option value="queue">Artwork &amp; Queue</option>
       </select>
     </label>
     <section>

@@ -8,8 +8,11 @@ window.clickWheel = (() => {
   const opener = byId('open-wheel');
   const ring = byId('wheel-ring');
   let state = {}, item = null, theme = 'copper';
+  let preference = 'automatic', style = '';
   let volume = 1, scrubbing = false, preview = null, drag = null, suppressClick = false;
   let artworkKey;
+  let queueKey = '';
+  let queueIndex;
   const clamp = (value, max) => Math.min(max, Math.max(0, value));
 
   function clock(value) {
@@ -79,8 +82,52 @@ window.clickWheel = (() => {
 
   function updateTheme(choice) {
     theme = choice;
-    opener.hidden = !item || theme === 'copper';
+    style = preference === 'automatic' ? (['classic', 'video'].includes(theme) ? theme : '') : preference;
+    root.dataset.miniPlayer = style;
+    byId('mini-queue').hidden = style !== 'queue';
+    byId('queue-close').hidden = style !== 'queue';
+    opener.hidden = !item || !style;
     if (opener.hidden && dialog.open) closePlayer();
+    if (style === 'queue' && item) drawQueue();
+  }
+
+  function setStyle(choice) {
+    preference = choice;
+    updateTheme(theme);
+  }
+
+  function drawQueue() {
+    const playing = state.status === 'playing';
+    byId('queue-play').textContent = playing ? '⏸' : '▶';
+    byId('queue-play').setAttribute('aria-label', playing ? 'Pause' : 'Play');
+    byId('queue-prev').disabled = !state.canPrevious;
+    byId('queue-next').disabled = !state.canNext;
+    const tracks = state.tracks || [];
+    const key = JSON.stringify([item.id, tracks.map(track => track.title)]);
+    const list = byId('mini-queue-list');
+    if (queueKey !== key) {
+      queueKey = key;
+      queueIndex = undefined;
+      list.replaceChildren(...tracks.map((track, index) => {
+        const row = document.createElement('li');
+        const play = document.createElement('button');
+        play.type = 'button';
+        play.textContent = track.title;
+        play.onclick = () => player.action({action:'playTrack', index});
+        row.append(play);
+        return row;
+      }));
+    }
+    if (queueIndex !== state.trackIndex) {
+      list.children[queueIndex]?.firstChild.removeAttribute('aria-current');
+      queueIndex = state.trackIndex;
+      list.children[queueIndex]?.firstChild.setAttribute('aria-current', 'true');
+      if (dialog.open) scrollToPlaying();
+    }
+  }
+
+  function scrollToPlaying() {
+    byId('mini-queue-list').querySelector('[aria-current="true"]')?.scrollIntoView({block:'nearest'});
   }
 
   function ringAngle(event) {
@@ -149,7 +196,10 @@ window.clickWheel = (() => {
     dialog.showModal();
     root.classList.add('floating-player');
     window.chrome.webview.postMessage({action:'openFloatingPlayer'});
-    byId('wheel-center').focus();
+    if (style === 'queue') {
+      byId('queue-close').focus();
+      scrollToPlaying();
+    } else byId('wheel-center').focus();
   };
   function closePlayer() {
     if (dialog.open) dialog.close();
@@ -167,11 +217,15 @@ window.clickWheel = (() => {
   });
   window.closeFloatingPlayer = closePlayer;
   dialog.querySelector('.device-screen').addEventListener('pointerdown', event => {
-    if (event.button === 0 && event.pointerType === 'mouse') {
+    if (event.button === 0 && event.pointerType === 'mouse' && !event.target.closest('button')) {
       window.chrome.webview.postMessage({action:'dragFloatingPlayer'});
     }
   });
   byId('wheel-menu').onclick = closePlayer;
+  byId('queue-close').onclick = closePlayer;
+  byId('queue-prev').onclick = () => player.action({action:'previous'});
+  byId('queue-play').onclick = () => player.action({action:'toggle'});
+  byId('queue-next').onclick = () => player.action({action:'next'});
   byId('wheel-prev').onclick = () => player.action(state.canPrevious && position() < 2.5 ?
     {action:'previous'} : {action:'seek', seconds:0});
   byId('wheel-next').onclick = () => player.action({action:'next'});
@@ -183,9 +237,10 @@ window.clickWheel = (() => {
   byId('wheel-minus').onclick = () => adjust(-1);
   byId('wheel-plus').onclick = () => adjust(1);
   dialog.addEventListener('keydown', event => {
+    if (style === 'queue') return;
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
     event.preventDefault();
     adjust(event.key === 'ArrowRight' ? 1 : -1);
   });
-  return {update, updateTheme};
+  return {update, updateTheme, setStyle};
 })();

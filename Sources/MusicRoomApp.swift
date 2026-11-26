@@ -47,16 +47,22 @@ private struct MusicWindow: View {
     @State private var searchTask: Task<Void, Never>?
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
     @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
+    @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @State private var showSettings = false
     @State private var showVolume = false
+    @State private var showPlexifyDeck = true
+    @State private var showCompactDeck = false
     @State private var miniPlayer = MacMiniPlayer()
     private var copper: Color { theme.accent }
     private var slate: Color { theme.surface }
     private var graphite: Bool { theme == .graphite }
+    private var plexify: Bool { theme == .plexify }
 
     var body: some View {
         Group {
-            if graphite {
+            if plexify {
+                plexifyWorkspace
+            } else if graphite {
                 HStack(spacing: 0) {
                     sidebar.frame(width: 206)
                     Divider()
@@ -90,15 +96,74 @@ private struct MusicWindow: View {
         }
     }
 
+    private var plexifyWorkspace: some View {
+        GeometryReader { geometry in
+            let wide = geometry.size.width >= 1040
+            VStack(spacing: 1) {
+                HStack(spacing: 20) {
+                    HeaderBrand(mark: headerMark, theme: theme, width: 155, height: 42)
+                    librarySearch.frame(maxWidth: 460).disabled(model.libraryID.isEmpty)
+                    Spacer(minLength: 4)
+                    Button {
+                        if wide { showPlexifyDeck.toggle() }
+                        else { showCompactDeck.toggle() }
+                    } label: { Label("Now Playing", systemImage: "rectangle.trailingthird.inset.filled") }
+                    .popover(isPresented: $showCompactDeck) {
+                        plexifyDeck.frame(width: 250, height: 370)
+                    }
+                    settingsButton
+                }
+                .padding(.horizontal, 18).padding(.vertical, 8)
+                .background(slate)
+                HStack(spacing: 1) {
+                    sidebar.frame(width: 178)
+                    mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    if wide && showPlexifyDeck { plexifyDeck.frame(width: 224) }
+                }
+                graphiteTransport
+                    .padding(.horizontal, 12).padding(.vertical, 6)
+            }
+            .background(.black.opacity(0.23))
+        }
+    }
+
+    private var plexifyDeck: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 14) {
+                Label("Now Playing", systemImage: "waveform")
+                    .font(.headline).foregroundStyle(copper)
+                if let album = model.playingAlbum {
+                    CoverArt(item: album, model: model).aspectRatio(1, contentMode: .fit)
+                    Text(model.state.title.isEmpty ? album.title : model.state.title)
+                        .font(.title2.bold()).lineLimit(3)
+                    if !album.artist.isEmpty {
+                        Text(album.artist).foregroundStyle(.secondary)
+                    }
+                    Text(album.title).font(.caption).foregroundStyle(.secondary)
+                    if let next = model.state.nextTitle {
+                        Divider()
+                        Text("Up Next").font(.caption.weight(.semibold)).foregroundStyle(copper)
+                        Text(next).font(.callout).lineLimit(2)
+                    }
+                } else {
+                    Text("Nothing playing").foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(18)
+        }
+        .background(slate)
+    }
+
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 24) {
-            HeaderBrand(mark: headerMark, theme: theme, width: 155, height: 46)
+            if !plexify { HeaderBrand(mark: headerMark, theme: theme, width: 155, height: 46) }
             if graphite {
                 librarySearch
                     .disabled(model.libraryID.isEmpty)
             }
             VStack(alignment: .leading, spacing: 6) {
-                if graphite {
+                if graphite || plexify {
                     Text("Plex library")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(.secondary)
@@ -124,7 +189,7 @@ private struct MusicWindow: View {
                 }
                 .labelsHidden()
             }
-            if !graphite { settingsButton }
+            if !graphite && !plexify { settingsButton }
             Spacer()
             if graphite {
                 Divider()
@@ -135,7 +200,7 @@ private struct MusicWindow: View {
                     .buttonStyle(.plain).foregroundStyle(.secondary)
             }
         }
-        .padding(graphite ? 19 : 24)
+        .padding(graphite || plexify ? 16 : 24)
         .frame(maxHeight: .infinity, alignment: .topLeading)
         .background(slate)
     }
@@ -153,7 +218,7 @@ private struct MusicWindow: View {
                 .textFieldStyle(.plain)
         }
         .padding(9)
-        .background(graphite ? .white.opacity(0.06) : slate, in: RoundedRectangle(cornerRadius: 8))
+        .background(graphite || plexify ? .white.opacity(0.06) : slate, in: RoundedRectangle(cornerRadius: 8))
     }
 
     private func tab(_ kind: MusicKind, icon: String) -> some View {
@@ -190,7 +255,7 @@ private struct MusicWindow: View {
                         .font(.system(size: graphite ? 38 : 31, weight: .bold, design: graphite ? .rounded : .default))
                         .lineLimit(1)
                     Spacer()
-                    if !graphite && model.selectedAlbum == nil && model.selectedArtist == nil {
+                    if !graphite && !plexify && model.selectedAlbum == nil && model.selectedArtist == nil {
                         librarySearch.frame(width: 205)
                     }
                 }
@@ -307,6 +372,11 @@ private struct MusicWindow: View {
 
     private var grid: some View {
         ScrollView {
+            if plexify && model.selectedArtist == nil && model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+               let entry = model.entries.first {
+                PlexifyFeature(item: entry, library: model) { model.open(entry) }
+                    .padding(.horizontal, 28).padding(.bottom, 15)
+            }
             if graphite && model.kind == .albums && model.selectedArtist == nil &&
                 model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                let album = model.entries.first {
@@ -384,13 +454,7 @@ private struct MusicWindow: View {
         HStack(spacing: 16) {
             transportMetadata
             Spacer()
-            if theme.usesClickWheel, model.playingAlbum != nil {
-                Button("Now Playing", systemImage: "dial.medium") {
-                    if let window = NSApp.keyWindow {
-                        miniPlayer.show(library: model, theme: theme, hiding: window)
-                    }
-                }
-            }
+            miniPlayerButton
             transportButtons
             seekControl.frame(width: 130)
             Text(clock(model.state.elapsed)).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 40)
@@ -399,9 +463,20 @@ private struct MusicWindow: View {
         .background(slate)
     }
 
+    @ViewBuilder private var miniPlayerButton: some View {
+        if let style = miniPlayerStyle.resolve(for: theme), model.playingAlbum != nil {
+            Button("Mini-player", systemImage: "macwindow.on.rectangle") {
+                if let window = NSApp.keyWindow {
+                    miniPlayer.show(library: model, style: style, hiding: window)
+                }
+            }
+        }
+    }
+
     private var graphiteTransport: some View {
         HStack(spacing: 14) {
             transportMetadata.frame(maxWidth: .infinity, alignment: .leading)
+            miniPlayerButton
             transportButtons
             HStack(spacing: 9) {
                 seekControl

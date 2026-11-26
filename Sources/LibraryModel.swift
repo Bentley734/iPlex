@@ -13,6 +13,7 @@ final class LibraryModel: ObservableObject {
     @Published private(set) var selectedAlbum: MusicEntry?
     @Published private(set) var tracks: [LiveTrack] = []
     @Published private(set) var playingAlbum: MusicEntry?
+    @Published private(set) var playingTracks: [LiveTrack] = []
     @Published private(set) var busy = false
     @Published private(set) var more = false
     @Published private(set) var signInURL: URL?
@@ -58,6 +59,7 @@ final class LibraryModel: ObservableObject {
         var next = false
         var index: Int?
         var message = ""
+        var nextTitle: String?
     }
 
     init() {
@@ -74,7 +76,7 @@ final class LibraryModel: ObservableObject {
                                       duration: value["duration"] as? Double ?? 0, status: value["status"] as? String ?? "idle",
                                       playing: value["playing"] as? Bool ?? false, previous: value["canPrevious"] as? Bool ?? false,
                                       next: value["canNext"] as? Bool ?? false, index: value["trackIndex"] as? Int,
-                                      message: value["message"] as? String ?? "")
+                                      message: value["message"] as? String ?? "", nextTitle: value["nextTitle"] as? String)
         }
     }
 
@@ -185,6 +187,7 @@ final class LibraryModel: ObservableObject {
         entries = []
         tracks = []
         playingAlbum = nil
+        playingTracks = []
         playingArtwork = nil
         offset = 0
         more = false
@@ -238,6 +241,7 @@ final class LibraryModel: ObservableObject {
         guard let album = selectedAlbum, tracks.indices.contains(index) else { return }
         let key = artworkKey(for: album)
         playingAlbum = album
+        playingTracks = tracks
         playingArtwork = key.flatMap { artwork.object(forKey: $0.path as NSString) }
         player.loadRemoteTracks(tracks, collection: album.title, artist: album.artist, artwork: playingArtwork, startTrack: index)
         if playingArtwork == nil, let key {

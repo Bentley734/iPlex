@@ -7,6 +7,11 @@
   let tracks = [], entries = [], request = 0, playRequest = 0, offset = 0, busy = false, timer;
   let hasMore = false;
   let caching = false;
+  let selectedTheme = 'copper';
+  let deckOpen = window.matchMedia('(min-width: 1040px)').matches;
+  let featureKey = '';
+  let deckKey = '';
+  let playbackState = {};
   const bands = ['bass', 'mid', 'treble'];
   const node = (tag, text = '', cls = '') => {
     const el = document.createElement(tag);
@@ -80,6 +85,7 @@
     get('more').hidden = Boolean(album) || !hasMore || busy;
     get('albums').setAttribute('aria-pressed', String(kind === 'albums'));
     get('artists').setAttribute('aria-pressed', String(kind === 'artists'));
+    renderFeature();
     if (!album) {
       const grid = get('grid');
       grid.append(...entries.slice(grid.childElementCount).map(item => {
@@ -105,6 +111,23 @@
       list.append(row);
     });
     get('details').replaceChildren(heading, list);
+  }
+  function renderFeature() {
+    const feature = get('plexify-feature');
+    const item = selectedTheme === 'plexify' && !album && !artist && !get('search').value.trim() ? entries[0] : null;
+    feature.hidden = !item;
+    const key = JSON.stringify([item?.id, item?.title, item?.kind, item?.artwork]);
+    if (key === featureKey) return;
+    featureKey = key;
+    if (!item) { feature.replaceChildren(); return; }
+    const openFeature = button('', () => open(item));
+    const info = node('span', '', 'feature-info');
+    info.append(node('small', 'From your library'), node('strong', item.title));
+    if (item.artist) info.append(node('span', item.artist));
+    const arrow = node('span', '↗', 'feature-arrow');
+    arrow.setAttribute('aria-hidden', 'true');
+    openFeature.append(cover(item), info, arrow);
+    feature.replaceChildren(openFeature);
   }
   function playAlbum(index) {
     if (!album || !tracks[index]) return;
@@ -178,6 +201,7 @@
   };
   let footerKey = '';
   window.macPlayerState = state => {
+    playbackState = state;
     const nextKey = JSON.stringify([playing?.id, state.title, state.message]);
     if (footerKey !== nextKey) {
       footerKey = nextKey;
@@ -196,6 +220,7 @@
         }
       }
     }
+    if (selectedTheme === 'plexify') renderDeck(state);
     window.clickWheel.update(playing, state, cover);
     const active = state.status === 'playing';
     get('toggle').textContent = active ? '⏸' : '▶';
@@ -208,15 +233,51 @@
     if (document.activeElement !== get('seek')) get('seek').value = state.elapsed || 0;
     get('elapsed').textContent = time(state.elapsed);
   };
+  function renderDeck(state) {
+    const next = state.tracks?.[state.trackIndex + 1];
+    const key = JSON.stringify([playing?.id, playing?.artwork, state.title, next?.title]);
+    if (deckKey === key) return;
+    deckKey = key;
+    const panel = get('plexify-track');
+    if (!playing) { panel.textContent = 'Nothing playing'; return; }
+    const title = node('strong', state.title || playing.title);
+    const artist = node('small', [playing.artist, playing.title].filter(Boolean).join(' · '));
+    panel.replaceChildren(cover(playing), title, artist);
+    if (next?.title) {
+      const upNext = node('div', '', 'plexify-up-next');
+      upNext.append(node('small', 'Up Next'), node('span', next.title));
+      panel.append(upNext);
+    }
+  }
   get('connect').onclick = () => host({action:'connect'});
   get('settings').onclick = () => get('settings-page').showModal();
   get('close-settings').onclick = () => get('settings-page').close();
   function chooseTheme(value) {
-    const theme = ['classic', 'video'].includes(value) ? value : 'copper';
+    const theme = ['classic', 'video', 'plexify'].includes(value) ? value : 'copper';
+    selectedTheme = theme;
     document.documentElement.dataset.theme = theme;
     window.clickWheel.updateTheme(theme);
     get('theme').value = theme;
+    updateDeckVisibility();
+    renderFeature();
+    if (theme === 'plexify') renderDeck(playbackState);
     try { localStorage.setItem('musicroom-theme', theme); } catch {}
+  }
+  function chooseMiniPlayer(value) {
+    const select = get('mini-player-style');
+    select.value = value;
+    if (select.selectedIndex < 0) select.value = 'automatic';
+    window.clickWheel.setStyle(select.value);
+    try { localStorage.setItem('musicroom-mini-player', select.value); } catch {}
+  }
+  function updateDeckVisibility() {
+    const plexify = selectedTheme === 'plexify';
+    const visible = plexify && deckOpen;
+    get('plexify-deck').hidden = !visible;
+    const toggle = get('plexify-deck-toggle');
+    toggle.hidden = !plexify;
+    toggle.setAttribute('aria-expanded', String(visible));
+    document.documentElement.dataset.plexifyDeck = visible ? 'open' : 'closed';
   }
   function chooseHeaderLogo(value) {
     const choice = get('header-logo');
@@ -250,6 +311,8 @@
     try { localStorage.setItem('musicroom-eq', JSON.stringify(settings)); } catch {}
   }
   get('theme').onchange = event => chooseTheme(event.target.value);
+  get('mini-player-style').onchange = event => chooseMiniPlayer(event.target.value);
+  get('plexify-deck-toggle').onclick = () => { deckOpen = !deckOpen; updateDeckVisibility(); };
   get('header-logo').onchange = event => chooseHeaderLogo(event.target.value);
   get('header-logo-size').onchange = event => chooseHeaderLogoSize(event.target.value);
   for (const band of bands) get(band).oninput = updateEQ;
@@ -280,6 +343,7 @@
   };
   try {
     chooseTheme(localStorage.getItem('musicroom-theme'));
+    chooseMiniPlayer(localStorage.getItem('musicroom-mini-player'));
     chooseHeaderLogo(localStorage.getItem('musicroom-header-logo'));
     chooseHeaderLogoSize(localStorage.getItem('musicroom-header-logo-size'));
     const eq = JSON.parse(localStorage.getItem('musicroom-eq')) || {};
