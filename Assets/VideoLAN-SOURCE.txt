@@ -1,6 +1,7 @@
 iPlex uses dynamically linked VideoLAN components under the GNU Lesser General Public
 License, version 2.1 or later. See VideoLAN-LICENSE.txt. Upstream packages are unmodified
-except for selecting the platform and playback plug-ins.
+except for selecting the platform and playback plug-ins and updating the macOS dylib
+install name for the symlink-free app bundle.
 
 VLCKit, MobileVLCKit and TVVLCKit 3.7.3
 https://download.videolan.org/cocoapods/prod/
