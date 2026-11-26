@@ -36,6 +36,8 @@ namespace MusicRoom
         {
             public long ratingCount;
             public int number;
+            public string plexID, codec, container;
+            public long sampleRate, bitDepth, bitrate, channels;
             public string title, localPath, token, mime, artwork, artist, album;
             public double? durationSeconds;
             public Uri remote;

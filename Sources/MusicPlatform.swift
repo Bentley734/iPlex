@@ -12,19 +12,25 @@ typealias MusicImage = UIImage
 
 @MainActor
 enum MusicPlatform {
-    private static let musicWordmarks: [HeaderWordmark: CGImage] = {
+    private static let wordmarkSheet: CGImage? = {
         guard let url = Bundle.main.url(forResource: "music-wordmarks", withExtension: "png"),
-              let source = CGImageSourceCreateWithURL(url as CFURL, nil),
-              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return [:] }
-        return Dictionary(uniqueKeysWithValues: HeaderWordmark.allCases.compactMap { option in
-            guard let region = option.region, let crop = image.cropping(to: region) else { return nil }
-            return (option, crop)
-        })
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil) else { return nil }
+        return CGImageSourceCreateImageAtIndex(source, 0, nil)
     }()
 
-    static func wordmarkImage(_ option: HeaderWordmark) -> Image? {
+    private static let wordmarks = loadWordmarks(dark: false)
+    private static let darkWordmarks = loadWordmarks(dark: true)
+
+    private static func loadWordmarks(dark: Bool) -> [HeaderWordmark: CGImage] {
+        Dictionary(uniqueKeysWithValues: HeaderWordmark.allCases.compactMap { option in
+            guard let region = option.region(dark: dark), let crop = wordmarkSheet?.cropping(to: region) else { return nil }
+            return (option, crop)
+        })
+    }
+
+    static func wordmarkImage(_ option: HeaderWordmark, dark: Bool) -> Image? {
         if option == .iplex { return brandImage("wordmark") }
-        return musicWordmarks[option].map { Image(decorative: $0, scale: 1) }
+        return (dark ? darkWordmarks : wordmarks)[option].map { Image(decorative: $0, scale: 1) }
     }
 
     static func brandImage(_ name: String, subdirectory: String? = nil) -> Image? {
@@ -123,17 +129,38 @@ struct ArtworkPalette {
 
 enum HeaderWordmark: String, CaseIterable, Identifiable {
     static let preferenceKey = "HeaderWordmark"
-    case iplex, music, musicBold
+    case iplex, music, musicBold, plex, plex2022, napster, iTunes
 
     var id: Self { self }
-    var title: String { self == .iplex ? "iPlex" : "Music" }
-    var label: String { self == .musicBold ? "music (Bold)" : title }
-    // Regions in the supplied transparent wordmark sheet, including a small inset.
-    var region: CGRect? {
+    var title: String {
+        switch self {
+        case .iplex: "iPlex"
+        case .music, .musicBold: "Music"
+        case .plex, .plex2022: "Plex"
+        case .napster: "Napster"
+        case .iTunes: "iTunes"
+        }
+    }
+    var label: String {
+        switch self {
+        case .musicBold: "music (Bold)"
+        case .plex: "Plex (Classic)"
+        case .plex2022: "Plex (2022)"
+        default: title
+        }
+    }
+    var hasAccent: Bool { self == .plex || self == .plex2022 }
+
+    // Pixel coordinates shared with the Windows asset sheet.
+    func region(dark: Bool) -> CGRect? {
         switch self {
         case .iplex: nil
         case .music: CGRect(x: 722, y: 251, width: 684, height: 210)
         case .musicBold: CGRect(x: 645, y: 609, width: 810, height: 193)
+        case .plex: CGRect(x: 0, y: dark ? 1745 : 1255, width: 1024, height: 332)
+        case .plex2022: CGRect(x: 1030, y: dark ? 1745 : 1255, width: 1000, height: 461)
+        case .napster: CGRect(x: 0, y: 1085, width: 707, height: 156)
+        case .iTunes: CGRect(x: 720, y: 1085, width: 565, height: 144)
         }
     }
 }
@@ -212,8 +239,8 @@ struct HeaderBrand: View {
                     .scaleEffect(mark.artworkScale)
                     .accessibilityHidden(true)
             }
-            if let image = MusicPlatform.wordmarkImage(wordmark) {
-                image.renderingMode(.template).resizable().scaledToFit()
+            if let image = MusicPlatform.wordmarkImage(wordmark, dark: theme.scheme == .dark) {
+                image.renderingMode(wordmark.hasAccent ? .original : .template).resizable().scaledToFit()
                     .foregroundStyle(ink)
                     .accessibilityLabel(wordmark.title)
             } else {

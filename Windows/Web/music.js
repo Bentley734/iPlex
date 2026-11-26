@@ -28,14 +28,22 @@
   let deckKey = '';
   let playbackState = {};
   let nowQueue = [];
+  let pins = [];
+  let launchPreview = null;
+  let replacingPreview = false;
+  let pinnedKey = "";
   let pendingEnqueue = null;
   let enqueueSequence = 0;
   let dragIndex = null;
   let renderedQueue = null;
   let nowCover = null;
   let nowIndex = null;
-  // Regions in the supplied transparent wordmark sheet, including a small inset.
-  const wordmarkRegions = new Map([['music', [722, 251, 684, 210]], ['musicBold', [645, 609, 810, 193]]]);
+  // Pixel coordinates shared with the Apple asset sheet.
+  const wordmarkRegions = new Map([
+    ['music', [722, 251, 684, 210]], ['musicBold', [645, 609, 810, 193]],
+    ['plex', [0, 1255, 1024, 332]], ['plex2022', [1030, 1255, 1000, 461]],
+    ['napster', [0, 1085, 707, 156]], ['iTunes', [720, 1085, 565, 144]]
+  ]);
   const wordmarkSheet = new Image();
   const pageEnd = get('page-end');
   const pageObserver = new IntersectionObserver(rows => {
@@ -77,23 +85,24 @@
     get('message').textContent = text;
     get('message').hidden = !text;
   }
-  function browse(append = false) {
-    if (!library || (append && busy)) return;
+  function browse(append = false, keepPreview = false) {
+    if (launchPreview || !library || (append && busy)) return;
     paging = append;
     pageFailed = false;
     album = null;
     refreshAfterAlbum = false;
     if (!append) {
       offset = 0;
-      entries = [];
+      replacingPreview = keepPreview;
+      if (!keepPreview) entries = [];
       listingIDs.clear();
       listingQuery = group ? '' : get('search').value;
       hasMore = false;
-      get('grid').replaceChildren();
+      if (!keepPreview) get('grid').replaceChildren();
     }
     busy = true;
     render();
-    status('Loading library…');
+    if (!keepPreview) status('Loading library…');
     requestPage();
   }
   function requestPage() {
@@ -101,6 +110,7 @@
           pageSize:pageSize === 'all' ? 120 : Number(pageSize)});
   }
   function open(item) {
+    if (launchPreview || replacingPreview) return;
     clearTimeout(timer);
     if (item.kind === 'artist' || item.kind === 'genre') {
       group = item;
@@ -127,13 +137,42 @@
     return menu;
   }
   function libraryQueueActions(item, track) {
-    return actions('Queue actions for ' + (track === undefined ? item.title : tracks[track]?.title || 'track'), [
-      ['Play Next', () => enqueueItem(item, true, track)],
-      ['Add to Queue', () => enqueueItem(item, false, track)]
-    ]);
+    const commands = [];
+    if (track !== undefined || item.kind !== 'artist') {
+      commands.push(['Play Next', () => enqueueItem(item, true, track)],
+        ['Add to Queue', () => enqueueItem(item, false, track)]);
+    }
+    if (track === undefined && ['album', 'artist', 'playlist'].includes(item.kind)) {
+      commands.push([pins.some(pin => pin.id === item.id) ? 'Unpin' : 'Pin',
+        () => host({action:'togglePin', item:item.id})]);
+    }
+    return actions('Actions for ' + (track === undefined ? item.title : tracks[track]?.title || 'track'), commands);
   }
+  function renderPins() {
+    get('pinned-shelf').hidden = !pins.length || Boolean(album || group || get('search').value.trim());
+    const key = JSON.stringify([Boolean(launchPreview),pins]);
+    if (key === pinnedKey) return;
+    pinnedKey = key;
+    get('pinned-items').replaceChildren(...pins.map(item => libraryTile(item)));
+  }
+  function libraryTile(item) {
+    const tile = button('', () => open(item), 'tile');
+    const text = node('div', '', 'tile-text');
+    text.append(node('strong', item.title));
+    if (item.artist) text.append(node('small', item.artist));
+    tile.append(cover(item), text);
+    const cell = node('div', '', 'library-tile');
+    cell.append(tile);
+    if (!launchPreview && item.kind !== 'genre') cell.append(libraryQueueActions(item));
+    return cell;
+  }
+  window.musicPins = reply => {
+    pins = reply.pins || [];
+    get('grid').replaceChildren();
+    render();
+  };
   function enqueueItem(item, playNext, track) {
-    if (pendingEnqueue || pendingAlbum) return;
+    if (launchPreview || pendingEnqueue || pendingAlbum) return;
     const id = --enqueueSequence;
     pendingEnqueue = {id, item, playNext};
     status('Adding to the queue…');
@@ -173,22 +212,13 @@
     pageObserver.unobserve(pageEnd);
     if (!pageEnd.hidden) pageObserver.observe(pageEnd);
     for (const tab of sectionNames) get(tab).setAttribute('aria-pressed', String(kind === tab));
+    renderPins();
     renderFeature();
     if (!album) {
       const grid = get('grid');
       grid.classList.toggle('track-list', kind === 'tracks' && !group);
       const added = document.createDocumentFragment();
-      for (const item of entries.slice(grid.childElementCount)) {
-        const tile = button('', () => open(item), 'tile');
-        const text = node('div', '', 'tile-text');
-        text.append(node('strong', item.title));
-        if (item.artist) text.append(node('small', item.artist));
-        tile.append(cover(item), text);
-        const cell = node('div', '', 'library-tile');
-        cell.append(tile);
-        if (item.kind !== 'artist' && item.kind !== 'genre') cell.append(libraryQueueActions(item));
-        added.append(cell);
-      }
+      for (const item of entries.slice(grid.childElementCount)) added.append(libraryTile(item));
       grid.append(added);
       return;
     }
@@ -199,7 +229,7 @@
     const play = button('Play ' + sectionLabel(album.kind), () => playAlbum(0), 'primary');
     play.disabled = tracks.length === 0;
     metadata.append(play);
-    if (tracks.length) metadata.append(libraryQueueActions(album));
+    if (tracks.length || ['album', 'playlist'].includes(album.kind)) metadata.append(libraryQueueActions(album));
     heading.append(cover(album), metadata);
     const list = node('div', '', 'tracks');
     tracks.forEach((track, index) => {
@@ -254,6 +284,11 @@
   };
   window.musicEntries = reply => {
     if (reply.id !== request || album) return;
+    if (replacingPreview) {
+      replacingPreview = false;
+      entries = [];
+      get('grid').replaceChildren();
+    }
     const oldCount = entries.length;
     for (const row of reply.entries) if (!listingIDs.has(row.id)) { entries.push(row); listingIDs.add(row.id); }
     hasMore = reply.more && reply.next > offset && entries.length > oldCount;
@@ -303,9 +338,24 @@
     get('connection-status').textContent = state.message;
     options(get('server'), state.servers, state.serverId, 'Choose server');
     options(get('library'), state.libraries, state.libraryId, 'Choose library');
-    for (const tab of sectionNames) get(tab).disabled = !state.libraryId;
-    get('browser').hidden = !state.libraryId;
-    get('welcome').hidden = Boolean(state.libraryId);
+    const quick = get('quick-library');
+    quick.replaceChildren(...state.libraries.map(row => new Option(row.name, row.id)));
+    quick.value = state.libraryId;
+    quick.hidden = !state.libraryId || state.libraries.length < 2;
+    pins = state.pins || [];
+    renderPins();
+    const before = launchPreview;
+    launchPreview = state.preview || null;
+    get('browser').hidden = !state.libraryId && !launchPreview;
+    get('welcome').hidden = !get('browser').hidden;
+    for (const tab of sectionNames) get(tab).disabled = get('browser').hidden;
+    get('search').disabled = Boolean(launchPreview);
+    get('retry-library').hidden = !launchPreview || launchPreview.waiting;
+    if (launchPreview) {
+      renderLaunchPreview();
+      status(launchPreview.waiting ? [launchPreview.name, 'Reconnecting to Plex…'].filter(Boolean).join(' · ') : state.message);
+      return;
+    }
     if (server !== state.serverId || library !== state.libraryId) {
       server = state.serverId;
       library = state.libraryId;
@@ -314,11 +364,19 @@
       playing = album = group = pendingAlbum = null;
       nowQueue = [];
       pendingEnqueue = null;
+      closePlaybackSheets();
       if (get('now-playing').open) get('now-playing').close();
       player.reset();
-      if (library) browse();
+      if (library) browse(false, Boolean(before?.library === library && before.server === server && entries.length));
+      else { entries = []; get('grid').replaceChildren(); }
     }
   };
+  function renderLaunchPreview() {
+    entries = launchPreview.listings?.[kind] || [];
+    get('grid').replaceChildren();
+    render();
+  }
+  get('retry-library').onclick = () => host({action:'servers'});
   function playingCover(state) {
     if (!playing) return '';
     const track = nowQueue[state.trackIndex];
@@ -385,28 +443,36 @@
     playbackState = state;
     const currentCover = playingCover(state);
     updateArtworkColors(state);
-    const nextKey = JSON.stringify([playing?.id, state.title, state.message, currentCover]);
+    const track = nowQueue[state.trackIndex];
+    const title = track?.title || state.title || playing?.title;
+    const artist = track?.artist || playing?.artist;
+    const albumTitle = track?.album || (playing?.kind === 'album' ? playing.title : '');
+    const nextKey = JSON.stringify([playing?.id, title, artist, albumTitle, state.message, currentCover]);
     if (footerKey !== nextKey) {
       footerKey = nextKey;
       const label = get('playing');
       if (!playing) label.textContent = 'Nothing playing';
       else {
         const info = node('div');
-        info.append(node('strong', state.title || playing.title), node('small', [playing.artist, playing.title].filter(Boolean).join(' · ')));
+        info.append(node('strong', title), node('small', [artist, albumTitle].filter(Boolean).join(' · ')));
         if (state.message) info.append(node('small', state.message));
-        label.replaceChildren(cover({...playing, artwork:currentCover || playing.artwork}), info);
+        const indicator = node('span', '⌃', 'playing-indicator');
+        indicator.setAttribute('aria-hidden', 'true');
+        label.replaceChildren(cover({...playing, artwork:currentCover || playing.artwork}), info, indicator);
         if ('mediaSession' in navigator && typeof MediaMetadata !== 'undefined') {
           navigator.mediaSession.metadata = new MediaMetadata({
-            title: state.title || playing.title, artist: playing.artist || '', album: playing.title,
+            title, artist: artist || '', album: albumTitle,
             artwork: artworkPattern.test(currentCover) ? [{src: new URL(currentCover, location.href).href}] : []
           });
         }
       }
     }
-    get('show-now-playing').disabled = !playing;
+    get('playing').disabled = !playing;
+    if (get('lyrics-sheet').open) updateLyrics(track);
+    if (get('signal-path-sheet').open) renderSignalPath(track);
     if (get('now-playing').open) {
       if (playing) renderNowPlaying(state);
-      else get('now-playing').close();
+      else { closePlaybackSheets(); get('now-playing').close(); }
     }
     if (selectedTheme === 'plexify') renderDeck(state);
     window.clickWheel.update(playing, state, cover);
@@ -428,6 +494,7 @@
       nowCover = path;
       get('now-art').replaceChildren(cover({...playing, artwork:path}));
     }
+    get('signal-path-button').textContent = signalBadge(track.format);
     get('now-title').textContent = track.title || state.title || playing.title;
     get('now-artist').textContent = track.artist || playing.artist || '';
     get('now-album').textContent = track.album || (playing.kind === 'album' ? playing.title : '');
@@ -516,7 +583,102 @@
       get('now-queue-heading').focus({preventScroll:true});
     }
   }
-  get('show-now-playing').onclick = () => {
+  const lyricsSheet = get('lyrics-sheet');
+  const signalSheet = get('signal-path-sheet');
+  let lyricsRequest = 0;
+  let lyricsFor = null;
+  let lyricCues = [];
+  let activeCue = -1;
+
+  function closePlaybackSheets() {
+    if (lyricsSheet.open) lyricsSheet.close();
+    if (signalSheet.open) signalSheet.close();
+  }
+  function parseLyrics(text) {
+    const offset = Number(text.match(/^\[offset:\s*([+-]?\d+)\]/im)?.[1] || 0) / 1000;
+    const timed = [];
+    const plain = [];
+    for (const line of text.replace(/^\uFEFF/, '').split(/\r?\n/)) {
+      const stamps = Array.from(line.matchAll(/\[(\d{1,4}):(\d{2})(?:[.:](\d{1,3}))?\]/g));
+      if (stamps.length) {
+        const last = stamps[stamps.length - 1];
+        const text = line.slice(last.index + last[0].length).trim();
+        for (const stamp of stamps) {
+          const seconds = Number(stamp[1]) * 60 + Number(stamp[2]) + Number('0.' + (stamp[3] || '0'));
+          timed.push({time:Math.max(0, seconds + offset), text});
+        }
+      } else if (line.trim() && !/^\[[a-z]+:.*\]$/i.test(line.trim())) {
+        plain.push({text:line.trim()});
+      }
+    }
+    return timed.length ? timed.sort((a,b) => a.time - b.time) : plain;
+  }
+  function updateLyrics(track) {
+    if (track !== lyricsFor) {
+      lyricsFor = track;
+      lyricCues = [];
+      activeCue = -1;
+      get('lyrics-lines').replaceChildren();
+      get('lyrics-track').textContent = [track?.title, track?.artist].filter(Boolean).join(' · ');
+      const handle = /^https:\/\/media\.musicroom\.invalid\/([a-f0-9]{32})$/.exec(track?.url)?.[1];
+      const id = ++lyricsRequest;
+      get('lyrics-status').textContent = handle ? 'Loading lyrics…' : 'No Plex lyrics for this track.';
+      if (handle) host({action:'lyrics', id, handle});
+    }
+    let low = 0, high = lyricCues.length;
+    while (low < high) {
+      const middle = (low + high) >>> 1;
+      if (lyricCues[middle].time <= (playbackState.elapsed || 0)) low = middle + 1;
+      else high = middle;
+    }
+    const index = low - 1;
+    if (index !== activeCue) {
+      const rows = get('lyrics-lines').children;
+      rows[activeCue]?.removeAttribute('aria-current');
+      activeCue = index;
+      const row = rows[index];
+      if (row) {
+        row.setAttribute('aria-current', 'true');
+        row.scrollIntoView({block:'center', behavior:matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth'});
+      }
+    }
+  }
+  window.musicLyrics = reply => {
+    if (reply.id !== lyricsRequest || !lyricsSheet.open) return;
+    lyricCues = parseLyrics(reply.text || '');
+    get('lyrics-status').textContent = reply.error ? 'Couldn’t load lyrics.' : lyricCues.length ? '' : 'No Plex lyrics for this track.';
+    get('lyrics-lines').replaceChildren(...lyricCues.map(cue => cue.time === undefined ? node('p', cue.text) :
+      button(cue.text || '♪', () => player.action({action:'seek', seconds:cue.time}))));
+    updateLyrics(lyricsFor);
+  };
+  function signalBadge(format) {
+    const codec = format?.codec?.toLowerCase();
+    if (!codec) return 'Signal Path';
+    if (!['alac', 'flac', 'wav', 'aiff', 'wavpack', 'ape'].includes(codec) && !codec.startsWith('pcm')) return codec.toUpperCase();
+    return format.sampleRate > 48000 && format.bitDepth > 16 ? 'Hi-Res' : 'Lossless';
+  }
+  function renderSignalPath(track) {
+    const {codec, container, sampleRate, bitDepth, bitrate, channels} = track?.format || {};
+    const fields = [codec?.toUpperCase(), container && container.toLowerCase() !== codec?.toLowerCase() ? container.toUpperCase() : '',
+      sampleRate > 0 ? sampleRate / 1000 + ' kHz' : '', bitDepth > 0 ? bitDepth + '-bit' : '',
+      bitrate > 0 ? bitrate + ' kbps' : '', channels > 0 ? channels + (channels === 1 ? ' channel' : ' channels') : ''];
+    get('signal-path-source').textContent = fields.filter(Boolean).join(' · ') || 'Format details unavailable';
+    const rate = player.sampleRate;
+    get('signal-path-processing').textContent = rate ? 'Web Audio at ' + rate / 1000 + ' kHz' : 'WebView2 media playback';
+  }
+  get('lyrics-button').onclick = () => {
+    lyricsFor = null;
+    lyricsSheet.showModal();
+    updateLyrics(nowQueue[playbackState.trackIndex] || {});
+  };
+  get('close-lyrics').onclick = () => lyricsSheet.close();
+  get('signal-path-button').onclick = () => {
+    renderSignalPath(nowQueue[playbackState.trackIndex]);
+    signalSheet.showModal();
+  };
+  get('close-signal-path').onclick = () => signalSheet.close();
+
+  get('playing').onclick = () => {
     if (!playing || nowPlaying.open) return;
     renderNowPlaying(playbackState);
     showNowQueue(false);
@@ -573,6 +735,7 @@
     renderFeature();
     if (theme === 'plexify') renderDeck(playbackState);
     try { localStorage.setItem('musicroom-theme', theme); } catch {}
+    renderHeaderWordmark();
   }
   function chooseMiniPlayer(value) {
     const select = get('mini-player-style');
@@ -591,15 +754,19 @@
     document.documentElement.dataset.plexifyDeck = visible ? 'open' : 'closed';
   }
   function renderHeaderWordmark() {
-    const region = wordmarkRegions.get(get('header-wordmark').value);
+    const choice = get('header-wordmark');
+    const region = wordmarkRegions.get(choice.value);
+    const accent = choice.value === 'plex' || choice.value === 'plex2022';
     const showMusic = Boolean(region && wordmarkSheet.naturalWidth);
     for (const brand of document.querySelectorAll('.header-brand')) {
       const canvas = brand.querySelector('.music-wordmark');
       if (showMusic) {
         const [x, y, width, height] = region;
+        canvas.dataset.color = accent ? 'original' : 'template';
+        if (canvas.hasAttribute('role')) canvas.setAttribute('aria-label', choice.selectedOptions[0].textContent);
         canvas.width = width;
         canvas.height = height;
-        canvas.getContext('2d').drawImage(wordmarkSheet, x, y, width, height, 0, 0, width, height);
+        canvas.getContext('2d').drawImage(wordmarkSheet, x, accent && selectedTheme !== 'classic' ? 1745 : y, width, height, 0, 0, width, height);
       }
       canvas.hidden = !showMusic;
       brand.querySelector('img.wordmark').hidden = showMusic;
@@ -678,7 +845,7 @@
   get('disconnect').onclick = () => host({action:'disconnect'});
   get('cancel').onclick = () => host({action:'cancel'});
   get('server').onchange = event => { if (event.target.value) host({action:'selectServer', server:event.target.value}); };
-  get('library').onchange = event => { if (event.target.value) host({action:'selectLibrary', library:event.target.value}); };
+  get('quick-library').onchange = get('library').onchange = event => { if (event.target.value) host({action:'selectLibrary', library:event.target.value}); };
   const iconChoices = Array.from(get('icon-choices').querySelectorAll('button'));
   function chooseIcon(value) {
     const choice = iconChoices.find(option => option.value === value) || iconChoices[0];
@@ -740,7 +907,8 @@
     clearTimeout(timer);
     kind = section;
     group = null;
-    if (library) browse();
+    if (launchPreview) renderLaunchPreview();
+    else if (library) browse();
     else render();
   }
   function setVisibleSections(sections) {

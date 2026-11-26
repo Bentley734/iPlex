@@ -138,11 +138,13 @@ namespace MusicRoom
                 message += " Windows could not save this sign-in. It will last until iPlex closes.";
             Server server;
             servers.TryGetValue(selectedServer, out server);
+            var preview = status == "connected" && (phase == "loading" || loadingSections || phase == "error")
+                && selectedSection.Length == 0 ? ReadLaunchLibrary() : null;
             Send("macPlexState", new {
                 status, message, loadingLibraries = loadingSections, libraryMessage = "",
                 refreshAvailable = status == "connected" && phase != "loading" && !loadingSections && selectedSection.Length == 0,
                 serverId = selectedServer, serverName = server != null ? server.Name : "",
-                libraryId = selectedSection,
+                libraryId = selectedSection, pins = PinSnapshot(), preview,
                 servers =
                     servers.Values.OrderBy(s => s.Name)
                         .Select(s => new { id = s.Id, name = s.Name, selected = s.Id == selectedServer })
@@ -365,6 +367,12 @@ namespace MusicRoom
             var previous = Pref("library." + server.Id);
             selectedSection = list.Any(s => s.id == previous) ? previous :
                 list.Count == 1 ? list[0].id : "";
+            if (selectedSection.Length > 0)
+            {
+                plexPrefs["library." + selectedServer] = selectedSection;
+                plexPrefs["server"] = selectedServer;
+                SavePrefs();
+            }
             loadingSections = false;
             plexMessage = list.Count == 0         ? "No music libraries found on this server."
                           : selectedSection == "" ? "Choose a music library."
@@ -397,7 +405,7 @@ namespace MusicRoom
         static readonly Regex ArtPath = new Regex(@"^(?:/library/metadata/[0-9]+/thumb|/playlists/[0-9]+/composite)(?:/[0-9]+)?\z");
         sealed class LibraryItem
         {
-            internal string Kind, Title;
+            internal string Kind, Title, Artist, Thumb;
         }
         readonly Dictionary<string, LibraryItem> items = new Dictionary<string, LibraryItem>();
         readonly Dictionary<string, string> art = new Dictionary<string, string>();
@@ -473,6 +481,8 @@ namespace MusicRoom
                 Metadata(payload, expected == "playlist" ? null : section)).ToArray();
             long total = Num(container, "totalSize");
             var results = new List<object>();
+            var snapshot = new List<Dictionary<string, object>>();
+            bool saveSnapshot = start == 0 && query.Length == 0 && group.Length == 0;
             var seen = new HashSet<string>();
             int matches = 0;
             if (localPaging) rows = rows.OrderBy(row => Str(row, "title"), StringComparer.CurrentCultureIgnoreCase).ToArray();
@@ -497,15 +507,126 @@ namespace MusicRoom
                     if (position < start || results.Count >= size) continue;
                 }
                 if (kind == "genre") key = "genre:" + key;
-                items[key] = new LibraryItem { Kind = kind, Title = title };
-                string artwork = RegisterArtwork(ArtworkPath(row, "thumb", "parentThumb", "composite"));
-                results.Add(new { id = key, title, kind, artwork, artist = Str(row, kind == "track" ? "grandparentTitle" : "parentTitle"), year = Num(row, "year"),
-                    genre = Rows(Get(row, "Genre")).Select(genre => Str(genre, "tag")).FirstOrDefault() ?? "" });
+                string thumb = ArtworkPath(row, "thumb", "parentThumb", "composite");
+                items[key] = new LibraryItem { Kind = kind, Title = title, Thumb = thumb, Artist = Str(row, "parentTitle") };
+                string artwork = RegisterArtwork(thumb);
+                var item = new Dictionary<string, object> {
+                    { "id", key }, { "title", title }, { "kind", kind },
+                    { "artist", Str(row, kind == "track" ? "grandparentTitle" : "parentTitle") },
+                    { "year", Num(row, "year") },
+                    { "genre", Rows(Get(row, "Genre")).Select(genre => Str(genre, "tag")).FirstOrDefault() ?? "" }
+                };
+                if (saveSnapshot) snapshot.Add(new Dictionary<string, object>(item) { { "thumb", thumb } });
+                item["artwork"] = artwork;
+                results.Add(item);
             }
             long next = start + (localPaging ? results.Count : rows.Length);
             bool more = results.Count > 0 && next <= 1000000 &&
                 (localPaging ? next < matches : total > 0 ? next < total : rows.Length >= size);
+            if (saveSnapshot) SaveLaunchLibrary(expected + "s", snapshot);
             Send("musicEntries", new { id, entries = results, next, more });
+        }
+
+        Dictionary<string, object> SavedLaunchLibrary()
+        {
+            var saved = Pref("lastMusicLibrary");
+            if (saved.Length == 0) return new Dictionary<string, object>();
+            try { return Map(Json().DeserializeObject(saved)); }
+            catch (ArgumentException) { return new Dictionary<string, object>(); }
+            catch (InvalidOperationException) { return new Dictionary<string, object>(); }
+        }
+
+        void SaveLaunchLibrary(string category, List<Dictionary<string, object>> rows)
+        {
+            var saved = SavedLaunchLibrary();
+            var listings = Str(saved, "server") == selectedServer && Str(saved, "library") == selectedSection
+                ? Map(Get(saved, "listings")) : new Dictionary<string, object>();
+            listings[category] = rows;
+            var section = sections.FirstOrDefault(item => item.id == selectedSection);
+            plexPrefs["lastMusicLibrary"] = Json().Serialize(new {
+                server = selectedServer, library = selectedSection,
+                name = section != null ? section.name : "",
+                listings
+            });
+            try { SavePrefs(); }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+
+        bool SnapshotContainsArtwork(string path)
+        {
+            var saved = SavedLaunchLibrary();
+            if (Str(saved, "server") != selectedServer || Str(saved, "library") != selectedSection) return false;
+            return Map(Get(saved, "listings")).Values.Any(list => Rows(list).Any(row => Str(row, "thumb") == path));
+        }
+
+        object ReadLaunchLibrary()
+        {
+            var saved = SavedLaunchLibrary();
+            string server = Pref("server"), library = Pref("library." + server);
+            if (server.Length == 0 || library.Length == 0) return null;
+            if (Str(saved, "server") != server || Str(saved, "library") != library) saved.Clear();
+            var listings = new Dictionary<string, object>();
+            foreach (var section in Map(Get(saved, "listings")))
+            {
+                listings[section.Key] = Rows(section.Value).Take(120).Select(row => {
+                    var entry = new Dictionary<string, object>(row);
+                    entry.Remove("thumb");
+                    entry["artwork"] = RegisterArtwork(ArtworkPath(row, "thumb"));
+                    return entry;
+                }).ToArray();
+            }
+            return new { server, library, name = Str(saved, "name"), listings, waiting = phase != "error" };
+        }
+
+        string PinKey { get { return "pins:" + selectedServer + ":" + selectedSection; } }
+
+        List<Dictionary<string, object>> SavedPins()
+        {
+            if (selectedServer.Length == 0 || selectedSection.Length == 0) return new List<Dictionary<string, object>>();
+            var saved = Pref(PinKey);
+            if (String.IsNullOrEmpty(saved)) return new List<Dictionary<string, object>>();
+            try { return Rows(Json().DeserializeObject(saved)).Take(200).ToList(); }
+            catch (ArgumentException) { return new List<Dictionary<string, object>>(); }
+            catch (InvalidOperationException) { return new List<Dictionary<string, object>>(); }
+        }
+
+        static bool Pinnable(string kind)
+        {
+            return kind == "album" || kind == "artist" || kind == "playlist";
+        }
+
+        object[] PinSnapshot()
+        {
+            var result = new List<object>();
+            foreach (var pin in SavedPins())
+            {
+                var id = Str(pin, "id");
+                var kind = Str(pin, "kind");
+                var title = Str(pin, "title");
+                var artist = Str(pin, "artist");
+                var thumb = Str(pin, "thumb");
+                if (!ItemID.IsMatch(id) || !Pinnable(kind) || title.Length == 0 || title.Length > 300) continue;
+                if (!ArtPath.IsMatch(thumb)) thumb = null;
+                if (!items.ContainsKey(id))
+                    items[id] = new LibraryItem { Kind = kind, Title = title, Artist = artist, Thumb = thumb };
+                result.Add(new { id, kind, title, artist, artwork = RegisterArtwork(thumb) });
+            }
+            return result.ToArray();
+        }
+
+        void TogglePin(string id)
+        {
+            LibraryItem item;
+            if (selectedSection.Length == 0 || !items.TryGetValue(id, out item) || !Pinnable(item.Kind)) return;
+            var pins = SavedPins();
+            if (pins.RemoveAll(pin => Str(pin, "id") == id) == 0 && pins.Count < 200)
+                pins.Add(new Dictionary<string, object> {
+                    { "id", id }, { "kind", item.Kind }, { "title", item.Title }, { "artist", item.Artist }, { "thumb", item.Thumb }
+                });
+            plexPrefs[PinKey] = Json().Serialize(pins);
+            SavePrefs();
+            Send("musicPins", new { pins = PinSnapshot() });
         }
 
         static string ArtworkPath(Dictionary<string, object> row, params string[] fields)
@@ -532,19 +653,32 @@ namespace MusicRoom
             Server server;
             string relative;
             if ((method != "GET" && method != "HEAD") || !Regex.IsMatch(handle, @"^[a-f0-9]{32}\z") ||
-                !servers.TryGetValue(selectedServer, out server) || !art.TryGetValue(handle, out relative))
+                !art.TryGetValue(handle, out relative))
                 return Response(404, "Not Found");
-            var target = CoverCachePath(server.Id, selectedSection, relative);
+            var ready = servers.TryGetValue(selectedServer, out server) && selectedSection.Length > 0;
+            string serverID = ready ? selectedServer : Pref("server");
+            string library = ready ? selectedSection : Pref("library." + serverID);
+            if (serverID.Length == 0 || library.Length == 0) return Response(404, "Not Found");
+            var target = CoverCachePath(serverID, library, relative);
             await artSlots.WaitAsync(shutdown.Token);
             try
             {
                 // Retain the server that issued the art ticket for the whole request.
-                var bytes = File.Exists(target) ? File.ReadAllBytes(target) :
-                    await FetchArtwork(server, relative, shutdown.Token);
+                bool cached = File.Exists(target);
+                if (!cached && !ready) return Response(404, "Not Found");
+                var bytes = cached ? File.ReadAllBytes(target) : await FetchArtwork(server, relative, shutdown.Token);
                 string mime = bytes.Length >= 8 && bytes[0] == 137 && bytes[1] == 80 && bytes[2] == 78 && bytes[3] == 71
                     ? "image/png" : bytes.Length > 2 && bytes[0] == 255 && bytes[1] == 216 && bytes[2] == 255
                     ? "image/jpeg" : bytes.Length >= 12 && Encoding.ASCII.GetString(bytes, 0, 4) == "RIFF" &&
                         Encoding.ASCII.GetString(bytes, 8, 4) == "WEBP" ? "image/webp" : null;
+                if (!cached && mime != null && SnapshotContainsArtwork(relative))
+                {
+                    try { SaveCover(bytes, target); }
+                    catch (IOException) { }
+                    catch (UnauthorizedAccessException) { }
+                    catch (ArgumentException) { }
+                    catch (System.Runtime.InteropServices.ExternalException) { }
+                }
                 return mime == null ? Response(415, "Unsupported image") :
                     Response(200, "OK", "Content-Type: " + mime + "\r\n", method == "HEAD" ? null : new MemoryStream(bytes, false));
             }
@@ -620,17 +754,27 @@ namespace MusicRoom
                         if (Str(row, "type") != "track" || !ItemID.IsMatch(trackKey) ||
                             (album && row.ContainsKey("parentRatingKey") && Str(row, "parentRatingKey") != key) ||
                             (!album && !playlist && trackKey != key) || (!playlist && !seen.Add(trackKey))) continue;
-                        var parts = Rows(Get(row, "Media")).Take(16).SelectMany(media => Rows(Get(media, "Part")).Take(16));
-                        foreach (var part in parts)
+                        var parts = Rows(Get(row, "Media")).Take(16).SelectMany(media =>
+                            Rows(Get(media, "Part")).Take(16).Select(part => new { media, part }));
+                        foreach (var option in parts)
                         {
+                            var part = option.part;
+                            var media = option.media;
                             string partPath = Str(part, "key"), mime;
                             if (!PartPath(partPath) || !Mime.TryGetValue(Path.GetExtension(partPath), out mime)) continue;
                             long duration = Num(row, "duration");
+                            var audio = Rows(Get(part, "Stream")).FirstOrDefault(stream => Num(stream, "streamType") == 2)
+                                ?? new Dictionary<string, object>();
                             found.Add(new MediaTrack { number = found.Count + 1, title = Str(row, "title"),
                                 durationSeconds = duration > 0 ? (double?)duration / 1000 : null,
                                 artwork = ArtworkPath(row, "parentThumb", "thumb"),
                                 artist = Str(row, "grandparentTitle"), album = Str(row, "parentTitle"),
                                 ratingCount = Math.Max(0, Num(row, "ratingCount")),
+                                plexID = trackKey, codec = Str(audio, "codec") == "" ? Str(media, "audioCodec") : Str(audio, "codec"),
+                                container = Str(media, "container"),
+                                sampleRate = Math.Max(Num(audio, "samplingRate"), Num(audio, "sampleRate")),
+                                bitDepth = Num(audio, "bitDepth"), bitrate = Math.Max(Num(audio, "bitrate"), Num(media, "bitrate")),
+                                channels = Math.Max(Num(audio, "channels"), Num(media, "audioChannels")),
                                 remote = new Uri(url, partPath), token = server.Token, mime = mime,
                                 directMp4 = Str(part, "audioCodec") == "aac" || Str(row, "audioCodec") == "aac" });
                             break;
@@ -668,10 +812,53 @@ namespace MusicRoom
                     string handle = Guid.NewGuid().ToString("N");
                     handles.Add(handle, track.CopyForQueue());
                     entries.Add(new { track.title, track.durationSeconds, track.artist, track.album, collection,
+                        format = new { track.codec, track.container, track.sampleRate, track.bitDepth, track.bitrate, track.channels },
                         artwork = RegisterArtwork(track.artwork), url = "https://media.musicroom.invalid/" + handle });
                 }
             }
             return entries;
+        }
+
+        async Task LoadLyrics(string handle, long id)
+        {
+            MediaTrack track;
+            lock (handles) handles.TryGetValue(handle, out track);
+            Server server;
+            if (track == null || !ItemID.IsMatch(track.plexID ?? "") || !servers.TryGetValue(selectedServer, out server))
+            {
+                Send("musicLyrics", new { id, text = "" });
+                return;
+            }
+            int generation = musicGeneration;
+            try
+            {
+                var token = shutdown.Token;
+                var text = await WithServer(server, async baseUrl =>
+                {
+                    var data = await FetchPlex(HttpMethod.Get, new Uri(baseUrl,
+                        "/library/metadata/" + track.plexID + "?includeExternalMedia=1"), server.Token, token, 4 * 1024 * 1024);
+                    var stream = Metadata(data, null).Where(row => Str(row, "ratingKey") == track.plexID && Str(row, "type") == "track")
+                        .SelectMany(row => Rows(Get(row, "Media")).Take(16))
+                        .SelectMany(media => Rows(Get(media, "Part")).Take(16))
+                        .SelectMany(part => Rows(Get(part, "Stream")).Take(64))
+                        .Where(row => Num(row, "streamType") == 4 &&
+                               Regex.IsMatch(Str(row, "key"), @"^/library/streams/[0-9]+(?:/[0-9]+)?\z"))
+                        .OrderByDescending(row => Str(row, "codec") == "lrc")
+                        .FirstOrDefault();
+                    if (stream == null) return "";
+                    using (var request = PlexRequest(HttpMethod.Get, new Uri(baseUrl, Str(stream, "key")), server.Token))
+                    {
+                        request.Headers.Remove("Accept");
+                        request.Headers.Add("Accept", "text/plain, */*");
+                        return await TextAsync(request, 256 * 1024, token, 10);
+                    }
+                }, token);
+                if (generation == musicGeneration) Send("musicLyrics", new { id, text });
+            }
+            catch (Exception)
+            {
+                if (generation == musicGeneration) Send("musicLyrics", new { id, text = "", error = true });
+            }
         }
 
         public async Task Handle(Dictionary<string, object> body)
@@ -707,6 +894,13 @@ namespace MusicRoom
             bool first = !initialized;
             InitPlex();
             if (action == "status" && !(first && account.Length > 0)) { PlexState(); return; }
+            if (action == "togglePin")
+            {
+                try { TogglePin(Str(body, "item")); }
+                catch (IOException) { Send("musicError", new { id, message = "Couldn’t save library pins." }); }
+                return;
+            }
+            if (action == "lyrics") { await LoadLyrics(Str(body, "handle"), id); return; }
             if (action == "enqueue")
             {
                 try { await Album(body, id, shutdown.Token, true); }
@@ -756,6 +950,8 @@ namespace MusicRoom
                     if (File.Exists(TokenFile)) File.Delete(TokenFile);
                     account = selectedServer = selectedSection = plexMessage = phase = "";
                     sessionOnly = false;
+                    plexPrefs.Remove("lastMusicLibrary");
+                    SavePrefs();
                     servers.Clear();
                     sections.Clear();
                     PlexState();

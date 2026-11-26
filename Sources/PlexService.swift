@@ -51,7 +51,7 @@ enum PlexAuthorizationPoll: Equatable {
     case connected
 }
 
-struct PlexServer: Equatable {
+struct PlexServer: Equatable, Codable {
     let id: String
     let name: String
     let owned: Bool
@@ -67,7 +67,7 @@ struct PlexServer: Equatable {
     }
 }
 
-struct PlexLibrary: Equatable {
+struct PlexLibrary: Equatable, Codable {
     let id: String
     let name: String
 
@@ -504,7 +504,7 @@ enum PlexParser {
             // Preserve the original, already authenticated URL. UI callbacks use LiveTrack.summary, which omits it.
             return LiveTrack(number: track.number, title: title, duration: track.duration, url: track.url,
                              artworkPath: track.artworkPath, artist: track.artist, album: track.album,
-                             ratingCount: track.ratingCount, id: track.id)
+                             ratingCount: track.ratingCount, id: track.id, plexID: track.plexID, format: track.format)
         }
     }
 
@@ -1031,6 +1031,13 @@ final class PlexService {
 
     deinit { cancelCurrentRequest(notify: false) }
 
+    var rememberedMusicSelection: (server: String, library: String)? {
+        guard status.connected,
+              let server = UserDefaults.standard.string(forKey: Self.preferredServerKey),
+              let library = UserDefaults.standard.string(forKey: "PlexMusicLibrary." + server) else { return nil }
+        return (server, library)
+    }
+
     var status: PlexStatus {
         lock.lock(); defer { lock.unlock() }
         return statusLocked()
@@ -1202,8 +1209,12 @@ final class PlexService {
                 self.lock.lock()
                 self.workingConnection = base
                 self.libraries = available
-                self.selectedLibraryID = PlexLibrary.restoredID(in: available, preferred: preference)
+                let selected = PlexLibrary.restoredID(in: available, preferred: preference)
+                self.selectedLibraryID = selected
                 self.lock.unlock()
+                if preference == nil, let selected {
+                    UserDefaults.standard.set(selected, forKey: "PlexMusicLibrary." + record.server.id)
+                }
                 self.setPhase("connected", message: available.isEmpty ? "No music libraries are available on this server." : "Music libraries are ready.")
                 completion(.success(available))
             case .failure(let error):
@@ -1443,7 +1454,7 @@ final class PlexService {
     }
 }
 
-enum MusicKind: String, CaseIterable {
+enum MusicKind: String, CaseIterable, Codable {
     case albums = "Albums"
     case artists = "Artists"
 
@@ -1480,6 +1491,8 @@ enum MusicKind: String, CaseIterable {
         }
     }
 
+    var canPin: Bool { self == .albums || self == .artists || self == .playlists }
+
     var isGroup: Bool { self == .artists || self == .genres }
 
     var playLabel: String {
@@ -1491,7 +1504,7 @@ enum MusicKind: String, CaseIterable {
     }
 }
 
-struct MusicEntry: Identifiable, Hashable {
+struct MusicEntry: Identifiable, Hashable, Codable {
     let id: String
     let title: String
     let artist: String
@@ -1540,6 +1553,21 @@ extension PlexParser {
         return value
     }
 
+    static func musicLyricsPath(_ data: Data, id: String) throws -> String? {
+        let rows = try metadataRows(data, sectionID: nil)
+        let matches = rows.filter { $0["type"] as? String == "track" && numericIdentifier($0["ratingKey"]) == id }
+        let streams = matches.flatMap { ($0["Media"] as? [[String: Any]] ?? []).prefix(16) }
+            .flatMap { ($0["Part"] as? [[String: Any]] ?? []).prefix(16) }
+            .flatMap { ($0["Stream"] as? [[String: Any]] ?? []).prefix(64) }
+            .filter { integer($0["streamType"]) == 4 }
+        let paths = streams.compactMap { stream -> (Bool, String)? in
+            guard let path = stream["key"] as? String,
+                  path.range(of: #"^/library/streams/[0-9]+(?:/[0-9]+)?$"#, options: .regularExpression) != nil else { return nil }
+            return (["lrc", "lyrics"].contains((stream["codec"] as? String ?? "").lowercased()), path)
+        }
+        return paths.first(where: { $0.0 })?.1 ?? paths.first?.1
+    }
+
     static let musicPlaylistLimit = 10_000
 
     static func musicTrackPage(_ data: Data, entry: MusicEntry, section: String, base: URL, token: String, offset: Int = 0)
@@ -1558,18 +1586,26 @@ extension PlexParser {
                   entry.kind == .playlists || seen.insert(id).inserted,
                   let title = string(row["title"], maximum: 300),
                   let media = row["Media"] as? [[String: Any]], media.count <= 16 else { continue }
-            let options = media.flatMap { Array(($0["Part"] as? [[String: Any]] ?? []).prefix(16)) }
-            let url = options.lazy.compactMap { part -> URL? in
+            let options = media.flatMap { media in
+                (media["Part"] as? [[String: Any]] ?? []).prefix(16).map { (media, $0) }
+            }
+            let playable = options.lazy.compactMap { media, part -> (URL, MusicTrackFormat)? in
                 guard let path = part["key"] as? String,
-                      supportedFormats.contains(URL(fileURLWithPath: path).pathExtension.lowercased()) else { return nil }
-                return try? playbackURL(base: base, partPath: path, token: token)
+                      supportedFormats.contains(URL(fileURLWithPath: path).pathExtension.lowercased()),
+                      let url = try? playbackURL(base: base, partPath: path, token: token) else { return nil }
+                let audio = (part["Stream"] as? [[String: Any]])?.first { integer($0["streamType"]) == 2 } ?? [:]
+                let format = MusicTrackFormat(codec: string(audio["codec"] ?? media["audioCodec"], maximum: 24),
+                    container: string(media["container"], maximum: 24), sampleRate: integer(audio["samplingRate"] ?? audio["sampleRate"]),
+                    bitDepth: integer(audio["bitDepth"]), bitrate: integer(audio["bitrate"] ?? media["bitrate"]),
+                    channels: integer(audio["channels"] ?? media["audioChannels"]))
+                return (url, format)
             }.first
-            guard let url else { continue }
+            guard let (url, format) = playable else { continue }
             let artwork = musicArtworkPath(row["parentThumb"] as? String) ?? musicArtworkPath(row["thumb"] as? String)
             let track = LiveTrack(number: 0, title: title, duration: milliseconds(row["duration"]), url: url,
                                   artworkPath: artwork, artist: string(row["grandparentTitle"], maximum: 300),
                                   album: string(row["parentTitle"], maximum: 300),
-                                  ratingCount: max(0, integer(row["ratingCount"]) ?? 0))
+                                  ratingCount: max(0, integer(row["ratingCount"]) ?? 0), plexID: id, format: format)
             tracks.append((integer(row["parentIndex"]) ?? 1, integer(row["index"]) ?? (position + 1), track))
         }
         if entry.kind == .albums {
@@ -1581,7 +1617,7 @@ extension PlexParser {
             let track = row.track
             return LiveTrack(number: offset + index + 1, title: track.title, duration: track.duration, url: track.url,
                              artworkPath: track.artworkPath, artist: track.artist, album: track.album,
-                             ratingCount: track.ratingCount, id: track.id)
+                             ratingCount: track.ratingCount, id: track.id, plexID: track.plexID, format: track.format)
         }, rows.count, integer(container["totalSize"]))
     }
 }
@@ -1662,20 +1698,48 @@ extension PlexService {
         }
     }
 
-    func musicArtwork(path: String, completion: @escaping (Data?) -> Void) -> (() -> Void)? {
-        guard let path = PlexParser.musicArtworkPath(path), let record = try? selectedServerAccess() else {
-            completion(nil)
-            return nil
+    func musicLyrics(trackID: String, completion: @escaping (Result<String?, Error>) -> Void) {
+        guard !trackID.isEmpty, trackID.count <= 20, trackID.allSatisfy({ $0.isASCII && $0.isNumber }),
+              let record = try? selectedServerAccess() else { completion(.success(nil)); return }
+        Self.artworkQueue.addOperation {
+            let result = Result<String?, Error> {
+                try self.withConnection(record: record) { base in
+                    let operation = PlexRequestOperation()
+                    let endpoint = try self.serverRequest(base: base, path: "/library/metadata/\(trackID)",
+                        query: [.init(name: "includeExternalMedia", value: "1")], token: record.token)
+                    let data = try operation.fetch(endpoint, limit: 4 * 1024 * 1024)
+                    guard let path = try PlexParser.musicLyricsPath(data, id: trackID) else { return nil }
+                    var request = try self.serverRequest(base: base, path: path, query: [], token: record.token)
+                    request.setValue("text/plain, */*", forHTTPHeaderField: "Accept")
+                    let lyrics = try operation.fetch(request, limit: 256 * 1024)
+                    return String(data: lyrics, encoding: .utf8) ?? String(data: lyrics, encoding: .utf16)
+                }
+            }
+            DispatchQueue.main.async { completion(result) }
         }
-        let operation = PlexRequestOperation()
+    }
+
+    func musicArtwork(path: String, server: String, library: String, cache: Bool,
+                      completion: @escaping (Data?) -> Void) -> (() -> Void)? {
+        guard let path = PlexParser.musicArtworkPath(path) else { completion(nil); return nil }
         let selection = status
+        let record = selection.selectedServerID == server && selection.selectedLibraryID == library
+            ? try? selectedServerAccess() : nil
+        let operation = PlexRequestOperation()
         Self.artworkQueue.addOperation { [weak self] in
             guard let self else { return }
-            let cached = AlbumCoverCache.location(server: selection.selectedServerID ?? "",
-                                                  library: selection.selectedLibraryID ?? "", path: path)
-            let data = (try? Data(contentsOf: cached)) ?? (try? self.withConnection(record: record) { base in
-                try self.fetchMusicArtwork(path, base: base, token: record.token, operation: operation)
-            })
+            let cached = AlbumCoverCache.location(server: server, library: library, path: path)
+            let data: Data?
+            if let saved = try? Data(contentsOf: cached) {
+                data = saved
+            } else if let record {
+                data = try? self.withConnection(record: record) { base in
+                    try self.fetchMusicArtwork(path, base: base, token: record.token, operation: operation)
+                }
+                if cache, let data { try? AlbumCoverCache.save(data, to: cached) }
+            } else {
+                data = nil
+            }
             DispatchQueue.main.async { completion(data) }
         }
         return { operation.cancel() }

@@ -81,6 +81,7 @@ private struct MusicLibraryScreen: View {
                 Spacer()
                 Button { showAppIcons = true } label: { Image(systemName: "app.dashed") }
                     .accessibilityLabel("App Icon")
+                PlexLibrarySwitcher(library: library)
                 Button { showSettings = true } label: { Image(systemName: "gearshape") }
                     .accessibilityLabel("Settings")
 
@@ -100,13 +101,23 @@ private struct MusicLibraryScreen: View {
                     HStack(spacing: 8) {
                         Button { showPlayer = true } label: {
                             HStack(spacing: 14) {
-                                MusicArtwork(item: album, library: library).frame(width: 43, height: 43)
+                                Group {
+                                    if let image = library.playingArtwork {
+                                        Image(uiImage: image).resizable().scaledToFill()
+                                    } else {
+                                        MusicArtwork(item: album, library: library)
+                                    }
+                                }
+                                .frame(width: 43, height: 43)
+                                .clipShape(.rect(cornerRadius: 7))
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(library.state.title.isEmpty ? album.title : library.state.title).font(.headline)
-                                    Text(album.artist).font(.caption).foregroundStyle(.secondary)
+                                    Text([library.currentTrack?.artist ?? album.artist, library.currentTrack?.album ?? album.title]
+                                        .filter { !$0.isEmpty }.joined(separator: " · "))
+                                        .font(.caption).foregroundStyle(.secondary)
                                 }.lineLimit(1)
                                 Spacer()
-                                Image(systemName: "waveform")
+                                Image(systemName: "chevron.up").accessibilityHidden(true)
                             }.padding(.horizontal, 14).padding(.vertical, 8)
                         }
                         .accessibilityLabel("Open Now Playing")
@@ -160,7 +171,7 @@ private struct MusicLibraryScreen: View {
                     HStack { sectionButtons }
                 }.scrollIndicators(.hidden)
                 #endif
-                TextField("Search " + library.kind.rawValue.lowercased(), text: $library.query)
+                TextField("Search " + library.kind.rawValue.lowercased(), text: $library.query).disabled(library.reconnecting)
                     .textFieldStyle(.plain)
                     .submitLabel(.search)
                     .padding(10)
@@ -173,10 +184,20 @@ private struct MusicLibraryScreen: View {
                     else { library.browse() }
                 } label: { Label("Back", systemImage: "chevron.left") }
             }
-            if let message = library.message { Text(message).foregroundStyle(.secondary) }
+            if let message = library.message {
+                HStack {
+                    Text(message).foregroundStyle(.secondary)
+                    if !library.busy && library.selectedDetail == nil && !library.more {
+                        Button("Retry", action: library.retryLibrary)
+                    }
+                }
+            }
             ScrollView {
                 if let album = library.selectedDetail { albumDetails(album) }
                 else {
+                    if library.selectedGroup == nil && library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                        PinnedMusicShelf(library: library) { search?.cancel(); library.open($0) }
+                    }
                     if theme == .plexify && library.selectedGroup == nil && [.albums, .artists].contains(library.kind)
                         && library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                        let entry = library.entries.first {
@@ -213,6 +234,7 @@ private struct MusicLibraryScreen: View {
                             #endif
                             .contextMenu {
                                 if !entry.kind.isGroup { LibraryQueueActions(library: library, entry: entry) }
+                                PlexPinButton(library: library, entry: entry)
                             }
                         }
                         if library.more && !library.busy && library.message == nil {
@@ -253,6 +275,7 @@ private struct MusicLibraryScreen: View {
                     if !description.isEmpty { Text(description).foregroundStyle(.secondary) }
                     Button(album.kind.playLabel) { library.play(at: 0) }
                         .buttonStyle(.borderedProminent).disabled(library.tracks.isEmpty)
+                    PlexPinButton(library: library, entry: album)
                     Menu("Queue", systemImage: "list.bullet") { LibraryQueueActions(library: library, entry: album) }
                         .disabled(library.tracks.isEmpty)
                 }

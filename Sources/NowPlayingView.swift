@@ -5,6 +5,8 @@ struct NowPlayingView: View {
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @State private var showingQueue = false
+    @State private var showingLyrics = false
+    @State private var showingSignalPath = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let close: () -> Void
 
@@ -44,6 +46,12 @@ struct NowPlayingView: View {
                 .ignoresSafeArea()
         }
         .tint(accent)
+        .sheet(isPresented: $showingLyrics) {
+            NowPlayingLyrics(library: library).preferredColorScheme(theme.scheme).tint(accent)
+        }
+        .sheet(isPresented: $showingSignalPath) {
+            signalPath
+        }
         #if os(tvOS)
         .onExitCommand(perform: close)
         #endif
@@ -166,6 +174,11 @@ struct NowPlayingView: View {
             if let release = currentTrack?.album ?? (album.kind == .albums ? album.title : nil) {
                 Text(release).font(compact ? .caption2 : .subheadline).foregroundStyle(.secondary).lineLimit(compact ? 1 : 2)
             }
+            ViewThatFits(in: .horizontal) {
+                HStack { playbackTools }
+                VStack(alignment: .leading) { playbackTools }
+            }
+            .buttonStyle(.bordered)
             if !library.state.message.isEmpty {
                 Text(library.state.message).font(.callout).foregroundStyle(accent)
             }
@@ -218,6 +231,40 @@ struct NowPlayingView: View {
             .foregroundStyle(.secondary)
             #endif
         }
+    }
+
+    @ViewBuilder private var playbackTools: some View {
+        if let track = currentTrack {
+            Button(track.format.badge, systemImage: "waveform.path") { showingSignalPath = true }
+                .accessibilityHint("Shows audio signal path")
+        }
+        Button("Lyrics", systemImage: "quote.bubble") { showingLyrics = true }
+            .disabled(currentTrack?.plexID == nil)
+    }
+
+    private var signalPath: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack {
+                Text("Signal Path").font(.title.bold())
+                Spacer()
+                Button("Done") { showingSignalPath = false }
+            }
+            LabeledContent("Plex source", value: currentTrack?.format.details.isEmpty == false
+                ? currentTrack?.format.details ?? "" : "Format details unavailable")
+            LabeledContent("Playback", value: "Direct stream · AVFoundation")
+            LabeledContent("Equalizer", value: library.equalizer.isFlat ? "Flat" :
+                library.equalizerAvailable == false ? "Unavailable" :
+                library.equalizerAvailable == true ? "Active" : "Configured")
+            LabeledContent("Output", value: library.player.outputDescription)
+        }
+        .monospacedDigit()
+        .padding(28)
+        #if os(macOS)
+        .frame(minWidth: 470)
+        #endif
+        #if os(tvOS)
+        .onExitCommand { showingSignalPath = false }
+        #endif
     }
 
     private func queue(compact: Bool) -> some View {
@@ -305,6 +352,92 @@ struct NowPlayingView: View {
     }
 }
 
+private struct NowPlayingLyrics: View {
+    @ObservedObject var library: LibraryModel
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var lines: [MusicLyricLine] = []
+    @State private var message = "Loading lyrics…"
+
+    private var active: Int? {
+        lines.last { line in
+            guard let time = line.time else { return false }
+            return time <= library.state.elapsed
+        }?.id
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            HStack {
+                VStack(alignment: .leading) {
+                    Text("Lyrics").font(.title.bold())
+                    if let track = library.currentTrack { Text(track.title).foregroundStyle(.secondary) }
+                }
+                Spacer()
+                Button("Done") { dismiss() }
+            }
+            if lines.isEmpty {
+                Text(message).foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollViewReader { scroll in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 14) {
+                            ForEach(lines) { line in
+                                if let time = line.time {
+                                    Button { library.player.seek(to: time) } label: { lyric(line) }
+                                        #if os(tvOS)
+                                        .buttonStyle(.bordered)
+                                        #else
+                                        .buttonStyle(.plain)
+                                        #endif
+                                        .id(line.id)
+                                } else {
+                                    lyric(line)
+                                }
+                            }
+                        }
+                        .padding(.vertical, 20)
+                    }
+                    .onChange(of: active, initial: true) { _, line in
+                        if let line {
+                            withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.24)) {
+                                scroll.scrollTo(line, anchor: .center)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .padding(26)
+        #if os(macOS)
+        .frame(minWidth: 460, minHeight: 450)
+        #endif
+        #if os(tvOS)
+        .onExitCommand { dismiss() }
+        #endif
+        .task(id: library.currentTrack?.id) {
+            lines = []
+            message = "Loading lyrics…"
+            guard let track = library.currentTrack else { message = "No track selected."; return }
+            do {
+                let lyrics = try await library.lyrics(for: track)
+                guard !Task.isCancelled else { return }
+                lines = lyrics
+                message = "Lyrics are unavailable for this track."
+            } catch {
+                if !Task.isCancelled { message = "Couldn’t load lyrics from Plex." }
+            }
+        }
+    }
+
+    private func lyric(_ line: MusicLyricLine) -> some View {
+        Text(line.text.isEmpty ? "♪" : line.text)
+            .font(.title2.weight(active == line.id ? .bold : .medium))
+            .foregroundStyle(active == nil || active == line.id ? .primary : .secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 struct LibraryQueueActions: View {
     let library: LibraryModel
     let entry: MusicEntry
@@ -326,5 +459,75 @@ struct PopularTrackBadge: View {
             .foregroundStyle(.orange)
             .accessibilityLabel("Popular track")
             .help("Popular track")
+    }
+}
+
+struct PlexPinButton: View {
+    @ObservedObject var library: LibraryModel
+    let entry: MusicEntry
+
+    var body: some View {
+        if entry.kind.canPin {
+            let pinned = library.isPinned(entry)
+            Button(pinned ? "Unpin" : "Pin", systemImage: pinned ? "pin.slash" : "pin") {
+                library.togglePin(entry)
+            }
+        }
+    }
+}
+
+struct PlexLibrarySwitcher: View {
+    @ObservedObject var library: LibraryModel
+
+    var body: some View {
+        if library.libraries.count > 1 {
+            Picker("Music Library", selection: Binding(get: { library.libraryID }, set: library.chooseLibrary)) {
+                if library.libraryID.isEmpty { Text("Choose Library").tag("") }
+                ForEach(library.libraries, id: \.id) { Text($0.name).tag($0.id) }
+            }
+            .labelsHidden()
+            .accessibilityLabel("Switch Music Library")
+            .fixedSize()
+            .disabled(library.reconnecting)
+        }
+    }
+}
+
+struct PinnedMusicShelf: View {
+    @ObservedObject var library: LibraryModel
+    let open: (MusicEntry) -> Void
+
+    var body: some View {
+        if !library.pins.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                Label("Pinned", systemImage: "pin.fill").font(.headline)
+                    .accessibilityAddTraits(.isHeader)
+                ScrollView(.horizontal) {
+                    LazyHStack(spacing: 13) {
+                        ForEach(library.pins) { entry in
+                            Button { open(entry) } label: {
+                                HStack(spacing: 9) {
+                                    Color.primary.opacity(0.08)
+                                        .overlay {
+                                            PlexArtwork(item: entry, library: library) {
+                                                Image(systemName: entry.kind.symbol).foregroundStyle(.secondary)
+                                            }
+                                        }
+                                        .frame(width: 42, height: 42)
+                                        .clipShape(.rect(cornerRadius: 7))
+                                    Text(entry.title).lineLimit(1).frame(maxWidth: 145, alignment: .leading)
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .contextMenu { PlexPinButton(library: library, entry: entry) }
+                        }
+                    }
+                }
+                .scrollIndicators(.hidden)
+                #if os(tvOS)
+                .focusSection()
+                #endif
+            }
+        }
     }
 }

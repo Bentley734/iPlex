@@ -42,10 +42,15 @@
         <button id="back" aria-label="Back" hidden>‹</button>
         <h1 id="title">Albums</h1>
         <input type="search" id="search" aria-label="Search albums or artists" placeholder="Search library" maxlength="120">
+        <select id="quick-library" aria-label="Switch Music Library" hidden></select>
       </header>
       <div class="content" id="scroll">
         <p id="message" role="status" hidden></p>
+        <button id="retry-library" type="button" hidden>Retry Plex Connection</button>
         <section id="details" hidden></section>
+        <section id="pinned-shelf" aria-labelledby="pinned-heading" hidden>
+          <h2 id="pinned-heading">Pinned</h2><div id="pinned-items"></div>
+        </section>
         <section id="plexify-feature" aria-label="From your library" hidden></section>
         <div id="grid" class="grid"></div>
         <div id="page-end" aria-hidden="true" hidden></div>
@@ -58,8 +63,7 @@
     <div id="plexify-track">Nothing playing</div>
   </section>
   <footer aria-label="Now playing">
-    <div class="playing" id="playing">Nothing playing</div>
-    <button id="show-now-playing" type="button" aria-haspopup="dialog" disabled>Now Playing</button>
+    <button class="playing" id="playing" type="button" aria-haspopup="dialog" aria-label="Open Now Playing" disabled>Nothing playing</button>
     <button id="open-wheel" type="button" hidden>Mini-player</button>
     <div class="controls">
       <button id="previous" aria-label="Previous track" disabled>⏮</button>
@@ -85,6 +89,10 @@
             <p id="now-artist"></p>
             <p id="now-album"></p>
             <p id="now-status" role="status" hidden></p>
+            <div class="now-playing-tools">
+              <button id="signal-path-button" type="button" aria-haspopup="dialog">Signal Path</button>
+              <button id="lyrics-button" type="button" aria-haspopup="dialog">Lyrics</button>
+            </div>
             <input id="now-seek" type="range" min="0" max="1" step="0.1" value="0" aria-label="Playback position">
             <div class="now-playing-times"><time id="now-elapsed">0:00</time><time id="now-duration">0:00</time></div>
             <div class="now-playing-transport">
@@ -105,6 +113,20 @@
         </div>
       </section>
     </div>
+  </dialog>
+  <dialog id="lyrics-sheet" class="playback-sheet" aria-labelledby="lyrics-heading">
+    <header><h2 id="lyrics-heading">Lyrics</h2><button id="close-lyrics" type="button">Done</button></header>
+    <p id="lyrics-track"></p>
+    <p id="lyrics-status" role="status"></p>
+    <div id="lyrics-lines"></div>
+  </dialog>
+  <dialog id="signal-path-sheet" class="playback-sheet" aria-labelledby="signal-path-heading">
+    <header><h2 id="signal-path-heading">Signal Path</h2><button id="close-signal-path" type="button">Done</button></header>
+    <dl>
+      <dt>Plex Source</dt><dd id="signal-path-source"></dd>
+      <dt>Playback</dt><dd id="signal-path-processing"></dd>
+      <dt>Output</dt><dd>System audio output</dd>
+    </dl>
   </dialog>
   <dialog id="wheel-player" aria-labelledby="wheel-heading">
     <div class="device-screen">
@@ -179,6 +201,10 @@
           <option value="iplex">iPlex</option>
           <option value="music">Music</option>
           <option value="musicBold">music (Bold)</option>
+          <option value="plex">Plex (Classic)</option>
+          <option value="plex2022">Plex (2022)</option>
+          <option value="napster">Napster</option>
+          <option value="iTunes">iTunes</option>
         </select>
       </label>
       <label class="header-logo-choice">Header Logo

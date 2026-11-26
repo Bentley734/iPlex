@@ -1,6 +1,9 @@
 import AVFoundation
 import Foundation
 import MediaPlayer
+#if os(macOS)
+import CoreAudio
+#endif
 
 final class PlayerController {
     typealias EventHandler = ([String: Any]) -> Void
@@ -435,6 +438,33 @@ final class PlayerController {
     }
 
     func next() { onMain { [weak self] in self?.advance(autoplay: true) } }
+
+    @MainActor var outputDescription: String {
+        #if os(macOS)
+        var address = AudioObjectPropertyAddress(mSelector: kAudioHardwarePropertyDefaultOutputDevice,
+            mScope: kAudioObjectPropertyScopeGlobal, mElement: kAudioObjectPropertyElementMain)
+        var device = AudioDeviceID(0)
+        var size = UInt32(MemoryLayout<AudioDeviceID>.size)
+        guard AudioObjectGetPropertyData(AudioObjectID(kAudioObjectSystemObject), &address, 0, nil, &size, &device) == noErr else {
+            return "System audio output"
+        }
+        address.mSelector = kAudioObjectPropertyName
+        var name: CFString = "Default audio device" as CFString
+        size = UInt32(MemoryLayout<CFString>.size)
+        _ = withUnsafeMutablePointer(to: &name) { AudioObjectGetPropertyData(device, &address, 0, nil, &size, $0) }
+        address.mSelector = kAudioDevicePropertyNominalSampleRate
+        var rate = Double(0)
+        size = UInt32(MemoryLayout<Double>.size)
+        let validRate = AudioObjectGetPropertyData(device, &address, 0, nil, &size, &rate) == noErr && rate > 0
+        return validRate ? "\(name) · \(MusicTrackFormat.rateLabel(rate)) nominal" : name as String
+        #else
+        let session = AVAudioSession.sharedInstance()
+        let outputs = session.currentRoute.outputs.map(\.portName).joined(separator: ", ")
+        var details = outputs.isEmpty ? "System audio output" : outputs
+        if session.sampleRate > 0 { details += " · \(MusicTrackFormat.rateLabel(session.sampleRate)) session rate" }
+        return details
+        #endif
+    }
 
     func setPlaybackVolume(_ volume: Double) {
         onMain { [weak self] in self?.player.volume = Float(volume) }

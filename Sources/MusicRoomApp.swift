@@ -143,6 +143,7 @@ private struct MusicWindow: View {
                     .popover(isPresented: $showCompactDeck) {
                         plexifyDeck.frame(width: 250, height: 370)
                     }
+                    PlexLibrarySwitcher(library: model)
                     settingsButton
                 }
                 .padding(.horizontal, 18).padding(.vertical, 8)
@@ -228,7 +229,7 @@ private struct MusicWindow: View {
     private var librarySearch: some View {
         HStack(spacing: 7) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField("Search \(model.kind.rawValue.lowercased())", text: $model.query)
+            TextField("Search \(model.kind.rawValue.lowercased())", text: $model.query).disabled(model.reconnecting)
                 .textFieldStyle(.plain)
         }
         .padding(9)
@@ -278,13 +279,21 @@ private struct MusicWindow: View {
                         .lineLimit(1)
                     Spacer()
                     if !graphite && !plexify && model.selectedDetail == nil && model.selectedGroup == nil {
-                        librarySearch.frame(width: 205)
+                        librarySearch.frame(width: 205).disabled(model.reconnecting)
                     }
-                    if !plexify { settingsButton }
+                    if !plexify {
+                        PlexLibrarySwitcher(library: model)
+                        settingsButton
+                    }
                 }
                 .padding(.horizontal, 28).padding(.vertical, 20)
                 if let message = model.message {
-                    Text(message).font(.callout).foregroundStyle(copper).padding(.horizontal, 28).padding(.bottom, 12)
+                    HStack {
+                        Text(message).font(.callout).foregroundStyle(copper)
+                        if !model.busy && model.selectedDetail == nil && !model.more {
+                            Button("Retry", action: model.retryLibrary)
+                        }
+                    }.padding(.horizontal, 28).padding(.bottom, 12)
                 }
                 if let album = model.selectedDetail { albumDetail(album) }
                 else { grid }
@@ -395,6 +404,10 @@ private struct MusicWindow: View {
 
     private var grid: some View {
         ScrollView {
+            if model.selectedGroup == nil && model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                PinnedMusicShelf(library: model) { searchTask?.cancel(); model.open($0) }
+                    .padding(.horizontal, 28).padding(.bottom, model.pins.isEmpty ? 0 : 14)
+            }
             if plexify && model.selectedGroup == nil && [.albums, .artists].contains(model.kind) && model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                let entry = model.entries.first {
                 PlexifyFeature(item: entry, library: model) { model.open(entry) }
@@ -433,6 +446,7 @@ private struct MusicWindow: View {
                     .buttonStyle(.plain)
                     .contextMenu {
                         if !entry.kind.isGroup { LibraryQueueActions(library: model, entry: entry) }
+                        PlexPinButton(library: model, entry: entry)
                     }
                 }
                 if model.more && !model.busy && model.message == nil {
@@ -460,6 +474,7 @@ private struct MusicWindow: View {
                         if !info.isEmpty { Text(info.joined(separator: " · ")).foregroundStyle(.secondary) }
                         Button { model.play(at: 0) } label: { Label(album.kind.playLabel, systemImage: "play.fill") }
                             .buttonStyle(.borderedProminent).disabled(model.tracks.isEmpty)
+                        PlexPinButton(library: model, entry: album)
                         Menu("Queue", systemImage: "list.bullet") { LibraryQueueActions(library: model, entry: album) }
                             .disabled(model.tracks.isEmpty)
                     }
@@ -499,7 +514,6 @@ private struct MusicWindow: View {
         HStack(spacing: 16) {
             transportMetadata
             Spacer()
-            nowPlayingButton
             miniPlayerButton
             transportButtons
             seekControl.frame(width: 130)
@@ -509,11 +523,6 @@ private struct MusicWindow: View {
         .background(theme == .liquidGlass ? .clear : slate)
         .musicGlass(theme, radius: 24)
         .padding(theme == .liquidGlass ? 8 : 0)
-    }
-
-    private var nowPlayingButton: some View {
-        Button("Now Playing", systemImage: "waveform") { showNowPlaying = true }
-            .disabled(model.playingAlbum == nil)
     }
 
     @ViewBuilder private var miniPlayerButton: some View {
@@ -529,7 +538,6 @@ private struct MusicWindow: View {
     private var graphiteTransport: some View {
         HStack(spacing: 14) {
             transportMetadata.frame(maxWidth: .infinity, alignment: .leading)
-            nowPlayingButton
             miniPlayerButton
             transportButtons
             HStack(spacing: 9) {
@@ -553,27 +561,35 @@ private struct MusicWindow: View {
         .shadow(color: .black.opacity(0.22), radius: 8, y: 3)
     }
 
-    private var transportMetadata: some View {
-        HStack(spacing: 11) {
-            if let album = model.playingAlbum {
-                CoverArt(item: album, model: model).frame(width: 46, height: 46)
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(model.state.title.isEmpty ? album.title : model.state.title).font(.headline).lineLimit(1)
-                    Text([album.artist, album.title].filter { !$0.isEmpty }.joined(separator: " · "))
-                        .font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                    if !model.state.message.isEmpty {
-                        Text(model.state.message).font(.caption2).foregroundStyle(copper).lineLimit(1)
+    @ViewBuilder private var transportMetadata: some View {
+        if let album = model.playingAlbum {
+            Button { showNowPlaying = true } label: {
+                HStack(spacing: 11) {
+                    if let image = model.playingArtwork {
+                        Image(nsImage: image).resizable().scaledToFill()
+                            .frame(width: 46, height: 46).clipShape(.rect(cornerRadius: 8))
+                    } else {
+                        CoverArt(item: album, model: model).frame(width: 46, height: 46)
                     }
-                }
-            } else {
-                if graphite {
-                    Image(systemName: "waveform").foregroundStyle(copper)
-                        .frame(width: 36, height: 36)
-                        .background(.white.opacity(0.07), in: RoundedRectangle(cornerRadius: 9))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(model.state.title.isEmpty ? album.title : model.state.title).font(.headline).lineLimit(1)
+                        Text([model.currentTrack?.artist ?? album.artist, model.currentTrack?.album ?? album.title]
+                            .filter { !$0.isEmpty }.joined(separator: " · "))
+                            .font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                        if !model.state.message.isEmpty {
+                            Text(model.state.message).font(.caption2).foregroundStyle(copper).lineLimit(1)
+                        }
+                    }
+                    Image(systemName: "chevron.up").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
                         .accessibilityHidden(true)
                 }
-                Text("Nothing playing").foregroundStyle(.secondary)
+                .contentShape(Rectangle())
             }
+            .buttonStyle(.plain)
+            .accessibilityHint("Opens Now Playing")
+            .help("Open Now Playing")
+        } else {
+            Text("Nothing playing").foregroundStyle(.secondary)
         }
     }
 

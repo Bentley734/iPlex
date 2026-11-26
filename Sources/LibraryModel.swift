@@ -17,6 +17,7 @@ final class LibraryModel: ObservableObject {
     @Published private(set) var libraries: [PlexLibrary] = []
     @Published private(set) var serverID = ""
     @Published private(set) var libraryID = ""
+    @Published private(set) var pins: [MusicEntry] = []
     @Published private(set) var entries: [MusicEntry] = []
     @Published private(set) var selectedGroup: MusicEntry?
     @Published private(set) var selectedDetail: MusicEntry?
@@ -24,6 +25,7 @@ final class LibraryModel: ObservableObject {
     @Published private(set) var playingAlbum: MusicEntry?
     @Published private(set) var playingTracks: [LiveTrack] = []
     @Published private(set) var busy = false
+    @Published private(set) var reconnecting = false
     @Published private(set) var more = false
     @Published private(set) var signInURL: URL?
     @Published private(set) var linkCode: String?
@@ -45,6 +47,16 @@ final class LibraryModel: ObservableObject {
     private let service = PlexService(version: "0.1")
     let player = PlayerController()
     private var operation: Task<Void, Never>?
+    private var launchSnapshot: LibrarySnapshot?
+    private static let snapshotKey = "LastMusicLibrary"
+
+    private struct LibrarySnapshot: Codable {
+        var server: String
+        var library: String
+        var servers: [PlexServer]
+        var libraries: [PlexLibrary]
+        var listings: [MusicKind: [MusicEntry]] = [:]
+    }
     private var offset = 0
     private var listingQuery = ""
     private var refreshAfterAlbum = false
@@ -90,6 +102,20 @@ final class LibraryModel: ObservableObject {
                 kind = first
             }
         }
+        if let saved = service.rememberedMusicSelection {
+            serverID = saved.server
+            libraryID = saved.library
+            if let data = defaults.data(forKey: Self.snapshotKey),
+               let snapshot = try? JSONDecoder().decode(LibrarySnapshot.self, from: data),
+               snapshot.server == serverID, snapshot.library == libraryID {
+                launchSnapshot = snapshot
+                servers = snapshot.servers
+                libraries = snapshot.libraries
+                entries = snapshot.listings[kind] ?? []
+            }
+            loadPins()
+            reconnecting = true
+        }
         if let values = defaults.array(forKey: "PlaybackEqualizer") as? [Double], values.count == 3 {
             equalizer = PlaybackEQSettings(bass: values[0], mid: values[1], treble: values[2])
             player.setEqualizer(equalizer)
@@ -115,8 +141,16 @@ final class LibraryModel: ObservableObject {
     }
 
     func restore() {
-        guard connected, servers.isEmpty, !busy else { return }
-        perform { try await self.findServers() }
+        guard connected, (reconnecting || servers.isEmpty || service.status.selectedLibraryID == nil), !busy else { return }
+        perform {
+            defer {
+                if !Task.isCancelled, self.reconnecting {
+                    self.reconnecting = false
+                    self.invalidateArtwork()
+                }
+            }
+            try await self.findServers()
+        }
     }
 
     func signIn() {
@@ -150,6 +184,11 @@ final class LibraryModel: ObservableObject {
         }
     }
 
+    func retryLibrary() {
+        if service.status.selectedLibraryID == nil { restore() }
+        else { browse() }
+    }
+
     func cancel() {
         operation?.cancel()
         busy = false
@@ -159,7 +198,13 @@ final class LibraryModel: ObservableObject {
     private func findServers() async throws {
         servers = try await request(service.refreshServers)
         try Task.checkCancellation()
-        serverID = service.status.selectedServerID ?? ""
+        let discovered = service.status.selectedServerID ?? ""
+        if serverID != discovered {
+            serverID = discovered
+            libraryID = ""
+            libraries = []
+            resetLibrary()
+        }
         if serverID.isEmpty, let only = servers.onlyElement {
             try service.selectServer(id: only.id)
             serverID = only.id
@@ -168,7 +213,7 @@ final class LibraryModel: ObservableObject {
     }
 
     func chooseServer(_ id: String) {
-        guard !id.isEmpty, id != serverID else { return }
+        guard !reconnecting, !id.isEmpty, id != serverID else { return }
         perform {
             try self.service.selectServer(id: id)
             self.serverID = id
@@ -182,20 +227,30 @@ final class LibraryModel: ObservableObject {
     private func findLibraries() async throws {
         libraries = try await request(service.refreshLibraries)
         try Task.checkCancellation()
-        libraryID = service.status.selectedLibraryID ?? ""
+        let discovered = service.status.selectedLibraryID ?? ""
+        if libraryID != discovered {
+            libraryID = discovered
+            resetLibrary()
+        }
         if libraryID.isEmpty, let only = libraries.onlyElement {
             try service.selectLibrary(id: only.id)
             libraryID = only.id
         }
+        loadPins()
         if !libraryID.isEmpty { try await loadEntries(append: false) }
+        else {
+            launchSnapshot = nil
+            UserDefaults.standard.removeObject(forKey: Self.snapshotKey)
+        }
     }
 
     func chooseLibrary(_ id: String) {
-        guard !id.isEmpty, id != libraryID else { return }
+        guard !reconnecting, !id.isEmpty, id != libraryID else { return }
         perform {
             try self.service.selectLibrary(id: id)
             self.libraryID = id
             self.resetLibrary()
+            self.loadPins()
             try await self.loadEntries(append: false)
         }
     }
@@ -205,6 +260,9 @@ final class LibraryModel: ObservableObject {
         do {
             try service.disconnect()
             connected = false
+            reconnecting = false
+            launchSnapshot = nil
+            UserDefaults.standard.removeObject(forKey: Self.snapshotKey)
             servers = []
             libraries = []
             serverID = ""
@@ -216,6 +274,7 @@ final class LibraryModel: ObservableObject {
     private func resetLibrary() {
         stopCachingCovers()
         coverCacheStatus = ""
+        pins = []
         selectedGroup = nil
         selectedDetail = nil
         entries = []
@@ -229,6 +288,10 @@ final class LibraryModel: ObservableObject {
         refreshAfterAlbum = false
         more = false
         player.stop()
+        invalidateArtwork()
+    }
+
+    private func invalidateArtwork() {
         artworkCollection = UUID()
         let canceledRequests = artworkRequests.values
         artworkRequests.removeAll()
@@ -242,7 +305,8 @@ final class LibraryModel: ObservableObject {
     func selectKind(_ section: MusicKind) {
         guard visibleKinds.contains(section) else { return }
         kind = section
-        browse()
+        if reconnecting { entries = launchSnapshot?.listings[kind] ?? [] }
+        else { browse() }
     }
 
     func setVisibility(_ section: MusicKind, visible: Bool) {
@@ -256,7 +320,7 @@ final class LibraryModel: ObservableObject {
     }
 
     func browse() {
-        guard !libraryID.isEmpty else { return }
+        guard !reconnecting, !libraryID.isEmpty else { return }
         refreshAfterAlbum = false
         selectedGroup = nil
         selectedDetail = nil
@@ -265,7 +329,7 @@ final class LibraryModel: ObservableObject {
     }
 
     func refreshPageSize() {
-        guard !libraryID.isEmpty else { return }
+        guard !reconnecting, !libraryID.isEmpty else { return }
         if selectedDetail == nil { perform { try await self.loadEntries(append: false) } }
         else { refreshAfterAlbum = true }
     }
@@ -275,7 +339,44 @@ final class LibraryModel: ObservableObject {
         perform { try await self.loadEntries(append: true) }
     }
 
+    private var pinPreference: String? {
+        guard !serverID.isEmpty, !libraryID.isEmpty else { return nil }
+        return "PlexPins.\(serverID).\(libraryID)"
+    }
+
+    private func loadPins() {
+        pins = pinPreference.flatMap(UserDefaults.standard.data(forKey:))
+            .flatMap { try? JSONDecoder().decode([MusicEntry].self, from: $0) } ?? []
+    }
+
+    func isPinned(_ entry: MusicEntry) -> Bool {
+        pins.contains { $0.id == entry.id && $0.kind == entry.kind }
+    }
+
+    func togglePin(_ entry: MusicEntry) {
+        guard let pinPreference, entry.kind.canPin else { return }
+        if isPinned(entry) {
+            pins.removeAll { $0.id == entry.id && $0.kind == entry.kind }
+        } else {
+            pins.append(entry)
+        }
+        if let data = try? JSONEncoder().encode(pins) { UserDefaults.standard.set(data, forKey: pinPreference) }
+    }
+
+    func lyrics(for track: LiveTrack) async throws -> [MusicLyricLine] {
+        guard let id = track.plexID else { return [] }
+        let text: String? = try await request { service.musicLyrics(trackID: id, completion: $0) }
+        try Task.checkCancellation()
+        return text.map(MusicLyricLine.parse) ?? []
+    }
+
+    var currentTrack: LiveTrack? {
+        guard let index = state.index, playingTracks.indices.contains(index) else { return nil }
+        return playingTracks[index]
+    }
+
     func open(_ entry: MusicEntry) {
+        guard !reconnecting else { return }
         if entry.kind.isGroup {
             selectedGroup = entry
             selectedDetail = nil
@@ -307,6 +408,7 @@ final class LibraryModel: ObservableObject {
     }
 
     func enqueue(_ entry: MusicEntry, track: LiveTrack? = nil, playNext: Bool) {
+        guard !reconnecting else { return }
         if let track {
             insertIntoQueue([track], entry: entry, playNext: playNext)
         } else if entry == selectedDetail, !tracks.isEmpty {
@@ -401,7 +503,8 @@ final class LibraryModel: ObservableObject {
         let request = ArtworkRequest()
         request.completions.append(completion)
         artworkRequests[key] = request
-        request.cancel = service.musicArtwork(path: key.path) { [weak self] data in
+        let cache = launchSnapshot?.listings.values.contains { entries in entries.contains { $0.artworkPath == key.path } } == true
+        request.cancel = service.musicArtwork(path: key.path, server: serverID, library: libraryID, cache: cache) { [weak self] data in
             guard let self, let completed = self.artworkRequests.removeValue(forKey: key) else { return }
             let cover = data.flatMap(AlbumCoverCache.thumbnail).map(MusicPlatform.image)
             if let cover { self.artwork.setObject(cover, forKey: path) }
@@ -458,7 +561,9 @@ final class LibraryModel: ObservableObject {
         if !append {
             more = false
             listingQuery = query
-            entries = []
+            entries = selectedGroup == nil && query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                launchSnapshot?.server == serverID && launchSnapshot?.library == libraryID
+                ? launchSnapshot?.listings[kind] ?? [] : []
         }
         let group = selectedGroup
         let requestedKind: MusicKind = group == nil ? kind : .albums
@@ -477,6 +582,19 @@ final class LibraryModel: ObservableObject {
             hasMore = !unique.isEmpty && result.hasMore
             accumulated.append(contentsOf: unique)
         } while setting == .all && hasMore
+        if group == nil, requestedQuery.isEmpty, !append {
+            var snapshot = launchSnapshot.flatMap { $0.server == serverID && $0.library == libraryID ? $0 : nil }
+                ?? LibrarySnapshot(server: serverID, library: libraryID, servers: servers, libraries: libraries)
+            snapshot.servers = servers
+            snapshot.libraries = libraries
+            snapshot.listings[requestedKind] = Array(accumulated.prefix(120))
+            launchSnapshot = snapshot
+            if let data = try? JSONEncoder().encode(snapshot) { UserDefaults.standard.set(data, forKey: Self.snapshotKey) }
+        }
+        if kind != requestedKind && group == nil && reconnecting {
+            try await loadEntries(append: false)
+            return
+        }
         entries = accumulated
         offset = start
         more = hasMore

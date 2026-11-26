@@ -405,5 +405,5 @@ window.windowsPlayback = (() => {
   window.addEventListener('pagehide', release, {once:true});
   window.addEventListener('beforeunload', release, {once:true});
   const decodedUpdates=setInterval(()=>{ if (decoded?.node) publish(); },250);
-  return {prepareAudio,action,visualize,eq,queue,reset,fail,enqueue,releaseTrack, get queueItems(){return tracks;}, get revision(){return revision;}, get origin(){return origin;}};
+  return {prepareAudio,action,visualize,eq,queue,reset,fail,enqueue,releaseTrack, get sampleRate(){return context?.sampleRate;}, get queueItems(){return tracks;}, get revision(){return revision;}, get origin(){return origin;}};
 })();
