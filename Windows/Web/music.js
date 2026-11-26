@@ -41,8 +41,11 @@
   // Pixel coordinates shared with the Apple asset sheet.
   const wordmarkRegions = new Map([
     ['music', [722, 251, 684, 210]], ['musicBold', [645, 609, 810, 193]],
-    ['plex', [0, 1255, 1024, 332]], ['plex2022', [1030, 1255, 1000, 461]],
-    ['napster', [0, 1085, 707, 156]], ['iTunes', [720, 1085, 565, 144]]
+    ['plex', [0, 1255, 1024, 332, 1745]], ['plex2022', [1030, 1255, 1000, 461, 1745]],
+    ['napster', [0, 1085, 707, 156]], ['iTunes', [720, 1085, 565, 144]],
+    ['realJukebox', [0, 2206, 1000, 248, 2508]], ['realJukeboxPlus', [1020, 2206, 1000, 300, 2508]],
+    ['realPlayer', [0, 2808, 471, 146, 2988]], ['realPlayerBasic', [520, 2808, 482, 175, 2988]],
+    ['realPlayerPlus', [1040, 2808, 471, 176, 2988]]
   ]);
   const wordmarkSheet = new Image();
   const pageEnd = get('page-end');
@@ -756,26 +759,28 @@
   function renderHeaderWordmark() {
     const choice = get('header-wordmark');
     const region = wordmarkRegions.get(choice.value);
-    const accent = choice.value === 'plex' || choice.value === 'plex2022';
     const showMusic = Boolean(region && wordmarkSheet.naturalWidth);
     for (const brand of document.querySelectorAll('.header-brand')) {
       const canvas = brand.querySelector('.music-wordmark');
       if (showMusic) {
-        const [x, y, width, height] = region;
-        canvas.dataset.color = accent ? 'original' : 'template';
+        const [x, y, width, height, darkY] = region;
+        canvas.dataset.color = darkY !== undefined ? 'original' : 'template';
         if (canvas.hasAttribute('role')) canvas.setAttribute('aria-label', choice.selectedOptions[0].textContent);
         canvas.width = width;
         canvas.height = height;
-        canvas.getContext('2d').drawImage(wordmarkSheet, x, accent && selectedTheme !== 'classic' ? 1745 : y, width, height, 0, 0, width, height);
+        canvas.getContext('2d').drawImage(wordmarkSheet, x, selectedTheme !== 'classic' ? (darkY ?? y) : y, width, height, 0, 0, width, height);
       }
       canvas.hidden = !showMusic;
-      brand.querySelector('img.wordmark').hidden = showMusic;
+      brand.querySelector('img.wordmark').hidden = showMusic || choice.value === 'none';
+      const mark = get('header-logo');
+      brand.querySelector('.header-mark').alt = choice.value === 'none' && mark.value !== 'none'
+        ? mark.selectedOptions[0]?.textContent || '' : '';
     }
   }
   function chooseHeaderWordmark(value) {
     const choice = get('header-wordmark');
-    choice.value = wordmarkRegions.has(value) ? value : 'iplex';
-    if (choice.value !== 'iplex' && !wordmarkSheet.getAttribute('src')) wordmarkSheet.src = 'music-wordmarks.png';
+    choice.value = value === 'none' || wordmarkRegions.has(value) ? value : 'iplex';
+    if (wordmarkRegions.has(choice.value) && !wordmarkSheet.getAttribute('src')) wordmarkSheet.src = 'music-wordmarks.png';
     renderHeaderWordmark();
     try { localStorage.setItem('musicroom-header-wordmark', choice.value); } catch {}
   }
@@ -791,6 +796,7 @@
       if (image.hidden) image.removeAttribute('src');
       else image.src = 'HeaderMarks/' + asset + '.png';
     }
+    renderHeaderWordmark();
     try { localStorage.setItem('musicroom-header-logo', logo); } catch {}
   }
   function chooseHeaderLogoSize(value) {

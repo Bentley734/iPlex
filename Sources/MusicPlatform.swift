@@ -130,6 +130,7 @@ struct ArtworkPalette {
 enum HeaderWordmark: String, CaseIterable, Identifiable {
     static let preferenceKey = "HeaderWordmark"
     case iplex, music, musicBold, plex, plex2022, napster, iTunes
+    case realJukebox, realJukeboxPlus, realPlayer, realPlayerBasic, realPlayerPlus, none
 
     var id: Self { self }
     var title: String {
@@ -139,6 +140,12 @@ enum HeaderWordmark: String, CaseIterable, Identifiable {
         case .plex, .plex2022: "Plex"
         case .napster: "Napster"
         case .iTunes: "iTunes"
+        case .realJukebox: "RealJukebox"
+        case .realJukeboxPlus: "RealJukebox Plus"
+        case .realPlayer: "RealPlayer"
+        case .realPlayerBasic: "RealPlayer Basic"
+        case .realPlayerPlus: "RealPlayer Plus"
+        case .none: "None"
         }
     }
     var label: String {
@@ -149,25 +156,33 @@ enum HeaderWordmark: String, CaseIterable, Identifiable {
         default: title
         }
     }
-    var hasAccent: Bool { self == .plex || self == .plex2022 }
+    var preservesColors: Bool { region(dark: false) != region(dark: true) }
 
     // Pixel coordinates shared with the Windows asset sheet.
     func region(dark: Bool) -> CGRect? {
         switch self {
-        case .iplex: nil
+        case .iplex, .none: nil
         case .music: CGRect(x: 722, y: 251, width: 684, height: 210)
         case .musicBold: CGRect(x: 645, y: 609, width: 810, height: 193)
         case .plex: CGRect(x: 0, y: dark ? 1745 : 1255, width: 1024, height: 332)
         case .plex2022: CGRect(x: 1030, y: dark ? 1745 : 1255, width: 1000, height: 461)
         case .napster: CGRect(x: 0, y: 1085, width: 707, height: 156)
         case .iTunes: CGRect(x: 720, y: 1085, width: 565, height: 144)
+        case .realJukebox: CGRect(x: 0, y: dark ? 2508 : 2206, width: 1000, height: 248)
+        case .realJukeboxPlus: CGRect(x: 1020, y: dark ? 2508 : 2206, width: 1000, height: 300)
+        case .realPlayer: CGRect(x: 0, y: dark ? 2988 : 2808, width: 471, height: 146)
+        case .realPlayerBasic: CGRect(x: 520, y: dark ? 2988 : 2808, width: 482, height: 175)
+        case .realPlayerPlus: CGRect(x: 1040, y: dark ? 2988 : 2808, width: 471, height: 176)
         }
     }
 }
 
 enum HeaderMark: String, CaseIterable, Identifiable {
     static let preferenceKey = "HeaderMark"
-    case none, black, white, rainbow, gold, aurora, silver
+    case none, black, white, rainbow, gold, aurora, silver, napster
+    case plexChevron = "plex-chevron"
+    case realPlayer = "realplayer"
+    case realPlayerGartoon = "realplayer-gartoon"
 
     var id: Self { self }
     var isMonochrome: Bool { self == .black || self == .white }
@@ -191,6 +206,10 @@ enum HeaderMark: String, CaseIterable, Identifiable {
         case .gold: "Brushed Gold"
         case .aurora: "Aurora"
         case .silver: "Polished Silver"
+        case .napster: "Napster"
+        case .plexChevron: "Plex Chevron"
+        case .realPlayer: "RealPlayer"
+        case .realPlayerGartoon: "RealPlayer Gartoon"
         }
     }
 }
@@ -237,15 +256,18 @@ struct HeaderBrand: View {
                     .shadow(color: markOutline, radius: 1)
                     .frame(width: markHeight, height: markHeight)
                     .scaleEffect(mark.artworkScale)
-                    .accessibilityHidden(true)
+                    .accessibilityLabel(mark.label)
+                    .accessibilityHidden(wordmark != .none)
             }
-            if let image = MusicPlatform.wordmarkImage(wordmark, dark: theme.scheme == .dark) {
-                image.renderingMode(wordmark.hasAccent ? .original : .template).resizable().scaledToFit()
-                    .foregroundStyle(ink)
-                    .accessibilityLabel(wordmark.title)
-            } else {
-                Text(wordmark.title).font(.system(size: height * 0.68, weight: wordmark == .musicBold ? .bold : .medium))
-                    .lineLimit(1).minimumScaleFactor(0.6)
+            if wordmark != .none {
+                if let image = MusicPlatform.wordmarkImage(wordmark, dark: theme.scheme == .dark) {
+                    image.renderingMode(wordmark.preservesColors ? .original : .template).resizable().scaledToFit()
+                        .foregroundStyle(ink)
+                        .accessibilityLabel(wordmark.title)
+                } else {
+                    Text(wordmark.title).font(.system(size: height * 0.68, weight: wordmark == .musicBold ? .bold : .medium))
+                        .lineLimit(1).minimumScaleFactor(0.6)
+                }
             }
         }
         .frame(width: width, height: height, alignment: .leading)
