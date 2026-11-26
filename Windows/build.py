@@ -77,6 +77,8 @@ def main():
                 web.write(icon, icon.name)
             for name in ("groove.png", "wordmark.png"):
                 web.write(ASSETS / name, name)
+            for mark in sorted((ASSETS / "HeaderMarks").glob("*.png")):
+                web.write(mark, "HeaderMarks/" + mark.name)
         embed(site, "site.zip")
         flags.append("/win32icon:" + str(stage / "groove.ico"))
         command = [str(args.compiler)]

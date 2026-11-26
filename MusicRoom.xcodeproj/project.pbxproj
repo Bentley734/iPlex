@@ -23,12 +23,14 @@
 		454FE1F4FDC5B933B903B4DD /* MusicRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EFA099A27452963E48DAEFD /* MusicRoomApp.swift */; };
 		45BD406408902A81EB0EE534 /* MusicRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EFA099A27452963E48DAEFD /* MusicRoomApp.swift */; };
 		48704D4C0C29E57ABDC677D1 /* groove-preview.png in Resources */ = {isa = PBXBuildFile; fileRef = 7842787F5186A057B67DDE3B /* groove-preview.png */; };
+		523B49DEEF64BD699C9746FE /* HeaderMarks in Resources */ = {isa = PBXBuildFile; fileRef = DBB6ACEC51BC04DF53298E15 /* HeaderMarks */; };
 		559F2534C6897DF20AAC1E02 /* Track.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8712B67A9D2431A2B0160DDC /* Track.swift */; };
 		564AA314BCCD696C8A91607B /* MusicPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CCA42EAE03D88BB3496D33 /* MusicPlatform.swift */; };
 		614CA070E7014A7C66698623 /* MacMiniPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3A4685EF46B49FB6B22D90 /* MacMiniPlayer.swift */; };
 		66D831237EA3E508723100E1 /* LibraryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C69FD3E93908A0408008D345 /* LibraryModel.swift */; };
 		6C4C7A59ED6A720264345604 /* MusicSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81F02BA2B14ABC3859F379BD /* MusicSettings.swift */; };
 		733CA465AF821A663909CC7B /* MobileMusicRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97A49FCD6AC086C13007CEB /* MobileMusicRoomApp.swift */; };
+		76564F19F8DE83CE1924C29F /* HeaderMarks in Resources */ = {isa = PBXBuildFile; fileRef = DBB6ACEC51BC04DF53298E15 /* HeaderMarks */; };
 		8E529B00CBCA255DA72EBCA3 /* MusicPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CCA42EAE03D88BB3496D33 /* MusicPlatform.swift */; };
 		93D79DBF914029D9676C6472 /* iOS.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A5FD29343DF8F67713D13B64 /* iOS.xcassets */; };
 		9B3C788DCE3EB58EF492A7D2 /* PlexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C780AA4CF17CC09BC5ABE45 /* PlexService.swift */; };
@@ -62,6 +64,7 @@
 		C69FD3E93908A0408008D345 /* LibraryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryModel.swift; sourceTree = "<group>"; };
 		C97A49FCD6AC086C13007CEB /* MobileMusicRoomApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileMusicRoomApp.swift; sourceTree = "<group>"; };
 		D6581BBFF504F8BAA5B38470 /* AlbumCoverCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumCoverCache.swift; sourceTree = "<group>"; };
+		DBB6ACEC51BC04DF53298E15 /* HeaderMarks */ = {isa = PBXFileReference; lastKnownFileType = folder; name = HeaderMarks; path = Assets/HeaderMarks; sourceTree = SOURCE_ROOT; };
 		ED8702E61EE0F31C7677EC30 /* AudioAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioAnalysis.swift; sourceTree = "<group>"; };
 		EE113F105DDF52C3139D4A91 /* clickwheel-preview.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clickwheel-preview.png"; sourceTree = "<group>"; };
 		EF99A5BF8FAE5BAC92EC8A5B /* tvOS.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = tvOS.xcassets; sourceTree = "<group>"; };
@@ -92,6 +95,7 @@
 		66B92525B616589C36D6A1F6 /* Assets */ = {
 			isa = PBXGroup;
 			children = (
+				DBB6ACEC51BC04DF53298E15 /* HeaderMarks */,
 				F185419F294F55DB3C3CAE00 /* wordmark.png */,
 			);
 			path = Assets;
@@ -212,6 +216,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				76564F19F8DE83CE1924C29F /* HeaderMarks in Resources */,
 				ECFB148B20F9BB9F02112F4B /* clickwheel-preview.png in Resources */,
 				48704D4C0C29E57ABDC677D1 /* groove-preview.png in Resources */,
 				93D79DBF914029D9676C6472 /* iOS.xcassets in Resources */,
@@ -223,6 +228,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				523B49DEEF64BD699C9746FE /* HeaderMarks in Resources */,
 				25CAA425ED3EAA058A2D3B19 /* clickwheel-preview.png in Resources */,
 				2C7F49F53E5D81DD0D406FAF /* groove-preview.png in Resources */,
 				B9FA1CBBF9218AE47683AD83 /* tvOS.xcassets in Resources */,
@@ -330,7 +336,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -345,7 +351,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex music server.";
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.1.1;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -427,7 +433,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 2;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -448,7 +454,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex music server.";
-				MARKETING_VERSION = 0.1.0;
+				MARKETING_VERSION = 0.1.1;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

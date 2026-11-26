@@ -218,6 +218,27 @@
     get('theme').value = theme;
     try { localStorage.setItem('musicroom-theme', theme); } catch {}
   }
+  function chooseHeaderLogo(value) {
+    const choice = get('header-logo');
+    choice.value = value;
+    if (choice.selectedIndex === -1) choice.value = 'none';
+    const logo = choice.value;
+    const asset = logo === 'black' || logo === 'white' ? 'monochrome' : logo;
+    for (const image of document.querySelectorAll('.header-mark')) {
+      image.hidden = logo === 'none';
+      image.dataset.mark = logo;
+      if (image.hidden) image.removeAttribute('src');
+      else image.src = 'HeaderMarks/' + asset + '.png';
+    }
+    try { localStorage.setItem('musicroom-header-logo', logo); } catch {}
+  }
+  function chooseHeaderLogoSize(value) {
+    const choice = get('header-logo-size');
+    choice.value = value;
+    if (choice.selectedIndex === -1) choice.value = 'medium';
+    for (const brand of document.querySelectorAll('.header-brand')) brand.dataset.markSize = choice.value;
+    try { localStorage.setItem('musicroom-header-logo-size', choice.value); } catch {}
+  }
   function updateEQ() {
     const settings = {};
     for (const band of bands) {
@@ -229,6 +250,8 @@
     try { localStorage.setItem('musicroom-eq', JSON.stringify(settings)); } catch {}
   }
   get('theme').onchange = event => chooseTheme(event.target.value);
+  get('header-logo').onchange = event => chooseHeaderLogo(event.target.value);
+  get('header-logo-size').onchange = event => chooseHeaderLogoSize(event.target.value);
   for (const band of bands) get(band).oninput = updateEQ;
   get('reset-eq').onclick = () => {
     for (const band of bands) get(band).value = 0;
@@ -257,6 +280,8 @@
   };
   try {
     chooseTheme(localStorage.getItem('musicroom-theme'));
+    chooseHeaderLogo(localStorage.getItem('musicroom-header-logo'));
+    chooseHeaderLogoSize(localStorage.getItem('musicroom-header-logo-size'));
     const eq = JSON.parse(localStorage.getItem('musicroom-eq')) || {};
     for (const band of bands) get(band).value = Math.max(-10, Math.min(10, Number(eq[band]) || 0));
     const icon = localStorage.getItem('musicroom-icon');

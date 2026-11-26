@@ -56,6 +56,8 @@ enum MusicTheme: String, CaseIterable, Identifiable {
 struct MusicSettings: View {
     @ObservedObject var library: LibraryModel
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
+    @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
+    @AppStorage(HeaderMarkSize.preferenceKey) private var headerMarkSize = HeaderMarkSize.medium
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
@@ -72,6 +74,18 @@ struct MusicSettings: View {
                             Text(option.label).tag(option)
                         }
                     }
+                    Picker("Header Logo", selection: $headerMark) {
+                        ForEach(HeaderMark.allCases) { mark in
+                            Text(mark.label).tag(mark)
+                        }
+                    }
+                    Picker("Header Logo Size", selection: $headerMarkSize) {
+                        ForEach(HeaderMarkSize.allCases) { size in
+                            Text(size.label).tag(size)
+                        }
+                    }
+                    HeaderBrand(mark: headerMark, theme: theme, width: 170, height: 42)
+                        .accessibilityHidden(true)
                     Divider()
                     VStack(alignment: .leading, spacing: 15) {
                         HStack {

@@ -7,6 +7,7 @@ cp "$project/Info.plist" "$bundle/Contents/Info.plist"
 for asset in "$project"/Assets/*.png "$project"/Assets/*.icns; do
     if [[ -f "$asset" ]]; then cp "$asset" "$bundle/Contents/Resources/"; fi
 done
+ditto --norsrc --noextattr --noqtn "$project/Assets/HeaderMarks" "$bundle/Contents/Resources/HeaderMarks"
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 for architecture in arm64 x86_64; do

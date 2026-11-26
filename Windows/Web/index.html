@@ -13,7 +13,10 @@
 </head>
 <body>
   <aside aria-label="iPlex">
-    <img class="wordmark" src="wordmark.png" alt="iPlex">
+    <div class="header-brand">
+      <img class="header-mark" alt="" hidden>
+      <img class="wordmark" src="wordmark.png" alt="iPlex">
+    </div>
     <nav aria-label="Library">
       <button id="albums" aria-pressed="true" disabled>Albums</button>
       <button id="artists" aria-pressed="false" disabled>Artists</button>
@@ -102,6 +105,31 @@
         <option value="video">iPod Video</option>
       </select>
     </label>
+    <section>
+      <label class="header-logo-choice">Header Logo
+        <select id="header-logo">
+          <option value="none">Text Only</option>
+          <option value="black">Black</option>
+          <option value="white">White</option>
+          <option value="rainbow">Rainbow</option>
+          <option value="gold">Brushed Gold</option>
+          <option value="aurora">Aurora</option>
+          <option value="silver">Polished Silver</option>
+        </select>
+      </label>
+      <label class="header-logo-choice">Header Logo Size
+        <select id="header-logo-size">
+          <option value="small">Small</option>
+          <option value="medium" selected>Medium</option>
+          <option value="large">Large</option>
+          <option value="extraLarge">XL</option>
+        </select>
+      </label>
+      <div class="header-brand header-preview" aria-hidden="true">
+        <img class="header-mark" alt="" hidden>
+        <img class="wordmark" src="wordmark.png" alt="">
+      </div>
+    </section>
     <section>
       <div class="settings-head">
         <h2>Equalizer</h2>

@@ -46,6 +46,7 @@ private struct MusicWindow: View {
     @ObservedObject var model: LibraryModel
     @State private var searchTask: Task<Void, Never>?
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
+    @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
     @State private var showSettings = false
     @State private var showVolume = false
     @State private var miniPlayer = MacMiniPlayer()
@@ -91,18 +92,7 @@ private struct MusicWindow: View {
 
     private var sidebar: some View {
         VStack(alignment: .leading, spacing: 24) {
-            Group {
-                if let wordmark = Bundle.main.url(forResource: "wordmark", withExtension: "png"),
-                   let image = NSImage(contentsOf: wordmark) {
-                    Image(nsImage: image).resizable().scaledToFit()
-                        .colorMultiply(theme.scheme == .light ? .black : .white)
-                        .frame(width: 155, height: 46, alignment: .leading)
-                        .accessibilityLabel("iPlex")
-                } else {
-                    Label("iPlex", systemImage: "record.circle.fill")
-                        .font(.system(size: 21, weight: .heavy))
-                }
-            }
+            HeaderBrand(mark: headerMark, theme: theme, width: 155, height: 46)
             if graphite {
                 librarySearch
                     .disabled(model.libraryID.isEmpty)

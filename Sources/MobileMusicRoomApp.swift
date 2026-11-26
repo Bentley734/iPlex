@@ -21,6 +21,7 @@ private struct MusicLibraryScreen: View {
     @State private var showConnection = false
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
     @State private var showSettings = false
+    @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
     @State private var showAppIcons = false
     @State private var showPlayer = false
     @State private var search: Task<Void, Never>?
@@ -64,14 +65,7 @@ private struct MusicLibraryScreen: View {
     private var libraryScreen: some View {
         VStack(spacing: 0) {
             HStack {
-                if let url = Bundle.main.url(forResource: "wordmark", withExtension: "png"),
-                   let wordmark = UIImage(contentsOfFile: url.path) {
-                    Image(uiImage: wordmark).resizable().scaledToFit()
-                        .colorMultiply(theme.scheme == .light ? .black : .white)
-                        .frame(width: columnWidth, height: 56).accessibilityLabel("iPlex")
-                } else {
-                    Text("iPlex").font(.title.bold())
-                }
+                HeaderBrand(mark: headerMark, theme: theme, width: columnWidth, height: 56)
                 Spacer()
                 Button { showAppIcons = true } label: { Image(systemName: "app.dashed") }
                     .accessibilityLabel("App Icon")
