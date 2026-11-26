@@ -1,0 +1,8 @@
+.DS_Store
+/dist/
+/build/
+/DerivedData/
+xcuserdata/
+*.xcuserstate
+__pycache__/
+/Windows/Codecs/Lossless-*.exe

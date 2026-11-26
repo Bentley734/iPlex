@@ -1,0 +1,513 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		0963354B7A8E8B7AC7C52E61 /* wordmark.png in Resources */ = {isa = PBXBuildFile; fileRef = F185419F294F55DB3C3CAE00 /* wordmark.png */; };
+		0D8B9B802C2B23D503C305AE /* MusicAppIconPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B6189D5420E12F096AED5C /* MusicAppIconPicker.swift */; };
+		11A1EFAC56D164FB0A224889 /* PlayerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109D6CF5E45B4DDC6F61EF87 /* PlayerController.swift */; };
+		11F3BB75364189A5F0A3B672 /* MacMiniPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3A4685EF46B49FB6B22D90 /* MacMiniPlayer.swift */; };
+		188CBDBB2368F430ACD2DF00 /* PlexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C780AA4CF17CC09BC5ABE45 /* PlexService.swift */; };
+		25CAA425ED3EAA058A2D3B19 /* clickwheel-preview.png in Resources */ = {isa = PBXBuildFile; fileRef = EE113F105DDF52C3139D4A91 /* clickwheel-preview.png */; };
+		29CF984811D8CCAD74A6AB1F /* ClickWheelPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2DA695E5F978CFBEDD54C3D /* ClickWheelPlayer.swift */; };
+		2C7F49F53E5D81DD0D406FAF /* groove-preview.png in Resources */ = {isa = PBXBuildFile; fileRef = 7842787F5186A057B67DDE3B /* groove-preview.png */; };
+		2F7B05532D59401224593621 /* AudioAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED8702E61EE0F31C7677EC30 /* AudioAnalysis.swift */; };
+		37DBDBEFBCA7FA9300B97620 /* MusicSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81F02BA2B14ABC3859F379BD /* MusicSettings.swift */; };
+		41BB757808343F6DE3116ACA /* AlbumCoverCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6581BBFF504F8BAA5B38470 /* AlbumCoverCache.swift */; };
+		42811EF14C7EB41CB2F0D3CD /* MusicAppIconPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B6189D5420E12F096AED5C /* MusicAppIconPicker.swift */; };
+		44CA82903C2BD4FAF29E8EDC /* PlaybackEqualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BC1D71E65269005100C4E31 /* PlaybackEqualizer.swift */; };
+		454FE1F4FDC5B933B903B4DD /* MusicRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EFA099A27452963E48DAEFD /* MusicRoomApp.swift */; };
+		45BD406408902A81EB0EE534 /* MusicRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EFA099A27452963E48DAEFD /* MusicRoomApp.swift */; };
+		48704D4C0C29E57ABDC677D1 /* groove-preview.png in Resources */ = {isa = PBXBuildFile; fileRef = 7842787F5186A057B67DDE3B /* groove-preview.png */; };
+		559F2534C6897DF20AAC1E02 /* Track.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8712B67A9D2431A2B0160DDC /* Track.swift */; };
+		564AA314BCCD696C8A91607B /* MusicPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CCA42EAE03D88BB3496D33 /* MusicPlatform.swift */; };
+		614CA070E7014A7C66698623 /* MacMiniPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3A4685EF46B49FB6B22D90 /* MacMiniPlayer.swift */; };
+		66D831237EA3E508723100E1 /* LibraryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C69FD3E93908A0408008D345 /* LibraryModel.swift */; };
+		6C4C7A59ED6A720264345604 /* MusicSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81F02BA2B14ABC3859F379BD /* MusicSettings.swift */; };
+		733CA465AF821A663909CC7B /* MobileMusicRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97A49FCD6AC086C13007CEB /* MobileMusicRoomApp.swift */; };
+		8E529B00CBCA255DA72EBCA3 /* MusicPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CCA42EAE03D88BB3496D33 /* MusicPlatform.swift */; };
+		93D79DBF914029D9676C6472 /* iOS.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A5FD29343DF8F67713D13B64 /* iOS.xcassets */; };
+		9B3C788DCE3EB58EF492A7D2 /* PlexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C780AA4CF17CC09BC5ABE45 /* PlexService.swift */; };
+		A69490A6AD7CB4C928AF43CD /* Track.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8712B67A9D2431A2B0160DDC /* Track.swift */; };
+		AD0027C3EA6B7D84AD57F90D /* ClickWheelPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2DA695E5F978CFBEDD54C3D /* ClickWheelPlayer.swift */; };
+		B0BBD7ED21A32E626ECC7A08 /* AlbumCoverCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6581BBFF504F8BAA5B38470 /* AlbumCoverCache.swift */; };
+		B14DB919AF1E5EA88CF12FE5 /* AudioAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED8702E61EE0F31C7677EC30 /* AudioAnalysis.swift */; };
+		B7E443953550133C851BC0A2 /* MobileMusicRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97A49FCD6AC086C13007CEB /* MobileMusicRoomApp.swift */; };
+		B9FA1CBBF9218AE47683AD83 /* tvOS.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EF99A5BF8FAE5BAC92EC8A5B /* tvOS.xcassets */; };
+		C0F0713CDBB0212EBBDFA09D /* LibraryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C69FD3E93908A0408008D345 /* LibraryModel.swift */; };
+		DB81C391DA990B61427422F0 /* PlayerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109D6CF5E45B4DDC6F61EF87 /* PlayerController.swift */; };
+		E1361EFA7954A2385E8B461A /* wordmark.png in Resources */ = {isa = PBXBuildFile; fileRef = F185419F294F55DB3C3CAE00 /* wordmark.png */; };
+		EC3D3CB23563AC5726D4B22A /* PlaybackEqualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BC1D71E65269005100C4E31 /* PlaybackEqualizer.swift */; };
+		ECFB148B20F9BB9F02112F4B /* clickwheel-preview.png in Resources */ = {isa = PBXBuildFile; fileRef = EE113F105DDF52C3139D4A91 /* clickwheel-preview.png */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		109D6CF5E45B4DDC6F61EF87 /* PlayerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerController.swift; sourceTree = "<group>"; };
+		12CCA42EAE03D88BB3496D33 /* MusicPlatform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicPlatform.swift; sourceTree = "<group>"; };
+		3BC1D71E65269005100C4E31 /* PlaybackEqualizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackEqualizer.swift; sourceTree = "<group>"; };
+		4EFA099A27452963E48DAEFD /* MusicRoomApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicRoomApp.swift; sourceTree = "<group>"; };
+		6C780AA4CF17CC09BC5ABE45 /* PlexService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlexService.swift; sourceTree = "<group>"; };
+		7842787F5186A057B67DDE3B /* groove-preview.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "groove-preview.png"; sourceTree = "<group>"; };
+		81F02BA2B14ABC3859F379BD /* MusicSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicSettings.swift; sourceTree = "<group>"; };
+		8712B67A9D2431A2B0160DDC /* Track.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Track.swift; sourceTree = "<group>"; };
+		A0B6189D5420E12F096AED5C /* MusicAppIconPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicAppIconPicker.swift; sourceTree = "<group>"; };
+		A5FD29343DF8F67713D13B64 /* iOS.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = iOS.xcassets; sourceTree = "<group>"; };
+		AE3A4685EF46B49FB6B22D90 /* MacMiniPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMiniPlayer.swift; sourceTree = "<group>"; };
+		B2DA695E5F978CFBEDD54C3D /* ClickWheelPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClickWheelPlayer.swift; sourceTree = "<group>"; };
+		B368254AA2FA6C110A7860BB /* MusicRoom-tvOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "MusicRoom-tvOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		C69FD3E93908A0408008D345 /* LibraryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryModel.swift; sourceTree = "<group>"; };
+		C97A49FCD6AC086C13007CEB /* MobileMusicRoomApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileMusicRoomApp.swift; sourceTree = "<group>"; };
+		D6581BBFF504F8BAA5B38470 /* AlbumCoverCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumCoverCache.swift; sourceTree = "<group>"; };
+		ED8702E61EE0F31C7677EC30 /* AudioAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioAnalysis.swift; sourceTree = "<group>"; };
+		EE113F105DDF52C3139D4A91 /* clickwheel-preview.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "clickwheel-preview.png"; sourceTree = "<group>"; };
+		EF99A5BF8FAE5BAC92EC8A5B /* tvOS.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = tvOS.xcassets; sourceTree = "<group>"; };
+		F185419F294F55DB3C3CAE00 /* wordmark.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = wordmark.png; sourceTree = "<group>"; };
+		F34E9130E32BD7FD17500B48 /* MusicRoom-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "MusicRoom-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		42F67F8380F0DE1543EDBB7E /* Mobile */ = {
+			isa = PBXGroup;
+			children = (
+				A5FD29343DF8F67713D13B64 /* iOS.xcassets */,
+				EF99A5BF8FAE5BAC92EC8A5B /* tvOS.xcassets */,
+				BAC280ED2D355840F3D7DC16 /* IconPreviews */,
+			);
+			path = Mobile;
+			sourceTree = "<group>";
+		};
+		432E4B33B14B9775787309F3 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F34E9130E32BD7FD17500B48 /* MusicRoom-iOS.app */,
+				B368254AA2FA6C110A7860BB /* MusicRoom-tvOS.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		66B92525B616589C36D6A1F6 /* Assets */ = {
+			isa = PBXGroup;
+			children = (
+				F185419F294F55DB3C3CAE00 /* wordmark.png */,
+			);
+			path = Assets;
+			sourceTree = "<group>";
+		};
+		B1212F1FE04C13B4DEBCB69A = {
+			isa = PBXGroup;
+			children = (
+				66B92525B616589C36D6A1F6 /* Assets */,
+				42F67F8380F0DE1543EDBB7E /* Mobile */,
+				CFC16E1EDD81B2C33EE455FD /* Sources */,
+				432E4B33B14B9775787309F3 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		BAC280ED2D355840F3D7DC16 /* IconPreviews */ = {
+			isa = PBXGroup;
+			children = (
+				EE113F105DDF52C3139D4A91 /* clickwheel-preview.png */,
+				7842787F5186A057B67DDE3B /* groove-preview.png */,
+			);
+			path = IconPreviews;
+			sourceTree = "<group>";
+		};
+		CFC16E1EDD81B2C33EE455FD /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				D6581BBFF504F8BAA5B38470 /* AlbumCoverCache.swift */,
+				ED8702E61EE0F31C7677EC30 /* AudioAnalysis.swift */,
+				B2DA695E5F978CFBEDD54C3D /* ClickWheelPlayer.swift */,
+				C69FD3E93908A0408008D345 /* LibraryModel.swift */,
+				AE3A4685EF46B49FB6B22D90 /* MacMiniPlayer.swift */,
+				C97A49FCD6AC086C13007CEB /* MobileMusicRoomApp.swift */,
+				A0B6189D5420E12F096AED5C /* MusicAppIconPicker.swift */,
+				12CCA42EAE03D88BB3496D33 /* MusicPlatform.swift */,
+				4EFA099A27452963E48DAEFD /* MusicRoomApp.swift */,
+				81F02BA2B14ABC3859F379BD /* MusicSettings.swift */,
+				3BC1D71E65269005100C4E31 /* PlaybackEqualizer.swift */,
+				109D6CF5E45B4DDC6F61EF87 /* PlayerController.swift */,
+				6C780AA4CF17CC09BC5ABE45 /* PlexService.swift */,
+				8712B67A9D2431A2B0160DDC /* Track.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		34BA7F85B2C91C701BA7B01E /* MusicRoom-tvOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7E28B9D23FE15C992C13FEA7 /* Build configuration list for PBXNativeTarget "MusicRoom-tvOS" */;
+			buildPhases = (
+				F4644290A52137820BB1BF1D /* Sources */,
+				DD12C1AD81CC43205D259847 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "MusicRoom-tvOS";
+			packageProductDependencies = (
+			);
+			productName = "MusicRoom-tvOS";
+			productReference = B368254AA2FA6C110A7860BB /* MusicRoom-tvOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+		A0D4B276365C34C91DD5F8BD /* MusicRoom-iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 8341E98AF44C1A1104E6ACAE /* Build configuration list for PBXNativeTarget "MusicRoom-iOS" */;
+			buildPhases = (
+				31FBD1C9F9CE5E14B3D3469A /* Sources */,
+				28E5C5322CA2873CB43B446A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "MusicRoom-iOS";
+			packageProductDependencies = (
+			);
+			productName = "MusicRoom-iOS";
+			productReference = F34E9130E32BD7FD17500B48 /* MusicRoom-iOS.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		E88A9D22A29A4523BD247FBF /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1600;
+				TargetAttributes = {
+				};
+			};
+			buildConfigurationList = BC632730C23DAD2A4A7B65DA /* Build configuration list for PBXProject "MusicRoom" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = B1212F1FE04C13B4DEBCB69A;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 432E4B33B14B9775787309F3 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A0D4B276365C34C91DD5F8BD /* MusicRoom-iOS */,
+				34BA7F85B2C91C701BA7B01E /* MusicRoom-tvOS */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		28E5C5322CA2873CB43B446A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				ECFB148B20F9BB9F02112F4B /* clickwheel-preview.png in Resources */,
+				48704D4C0C29E57ABDC677D1 /* groove-preview.png in Resources */,
+				93D79DBF914029D9676C6472 /* iOS.xcassets in Resources */,
+				0963354B7A8E8B7AC7C52E61 /* wordmark.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		DD12C1AD81CC43205D259847 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				25CAA425ED3EAA058A2D3B19 /* clickwheel-preview.png in Resources */,
+				2C7F49F53E5D81DD0D406FAF /* groove-preview.png in Resources */,
+				B9FA1CBBF9218AE47683AD83 /* tvOS.xcassets in Resources */,
+				E1361EFA7954A2385E8B461A /* wordmark.png in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		31FBD1C9F9CE5E14B3D3469A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B0BBD7ED21A32E626ECC7A08 /* AlbumCoverCache.swift in Sources */,
+				2F7B05532D59401224593621 /* AudioAnalysis.swift in Sources */,
+				AD0027C3EA6B7D84AD57F90D /* ClickWheelPlayer.swift in Sources */,
+				66D831237EA3E508723100E1 /* LibraryModel.swift in Sources */,
+				614CA070E7014A7C66698623 /* MacMiniPlayer.swift in Sources */,
+				733CA465AF821A663909CC7B /* MobileMusicRoomApp.swift in Sources */,
+				42811EF14C7EB41CB2F0D3CD /* MusicAppIconPicker.swift in Sources */,
+				8E529B00CBCA255DA72EBCA3 /* MusicPlatform.swift in Sources */,
+				45BD406408902A81EB0EE534 /* MusicRoomApp.swift in Sources */,
+				37DBDBEFBCA7FA9300B97620 /* MusicSettings.swift in Sources */,
+				44CA82903C2BD4FAF29E8EDC /* PlaybackEqualizer.swift in Sources */,
+				11A1EFAC56D164FB0A224889 /* PlayerController.swift in Sources */,
+				188CBDBB2368F430ACD2DF00 /* PlexService.swift in Sources */,
+				559F2534C6897DF20AAC1E02 /* Track.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F4644290A52137820BB1BF1D /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				41BB757808343F6DE3116ACA /* AlbumCoverCache.swift in Sources */,
+				B14DB919AF1E5EA88CF12FE5 /* AudioAnalysis.swift in Sources */,
+				29CF984811D8CCAD74A6AB1F /* ClickWheelPlayer.swift in Sources */,
+				C0F0713CDBB0212EBBDFA09D /* LibraryModel.swift in Sources */,
+				11F3BB75364189A5F0A3B672 /* MacMiniPlayer.swift in Sources */,
+				B7E443953550133C851BC0A2 /* MobileMusicRoomApp.swift in Sources */,
+				0D8B9B802C2B23D503C305AE /* MusicAppIconPicker.swift in Sources */,
+				564AA314BCCD696C8A91607B /* MusicPlatform.swift in Sources */,
+				454FE1F4FDC5B933B903B4DD /* MusicRoomApp.swift in Sources */,
+				6C4C7A59ED6A720264345604 /* MusicSettings.swift in Sources */,
+				EC3D3CB23563AC5726D4B22A /* PlaybackEqualizer.swift in Sources */,
+				DB81C391DA990B61427422F0 /* PlayerController.swift in Sources */,
+				9B3C788DCE3EB58EF492A7D2 /* PlexService.swift in Sources */,
+				A69490A6AD7CB4C928AF43CD /* Track.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		397439B97D2997D30D57C318 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = ClassicClickWheel;
+				ASSETCATALOG_COMPILER_APPICON_NAME = TVBrand;
+				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = net.bentley734.musicroom.tvos;
+				PRODUCT_NAME = iPlex;
+				SDKROOT = appletvos;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+			};
+			name = Debug;
+		};
+		5D3E590BC650C5706CD11F73 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex music server.";
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		64365578754BED6828A1E01D /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = ClassicClickWheel;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = "Mobile/iOS-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = net.bentley734.musicroom.ios;
+				PRODUCT_NAME = iPlex;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		6CEB115B199E0BD249279873 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = ClassicClickWheel;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = "Mobile/iOS-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = net.bentley734.musicroom.ios;
+				PRODUCT_NAME = iPlex;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		91865EA8D807C9A6E0B6B4EF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
+				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex music server.";
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		ECBAE4830A62993D4C987AD8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = ClassicClickWheel;
+				ASSETCATALOG_COMPILER_APPICON_NAME = TVBrand;
+				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = net.bentley734.musicroom.tvos;
+				PRODUCT_NAME = iPlex;
+				SDKROOT = appletvos;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		7E28B9D23FE15C992C13FEA7 /* Build configuration list for PBXNativeTarget "MusicRoom-tvOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				397439B97D2997D30D57C318 /* Debug */,
+				ECBAE4830A62993D4C987AD8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		8341E98AF44C1A1104E6ACAE /* Build configuration list for PBXNativeTarget "MusicRoom-iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				64365578754BED6828A1E01D /* Debug */,
+				6CEB115B199E0BD249279873 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		BC632730C23DAD2A4A7B65DA /* Build configuration list for PBXProject "MusicRoom" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				91865EA8D807C9A6E0B6B4EF /* Debug */,
+				5D3E590BC650C5706CD11F73 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = E88A9D22A29A4523BD247FBF /* Project object */;
+}

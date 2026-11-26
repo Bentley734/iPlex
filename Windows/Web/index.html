@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; media-src https://media.musicroom.invalid; connect-src https://media.musicroom.invalid; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>iPlex</title>
+  <link rel="icon" href="groove.ico">
+  <link rel="stylesheet" href="style.css">
+  <script defer src="playback.js"></script>
+  <script defer src="clickwheel.js"></script>
+  <script defer src="music.js"></script>
+</head>
+<body>
+  <aside aria-label="iPlex">
+    <img class="wordmark" src="wordmark.png" alt="iPlex">
+    <nav aria-label="Library">
+      <button id="albums" aria-pressed="true" disabled>Albums</button>
+      <button id="artists" aria-pressed="false" disabled>Artists</button>
+    </nav>
+    <div id="connection" hidden>
+      <label>Server<select id="server"></select></label>
+      <label id="library-label">Music library<select id="library"></select></label>
+    </div>
+    <div class="preferences">
+      <label>Window icon<select id="icon">
+        <option value="groove">Copper Groove</option>
+        <option value="prism">Prism</option>
+        <option value="signal">Teal Signal</option>
+        <option value="clickwheel">Classic Click Wheel</option>
+      </select></label>
+      <button id="settings" type="button">Settings</button>
+      <button id="disconnect" hidden>Disconnect Plex</button>
+    </div>
+  </aside>
+  <main>
+    <section id="welcome">
+      <img src="groove.png" alt="" width="74" height="74">
+      <h1 id="welcome-title">Connect to Plex</h1>
+      <p id="connection-status" role="status">Browse and play music from your Plex server.</p>
+      <button class="primary" id="connect">Connect Plex</button>
+      <button id="cancel" hidden>Cancel</button>
+    </section>
+    <section id="browser" hidden>
+      <header>
+        <button id="back" aria-label="Back" hidden>‹</button>
+        <h1 id="title">Albums</h1>
+        <input type="search" id="search" aria-label="Search albums or artists" placeholder="Search library" maxlength="120">
+      </header>
+      <div class="content" id="scroll">
+        <p id="message" role="status" hidden></p>
+        <section id="details" hidden></section>
+        <div id="grid" class="grid"></div>
+        <button id="more" hidden>Load More</button>
+      </div>
+    </section>
+  </main>
+  <footer aria-label="Now playing">
+    <div class="playing" id="playing">Nothing playing</div>
+    <button id="open-wheel" type="button" hidden>Now Playing</button>
+    <div class="controls">
+      <button id="previous" aria-label="Previous track" disabled>⏮</button>
+      <button class="primary" id="toggle" aria-label="Play" disabled>▶</button>
+      <button id="next" aria-label="Next track" disabled>⏭</button>
+    </div>
+    <input id="seek" aria-label="Playback position" type="range" min="0" max="1" value="0" disabled>
+    <time id="elapsed">0:00</time>
+  </footer>
+  <dialog id="wheel-player" aria-labelledby="wheel-heading">
+    <div class="device-screen">
+      <div class="screen-top"><h1 id="wheel-heading">Now Playing</h1><span id="wheel-track"></span></div>
+      <div class="screen-track">
+        <div id="wheel-cover"></div>
+        <div><strong id="wheel-title"></strong><small id="wheel-subtitle"></small></div>
+      </div>
+      <progress id="wheel-progress" max="1" value="0" aria-label="Playback position"></progress>
+      <div class="screen-times"><time id="wheel-elapsed">0:00</time><time id="wheel-duration">0:00</time></div>
+      <p id="wheel-message" hidden></p>
+    </div>
+    <div id="wheel-ring" role="group" aria-label="Click wheel">
+      <button id="wheel-menu" type="button" aria-label="Back to Library">MENU</button>
+      <button id="wheel-prev" type="button" aria-label="Previous or restart track">⏮</button>
+      <button id="wheel-next" type="button" aria-label="Next track">⏭</button>
+      <button id="wheel-play" type="button" aria-label="Play">▶</button>
+      <button id="wheel-center" type="button" aria-label="Switch wheel to scrub"><span aria-hidden="true">◉</span></button>
+    </div>
+    <div class="wheel-adjustments">
+      <button id="wheel-minus" type="button" aria-label="Decrease playback volume">−</button>
+      <output id="wheel-mode">VOL 100%</output>
+      <button id="wheel-plus" type="button" aria-label="Increase playback volume">+</button>
+    </div>
+  </dialog>
+  <dialog id="settings-page" aria-labelledby="settings-heading">
+    <div class="settings-head">
+      <h1 id="settings-heading">Settings</h1>
+      <button id="close-settings" type="button">Done</button>
+    </div>
+    <label class="theme-choice">Theme
+      <select id="theme">
+        <option value="copper">Copper Groove</option>
+        <option value="classic">Classic iPod</option>
+        <option value="video">iPod Video</option>
+      </select>
+    </label>
+    <section>
+      <div class="settings-head">
+        <h2>Equalizer</h2>
+        <button id="reset-eq" type="button">Reset EQ</button>
+      </div>
+      <label class="eq-band">Bass <input id="bass" type="range" min="-10" max="10" step="1" value="0"><output for="bass" id="bass-value">+0 dB</output></label>
+      <label class="eq-band">Midrange <input id="mid" type="range" min="-10" max="10" step="1" value="0"><output for="mid" id="mid-value">+0 dB</output></label>
+      <label class="eq-band">Treble <input id="treble" type="range" min="-10" max="10" step="1" value="0"><output for="treble" id="treble-value">+0 dB</output></label>
+      <p id="eq-status" role="status" hidden></p>
+    </section>
+    <section>
+      <h2>Plex Artwork</h2>
+      <p id="cover-library">Choose a Plex music library to cache artwork.</p>
+      <button id="cache-covers" type="button" disabled>Cache Library Artwork</button>
+      <p id="cover-cache-status" role="status"></p>
+    </section>
+  </dialog>
+</body>
+</html>

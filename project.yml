@@ -1,0 +1,53 @@
+name: MusicRoom
+options:
+  createIntermediateGroups: true
+settings:
+  SWIFT_VERSION: 5.0
+  MARKETING_VERSION: 0.1.0
+  CURRENT_PROJECT_VERSION: 1
+  GENERATE_INFOPLIST_FILE: YES
+  INFOPLIST_KEY_CFBundleDisplayName: iPlex
+  INFOPLIST_KEY_NSLocalNetworkUsageDescription: iPlex connects to your Plex music server.
+targets:
+  MusicRoom-iOS:
+    type: application
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - Sources
+      - path: Assets/wordmark.png
+        buildPhase: resources
+      - path: Mobile/IconPreviews
+        buildPhase: resources
+      - path: Mobile/iOS.xcassets
+        buildPhase: resources
+    info:
+      path: Mobile/iOS-Info.plist
+      properties:
+        CFBundleDisplayName: iPlex
+        UIBackgroundModes: [audio]
+        UILaunchScreen: {}
+        NSLocalNetworkUsageDescription: iPlex connects to your Plex music server.
+    settings:
+      PRODUCT_NAME: iPlex
+      PRODUCT_BUNDLE_IDENTIFIER: net.bentley734.musicroom.ios
+      TARGETED_DEVICE_FAMILY: "1,2"
+      ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+      ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: ClassicClickWheel
+  MusicRoom-tvOS:
+    type: application
+    platform: tvOS
+    deploymentTarget: "17.0"
+    sources:
+      - Sources
+      - path: Assets/wordmark.png
+        buildPhase: resources
+      - path: Mobile/IconPreviews
+        buildPhase: resources
+      - path: Mobile/tvOS.xcassets
+        buildPhase: resources
+    settings:
+      PRODUCT_NAME: iPlex
+      PRODUCT_BUNDLE_IDENTIFIER: net.bentley734.musicroom.tvos
+      ASSETCATALOG_COMPILER_APPICON_NAME: TVBrand
+      ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: ClassicClickWheel
