@@ -404,22 +404,31 @@
   }
   const nowPlaying = get('now-playing');
   function showNowQueue(show) {
-    get('now-queue').hidden = !show;
-    nowPlaying.querySelector('.now-playing-hero').hidden = show;
+    const queue = get('now-queue');
     const toggle = get('jump-now-queue');
-    toggle.textContent = show ? 'Player' : 'Queue';
+    if (!show && queue.contains(document.activeElement)) toggle.focus();
     toggle.setAttribute('aria-expanded', String(show));
-    nowPlaying.querySelector('.now-playing-scroll').scrollTop = 0;
-    if (show) get('now-queue-heading').focus();
+    queue.inert = !show;
+    queue.setAttribute('aria-hidden', String(!show));
+    nowPlaying.classList.toggle('queue-open', show);
+    if (show) {
+      const active = queue.querySelector('[aria-current="true"]');
+      if (active) {
+        const scroll = queue.querySelector('.now-queue-content');
+        scroll.scrollTop += active.getBoundingClientRect().top - scroll.getBoundingClientRect().top - scroll.clientHeight / 2;
+      }
+      get('now-queue-heading').focus({preventScroll:true});
+    }
   }
   get('show-now-playing').onclick = () => {
     if (!playing || nowPlaying.open) return;
     renderNowPlaying(playbackState);
-    nowPlaying.showModal();
     showNowQueue(false);
+    nowPlaying.showModal();
+    nowPlaying.querySelector('.now-playing-scroll').scrollTop = 0;
   };
   get('close-now-playing').onclick = () => nowPlaying.close();
-  get('jump-now-queue').onclick = () => showNowQueue(get('now-queue').hidden);
+  get('jump-now-queue').onclick = () => showNowQueue(!nowPlaying.classList.contains('queue-open'));
   get('now-prev').onclick = () => player.action({action:'previous'});
   get('now-play').onclick = () => player.action({action:'toggle'});
   get('now-next').onclick = () => player.action({action:'next'});

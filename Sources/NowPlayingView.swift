@@ -5,6 +5,7 @@ struct NowPlayingView: View {
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @State private var showingQueue = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let close: () -> Void
 
     private var palette: ArtworkPalette? { artworkColors ? library.playingPalette : nil }
@@ -19,52 +20,19 @@ struct NowPlayingView: View {
 
     var body: some View {
         GeometryReader { geometry in
-            let wide = geometry.size.width >= 650
-            let inset = wide ? min(68, geometry.size.width * 0.045) : 24
-            let coverWidth = wide
-                ? min(680, geometry.size.width * 0.47, max(220, geometry.size.height - 164))
-                : min(460, geometry.size.width - inset * 2, max(210, geometry.size.height * 0.53))
+            let queueWidth = min(340, max(128, geometry.size.width * 0.43))
             VStack(spacing: 0) {
                 header
-                    .padding(.horizontal, inset)
-                GeometryReader { available in
+                    .padding(.horizontal, min(60, geometry.size.width * 0.045))
+                HStack(spacing: 0) {
+                    player
                     if showingQueue {
-                        ScrollViewReader { scroll in
-                            ScrollView {
-                                queue
-                                    .frame(maxWidth: 850)
-                                    .padding(.horizontal, inset)
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .onAppear {
-                                if let index = library.state.index { scroll.scrollTo(index, anchor: .center) }
-                            }
-                        }
-                    } else {
-                        ScrollView {
-                            if let album = library.playingAlbum {
-                                let layout = wide
-                                    ? AnyLayout(HStackLayout(alignment: .center, spacing: min(78, geometry.size.width * 0.055)))
-                                    : AnyLayout(VStackLayout(alignment: .center, spacing: 26))
-                                layout {
-                                    artwork(album)
-                                        .frame(width: max(1, coverWidth), height: max(1, coverWidth))
-                                    playback(album)
-                                        .frame(maxWidth: 510, alignment: .leading)
-                                        .frame(maxWidth: .infinity)
-                                }
-                                .padding(.horizontal, inset)
-                                .padding(.vertical, wide ? 30 : 22)
-                                .frame(maxWidth: 1400)
-                                .frame(maxWidth: .infinity, minHeight: available.size.height)
-                            } else {
-                                Text("Nothing playing")
-                                    .foregroundStyle(.secondary)
-                                    .frame(maxWidth: .infinity, minHeight: available.size.height)
-                            }
-                        }
+                        queuePanel(compact: queueWidth < 235)
+                            .frame(width: queueWidth)
+                            .transition(.move(edge: .trailing))
                     }
                 }
+                .clipped()
             }
         }
         .background {
@@ -88,11 +56,14 @@ struct NowPlayingView: View {
                 .keyboardShortcut(.cancelAction)
                 #endif
                 .frame(maxWidth: .infinity, alignment: .leading)
-            Text(showingQueue ? "Up Next" : "Now Playing")
+            Text("Now Playing")
                 .font(.headline)
                 .accessibilityAddTraits(.isHeader)
-            Button(showingQueue ? "Player" : "Queue",
-                   systemImage: showingQueue ? "waveform" : "list.bullet") { showingQueue.toggle() }
+            Button("Queue", systemImage: "list.bullet") {
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { showingQueue.toggle() }
+            }
+                .tint(showingQueue ? accent : nil)
+                .accessibilityAddTraits(showingQueue ? .isSelected : [])
                 .disabled(library.playingTracks.isEmpty)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
@@ -100,6 +71,66 @@ struct NowPlayingView: View {
         .buttonStyle(.bordered)
         .padding(.vertical, 16)
         .overlay(alignment: .bottom) { Divider().opacity(0.5) }
+    }
+
+    private var player: some View {
+        GeometryReader { geometry in
+            let wide = geometry.size.width >= 650
+            let compact = geometry.size.width < 300 || (showingQueue && geometry.size.height < 405)
+            let inset = wide ? min(68, geometry.size.width * 0.045) : (compact ? 10 : 24)
+            let coverWidth = wide
+                ? min(680, geometry.size.width * 0.47, max(220, geometry.size.height - 60))
+                : min(460, geometry.size.width - inset * 2, max(130, geometry.size.height * (showingQueue ? 0.35 : 0.53)))
+            ScrollView {
+                if let album = library.playingAlbum {
+                    let layout = wide
+                        ? AnyLayout(HStackLayout(alignment: .center, spacing: min(78, geometry.size.width * 0.055)))
+                        : AnyLayout(VStackLayout(alignment: .center, spacing: compact ? 12 : 26))
+                    layout {
+                        artwork(album)
+                            .frame(width: max(1, coverWidth), height: max(1, coverWidth))
+                        playback(album, compact: compact)
+                            .frame(maxWidth: 510, alignment: .leading)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .padding(.horizontal, inset)
+                    .padding(.vertical, wide ? 30 : (compact ? 10 : 22))
+                    .frame(maxWidth: 1400)
+                    .frame(maxWidth: .infinity, minHeight: geometry.size.height)
+                } else {
+                    Text("Nothing playing")
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity, minHeight: geometry.size.height)
+                }
+            }
+        }
+        #if os(tvOS)
+        .focusSection()
+        #endif
+    }
+
+    private func queuePanel(compact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("Up Next")
+                .font(.headline)
+                .accessibilityAddTraits(.isHeader)
+                .padding(compact ? 10 : 18)
+            ScrollViewReader { scroll in
+                ScrollView {
+                    queue(compact: compact)
+                        .padding(.horizontal, compact ? 5 : 12)
+                }
+                .onAppear {
+                    if let index = library.state.index { scroll.scrollTo(index, anchor: .center) }
+                }
+            }
+        }
+        .frame(maxHeight: .infinity)
+        .background(theme.surface(using: palette))
+        .overlay(alignment: .leading) { Divider().opacity(0.5) }
+        #if os(tvOS)
+        .focusSection()
+        #endif
     }
 
     private func artwork(_ album: MusicEntry) -> some View {
@@ -126,14 +157,14 @@ struct NowPlayingView: View {
         Image(systemName: "music.note").font(.largeTitle).foregroundStyle(accent)
     }
 
-    private func playback(_ album: MusicEntry) -> some View {
-        VStack(alignment: .leading, spacing: 15) {
+    private func playback(_ album: MusicEntry, compact: Bool) -> some View {
+        VStack(alignment: .leading, spacing: compact ? 7 : 15) {
             Text(currentTrack?.title ?? (library.state.title.isEmpty ? album.title : library.state.title))
-                .font(.largeTitle.bold()).lineLimit(3)
+                .font(compact ? .headline : .largeTitle.bold()).lineLimit(compact ? 2 : 3)
             let artist = currentTrack?.artist ?? album.artist
-            if !artist.isEmpty { Text(artist).font(.title3).foregroundStyle(.secondary) }
+            if !artist.isEmpty { Text(artist).font(compact ? .caption : .title3).foregroundStyle(.secondary).lineLimit(compact ? 1 : 2) }
             if let release = currentTrack?.album ?? (album.kind == .albums ? album.title : nil) {
-                Text(release).font(.subheadline).foregroundStyle(.secondary)
+                Text(release).font(compact ? .caption2 : .subheadline).foregroundStyle(.secondary).lineLimit(compact ? 1 : 2)
             }
             if !library.state.message.isEmpty {
                 Text(library.state.message).font(.callout).foregroundStyle(accent)
@@ -154,7 +185,7 @@ struct NowPlayingView: View {
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
             }
-            HStack(spacing: 14) {
+            HStack(spacing: compact ? 5 : 14) {
                 Spacer(minLength: 0)
                 Button("Previous Track", systemImage: "backward.end.fill", action: library.player.previous)
                     .disabled(!library.state.previous)
@@ -165,7 +196,7 @@ struct NowPlayingView: View {
                 Button(library.state.playing ? "Pause" : "Play",
                        systemImage: library.state.playing ? "pause.fill" : "play.fill", action: library.player.toggle)
                     .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
+                    .controlSize(compact ? .regular : .large)
                 #if os(tvOS)
                 Button("Forward 15 Seconds", systemImage: "goforward.15") { library.player.seek(to: min(duration, elapsed + 15)) }
                     .disabled(duration <= 0)
@@ -189,25 +220,27 @@ struct NowPlayingView: View {
         }
     }
 
-    private var queue: some View {
+    private func queue(compact: Bool) -> some View {
         LazyVStack(alignment: .leading, spacing: 5) {
             ForEach(library.playingTracks.indices, id: \.self) { index in
                 let track = library.playingTracks[index]
                 let current = index == library.state.index
                 Button { library.player.selectTrack(index) } label: {
                     HStack(spacing: 12) {
-                        Group {
-                            if current { Image(systemName: "waveform") }
-                            else { Text(String(track.number)).monospacedDigit() }
+                        if !compact {
+                            Group {
+                                if current { Image(systemName: "waveform") }
+                                else { Text(String(track.number)).monospacedDigit() }
+                            }
+                            .frame(width: 29)
+                            .accessibilityHidden(true)
                         }
-                        .frame(width: 29)
-                        .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(track.title).lineLimit(1)
                             if let artist = track.artist { Text(artist).font(.caption).foregroundStyle(.secondary) }
                         }
                         Spacer()
-                        if let length = track.duration { Text(clock(length)).font(.caption.monospacedDigit()) }
+                        if !compact, let length = track.duration { Text(clock(length)).font(.caption.monospacedDigit()) }
                     }
                     .padding(9)
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -225,7 +258,7 @@ struct NowPlayingView: View {
                 .id(index)
             }
         }
-        .padding(.vertical, 20)
+        .padding(.bottom, 16)
     }
 
     private func clock(_ seconds: Double) -> String {

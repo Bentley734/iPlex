@@ -76,29 +76,33 @@
       <h1 id="now-playing-heading">Now Playing</h1>
       <button id="jump-now-queue" type="button" aria-controls="now-queue" aria-expanded="false">Queue</button>
     </header>
-    <div class="now-playing-scroll">
-      <div class="now-playing-hero">
-        <div id="now-art"></div>
-        <div class="now-playing-controls">
-          <h2 id="now-title"></h2>
-          <p id="now-artist"></p>
-          <p id="now-album"></p>
-          <p id="now-status" role="status" hidden></p>
-          <input id="now-seek" type="range" min="0" max="1" step="0.1" value="0" aria-label="Playback position">
-          <div class="now-playing-times"><time id="now-elapsed">0:00</time><time id="now-duration">0:00</time></div>
-          <div class="now-playing-transport">
-            <button id="now-prev" type="button" aria-label="Previous Track">⏮</button>
-            <button id="now-play" class="primary" type="button" aria-label="Play">▶</button>
-            <button id="now-next" type="button" aria-label="Next Track">⏭</button>
+    <div class="now-playing-body">
+      <div class="now-playing-scroll">
+        <div class="now-playing-hero">
+          <div id="now-art"></div>
+          <div class="now-playing-controls">
+            <h2 id="now-title"></h2>
+            <p id="now-artist"></p>
+            <p id="now-album"></p>
+            <p id="now-status" role="status" hidden></p>
+            <input id="now-seek" type="range" min="0" max="1" step="0.1" value="0" aria-label="Playback position">
+            <div class="now-playing-times"><time id="now-elapsed">0:00</time><time id="now-duration">0:00</time></div>
+            <div class="now-playing-transport">
+              <button id="now-prev" type="button" aria-label="Previous Track">⏮</button>
+              <button id="now-play" class="primary" type="button" aria-label="Play">▶</button>
+              <button id="now-next" type="button" aria-label="Next Track">⏭</button>
+            </div>
+            <label class="now-playing-volume">Volume
+              <input id="now-volume" type="range" min="0" max="1" step="0.01" value="1">
+            </label>
           </div>
-          <label class="now-playing-volume">Volume
-            <input id="now-volume" type="range" min="0" max="1" step="0.01" value="1">
-          </label>
         </div>
       </div>
-      <section id="now-queue" aria-labelledby="now-queue-heading" hidden>
-        <h2 id="now-queue-heading" tabindex="-1">Up Next</h2>
-        <ol id="now-queue-list"></ol>
+      <section id="now-queue" aria-labelledby="now-queue-heading" aria-hidden="true" inert>
+        <div class="now-queue-content">
+          <h2 id="now-queue-heading" tabindex="-1">Up Next</h2>
+          <ol id="now-queue-list"></ol>
+        </div>
       </section>
     </div>
   </dialog>
