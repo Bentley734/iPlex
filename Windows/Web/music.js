@@ -33,6 +33,7 @@
   let nowQueue = [];
   let pins = [];
   let launchPreview = null;
+  let queuedOpen = null;
   let replacingPreview = false;
   let pinnedKey = "";
   let pendingEnqueue = null;
@@ -177,7 +178,13 @@
           pageSize:pageSize === 'all' ? 120 : Number(pageSize)});
   }
   function open(item) {
-    if (launchPreview || replacingPreview) return;
+    if (launchPreview) {
+      queuedOpen = {item, server:launchPreview.server, library:launchPreview.library};
+      status('Opening ' + item.title + ' when Plex reconnects…');
+      if (!launchPreview.waiting) host({action:'servers'});
+      return;
+    }
+    replacingPreview = false;
     clearTimeout(timer);
     if (item.kind === 'artist' || item.kind === 'genre') {
       group = item;
@@ -515,7 +522,8 @@
     get('retry-library').hidden = !launchPreview || launchPreview.waiting;
     if (launchPreview) {
       renderLaunchPreview();
-      status(launchPreview.waiting ? [launchPreview.name, 'Reconnecting to Plex…'].filter(Boolean).join(' · ') : state.message);
+      status(launchPreview.waiting && queuedOpen ? 'Opening ' + queuedOpen.item.title + ' when Plex reconnects…' :
+        launchPreview.waiting ? [launchPreview.name, 'Reconnecting to Plex…'].filter(Boolean).join(' · ') : state.message);
       return;
     }
     if (server !== state.serverId || library !== state.libraryId) {
@@ -530,8 +538,16 @@
       closePlaybackSheets();
       if (get('now-playing').open) get('now-playing').close();
       player.reset();
-      if (library) browse(false, Boolean(before?.library === library && before.server === server && entries.length));
+      const selection = queuedOpen;
+      queuedOpen = null;
+      if (library && selection?.server === server && selection.library === library) open(selection.item);
+      else if (library) browse(false, Boolean(before?.library === library && before.server === server && entries.length));
       else { entries = []; get('grid').replaceChildren(); }
+    } else if (before && library) {
+      const selection = queuedOpen;
+      queuedOpen = null;
+      if (selection?.server === server && selection.library === library) open(selection.item);
+      else browse(false, Boolean(before.server === server && before.library === library && entries.length));
     }
   };
   function renderLaunchPreview() {
@@ -1172,9 +1188,13 @@
   host({action:'status'});
   function selectSection(section) {
     clearTimeout(timer);
+    queuedOpen = null;
     kind = section;
     group = null;
-    if (launchPreview) renderLaunchPreview();
+    if (launchPreview) {
+      renderLaunchPreview();
+      if (launchPreview.waiting) status([launchPreview.name, 'Reconnecting to Plex…'].filter(Boolean).join(' · '));
+    }
     else if (library) browse();
     else render();
   }

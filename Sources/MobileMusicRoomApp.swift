@@ -221,6 +221,9 @@ private struct MusicLibraryScreen: View {
                     else { library.browse() }
                 } label: { Label("Back", systemImage: "chevron.left") }
             }
+            if let status = library.libraryConnectionStatus {
+                Text(status).font(.callout).foregroundStyle(.secondary)
+            }
             if let message = library.message {
                 HStack {
                     Text(message).foregroundStyle(.secondary)

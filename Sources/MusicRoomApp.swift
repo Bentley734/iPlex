@@ -354,6 +354,10 @@ private struct MusicWindow: View {
                     }
                 }
                 .padding(.horizontal, 28).padding(.vertical, 20)
+                if let status = model.libraryConnectionStatus {
+                    Text(status).font(.callout).foregroundStyle(.secondary)
+                        .padding(.horizontal, 28).padding(.bottom, 12)
+                }
                 if let message = model.message {
                     HStack {
                         Text(message).font(.callout).foregroundStyle(copper)

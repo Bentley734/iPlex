@@ -376,6 +376,7 @@ namespace MusicRoom
                 plexPrefs["library." + selectedServer] = selectedSection;
                 plexPrefs["server"] = selectedServer;
                 SavePrefs();
+                RegisterCachedMusicItems();
             }
             loadingSections = false;
             plexMessage = list.Count == 0         ? "No music libraries found on this server."
@@ -569,6 +570,24 @@ namespace MusicRoom
             var saved = SavedLaunchLibrary();
             if (Str(saved, "server") != selectedServer || Str(saved, "library") != selectedSection) return false;
             return Map(Get(saved, "listings")).Values.Any(list => Rows(list).Any(row => Str(row, "thumb") == path));
+        }
+
+        void RegisterCachedMusicItems()
+        {
+            var saved = SavedLaunchLibrary();
+            if (Str(saved, "server") != selectedServer || Str(saved, "library") != selectedSection) return;
+            foreach (var listing in Map(Get(saved, "listings")).Values)
+            {
+                foreach (var row in Rows(listing).Take(120))
+                {
+                    string key = Str(row, "id"), kind = Str(row, "kind");
+                    bool valid = kind == "genre" ? key.StartsWith("genre:", StringComparison.Ordinal) && ItemID.IsMatch(key.Substring(6)) :
+                        (kind == "album" || kind == "artist" || kind == "playlist" || kind == "track") && ItemID.IsMatch(key);
+                    if (valid && !items.ContainsKey(key))
+                        items[key] = new LibraryItem { Kind = kind, Title = Str(row, "title"), Artist = Str(row, "artist"),
+                            Thumb = ArtworkPath(row, "thumb") };
+                }
+            }
         }
 
         object ReadLaunchLibrary()

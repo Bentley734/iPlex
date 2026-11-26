@@ -26,6 +26,7 @@ final class LibraryModel: ObservableObject {
     @Published private(set) var playingTracks: [LiveTrack] = []
     @Published private(set) var busy = false
     @Published private(set) var reconnecting = false
+    @Published private(set) var pendingCachedOpen: MusicEntry?
     @Published private(set) var more = false
     @Published private(set) var signInURL: URL?
     @Published private(set) var linkCode: String?
@@ -184,9 +185,17 @@ final class LibraryModel: ObservableObject {
         }
     }
 
+    var libraryConnectionStatus: String? {
+        guard reconnecting else { return nil }
+        if let pendingCachedOpen { return "Opening \(pendingCachedOpen.title) when Plex reconnects…" }
+        return "Reconnecting to Plex…"
+    }
+
     func retryLibrary() {
-        if service.status.selectedLibraryID == nil { restore() }
-        else { browse() }
+        if service.status.selectedLibraryID != libraryID || libraryID.isEmpty {
+            if !libraryID.isEmpty { reconnecting = true }
+            restore()
+        } else { browse() }
     }
 
     func cancel() {
@@ -237,8 +246,18 @@ final class LibraryModel: ObservableObject {
             libraryID = only.id
         }
         loadPins()
-        if !libraryID.isEmpty { try await loadEntries(append: false) }
-        else {
+        if reconnecting {
+            reconnecting = false
+            invalidateArtwork()
+        }
+        if !libraryID.isEmpty {
+            if let selection = pendingCachedOpen {
+                pendingCachedOpen = nil
+                try await loadSelection(selection)
+            } else {
+                try await loadEntries(append: false)
+            }
+        } else {
             launchSnapshot = nil
             UserDefaults.standard.removeObject(forKey: Self.snapshotKey)
         }
@@ -272,6 +291,7 @@ final class LibraryModel: ObservableObject {
     }
 
     private func resetLibrary() {
+        pendingCachedOpen = nil
         stopCachingCovers()
         coverCacheStatus = ""
         pins = []
@@ -304,6 +324,7 @@ final class LibraryModel: ObservableObject {
 
     func selectKind(_ section: MusicKind) {
         guard visibleKinds.contains(section) else { return }
+        pendingCachedOpen = nil
         kind = section
         if reconnecting { entries = launchSnapshot?.listings[kind] ?? [] }
         else { browse() }
@@ -376,19 +397,29 @@ final class LibraryModel: ObservableObject {
     }
 
     func open(_ entry: MusicEntry) {
-        guard !reconnecting else { return }
+        guard connected, !libraryID.isEmpty else { return }
+        if reconnecting || service.status.selectedLibraryID != libraryID {
+            pendingCachedOpen = entry
+            if !busy {
+                reconnecting = true
+                restore()
+            }
+            return
+        }
+        perform { try await self.loadSelection(entry) }
+    }
+
+    private func loadSelection(_ entry: MusicEntry) async throws {
         if entry.kind.isGroup {
             selectedGroup = entry
             selectedDetail = nil
-            perform { try await self.loadEntries(append: false) }
+            try await loadEntries(append: false)
         } else {
             selectedDetail = entry
             tracks = []
-            perform {
-                let found = try await self.request { self.service.musicTracks(entry: entry, completion: $0) }
-                try Task.checkCancellation()
-                self.tracks = found
-            }
+            let found = try await request { self.service.musicTracks(entry: entry, completion: $0) }
+            try Task.checkCancellation()
+            tracks = found
         }
     }
 
@@ -613,10 +644,6 @@ final class LibraryModel: ObservableObject {
             snapshot.listings[requestedKind] = Array(accumulated.prefix(120))
             launchSnapshot = snapshot
             if let data = try? JSONEncoder().encode(snapshot) { UserDefaults.standard.set(data, forKey: Self.snapshotKey) }
-        }
-        if kind != requestedKind && group == nil && reconnecting {
-            try await loadEntries(append: false)
-            return
         }
         entries = accumulated
         offset = start
