@@ -28,6 +28,9 @@
   let deckKey = '';
   let playbackState = {};
   let nowQueue = [];
+  let pendingEnqueue = null;
+  let enqueueSequence = 0;
+  let dragIndex = null;
   let renderedQueue = null;
   let nowCover = null;
   let nowIndex = null;
@@ -112,6 +115,50 @@
     status('Loading tracks…');
     host({action:'album', id:++request, album:item.id});
   }
+  function actions(label, entries) {
+    const menu = node('details', '', 'queue-actions');
+    const summary = node('summary', '⋯');
+    summary.setAttribute('aria-label', label);
+    const commands = node('div', '', 'queue-action-list');
+    for (const [title, action] of entries) {
+      commands.append(button(title, () => { menu.open = false; action(); }));
+    }
+    menu.append(summary, commands);
+    return menu;
+  }
+  function libraryQueueActions(item, track) {
+    return actions('Queue actions for ' + (track === undefined ? item.title : tracks[track]?.title || 'track'), [
+      ['Play Next', () => enqueueItem(item, true, track)],
+      ['Add to Queue', () => enqueueItem(item, false, track)]
+    ]);
+  }
+  function enqueueItem(item, playNext, track) {
+    if (pendingEnqueue || pendingAlbum) return;
+    const id = --enqueueSequence;
+    pendingEnqueue = {id, item, playNext};
+    status('Adding to the queue…');
+    host({action:'enqueue', id, album:item.id, track});
+  }
+  window.musicEnqueued = reply => {
+    if (reply.id !== pendingEnqueue?.id) {
+      reply.tracks.forEach(player.releaseTrack);
+      return;
+    }
+    const {item, playNext} = pendingEnqueue;
+    pendingEnqueue = null;
+    if (!nowQueue.length || playbackState.status === 'finished') {
+      nowQueue.forEach(player.releaseTrack);
+      playing = item;
+      const revision = player.reset(reply.context, 'plex');
+      player.queue({...reply, origin:'plex'}, 0, revision, null, playNext);
+    } else player.enqueue(reply.tracks, playNext);
+    status(playNext ? 'Added to Play Next.' : 'Added to the queue.');
+  };
+  window.musicEnqueueError = reply => {
+    if (reply.id !== pendingEnqueue?.id) return;
+    pendingEnqueue = null;
+    status(reply.message);
+  };
   function render() {
     get('title').textContent = album?.title || group?.title || sectionLabel(kind);
     get('search').hidden = Boolean(group || album);
@@ -137,7 +184,10 @@
         text.append(node('strong', item.title));
         if (item.artist) text.append(node('small', item.artist));
         tile.append(cover(item), text);
-        added.append(tile);
+        const cell = node('div', '', 'library-tile');
+        cell.append(tile);
+        if (item.kind !== 'artist' && item.kind !== 'genre') cell.append(libraryQueueActions(item));
+        added.append(cell);
       }
       grid.append(added);
       return;
@@ -149,12 +199,22 @@
     const play = button('Play ' + sectionLabel(album.kind), () => playAlbum(0), 'primary');
     play.disabled = tracks.length === 0;
     metadata.append(play);
+    if (tracks.length) metadata.append(libraryQueueActions(album));
     heading.append(cover(album), metadata);
     const list = node('div', '', 'tracks');
     tracks.forEach((track, index) => {
       const row = button('', () => playAlbum(index), 'track');
-      row.append(node('span', String(track.number), 'number'), node('span', track.title), node('small', time(track.durationSeconds)));
-      list.append(row);
+      const title = node('span', track.title);
+      if (track.popular) {
+        const badge = node('span', ' 🔥', 'popular-track');
+        badge.title = 'Popular track';
+        badge.setAttribute('aria-label', 'Popular track');
+        title.append(badge);
+      }
+      row.append(node('span', String(track.number), 'number'), title, node('small', time(track.durationSeconds)));
+      const entry = node('div', '', 'library-track');
+      entry.append(row, libraryQueueActions(album, index));
+      list.append(entry);
     });
     get('details').replaceChildren(heading, list);
   }
@@ -176,7 +236,7 @@
     feature.replaceChildren(openFeature);
   }
   function playAlbum(index) {
-    if (!album || !tracks[index]) return;
+    if (!album || !tracks[index] || pendingEnqueue || pendingAlbum) return;
     player.prepareAudio();
     playRequest = ++request;
     pendingAlbum = album;
@@ -253,6 +313,7 @@
       ++request;
       playing = album = group = pendingAlbum = null;
       nowQueue = [];
+      pendingEnqueue = null;
       if (get('now-playing').open) get('now-playing').close();
       player.reset();
       if (library) browse();
@@ -260,7 +321,9 @@
   };
   function playingCover(state) {
     if (!playing) return '';
-    return (playing.kind === 'playlist' ? state.artwork : playing.artwork || state.artwork) || '';
+    const track = nowQueue[state.trackIndex];
+    return (playing.kind !== 'playlist' && (!track?.collection || track.collection === playing.id)
+      ? playing.artwork || state.artwork : state.artwork) || '';
   }
   function applyPalette() {
     const root = document.documentElement;
@@ -317,6 +380,8 @@
   }
   let footerKey = '';
   window.macPlayerState = state => {
+    nowQueue = player.queueItems;
+    if (state.status === 'closed') playing = null;
     playbackState = state;
     const currentCover = playingCover(state);
     updateArtworkColors(state);
@@ -339,7 +404,10 @@
       }
     }
     get('show-now-playing').disabled = !playing;
-    if (get('now-playing').open && playing) renderNowPlaying(state);
+    if (get('now-playing').open) {
+      if (playing) renderNowPlaying(state);
+      else get('now-playing').close();
+    }
     if (selectedTheme === 'plexify') renderDeck(state);
     window.clickWheel.update(playing, state, cover);
     const active = state.status === 'playing';
@@ -382,14 +450,42 @@
     if (renderedQueue !== nowQueue) {
       const rows = document.createDocumentFragment();
       nowQueue.forEach((item, index) => {
-        const row = node('li');
-        const play = button('', () => player.action({action:'playTrack', index}));
+        const row = node('li', '', 'now-queue-row');
+        const drag = node('span', '☰', 'now-drag-handle');
+        drag.draggable = true;
+        drag.title = 'Drag to reorder';
+        drag.setAttribute('aria-hidden', 'true');
+        drag.addEventListener('dragstart', event => {
+          dragIndex = index;
+          event.dataTransfer.effectAllowed = 'move';
+          event.dataTransfer.setData('text/plain', String(index));
+        });
+        drag.addEventListener('dragend', () => { dragIndex = null; });
+        row.addEventListener('dragover', event => {
+          if (dragIndex === null || dragIndex === index) return;
+          event.preventDefault();
+          event.dataTransfer.dropEffect = 'move';
+          row.classList.add('drop-target');
+        });
+        row.addEventListener('dragleave', event => {
+          if (!row.contains(event.relatedTarget)) row.classList.remove('drop-target');
+        });
+        row.addEventListener('drop', event => {
+          event.preventDefault();
+          row.classList.remove('drop-target');
+          if (dragIndex !== null) player.action({action:'moveTrack', from:dragIndex, to:index});
+          dragIndex = null;
+        });
+        const play = button('', () => player.action({action:'playTrack', index}), 'now-queue-play');
         const info = node('span', '', 'now-queue-track');
         info.append(node('strong', item.title));
         if (item.artist) info.append(node('small', item.artist));
-        play.append(node('span', String(index + 1), 'now-queue-number'), info,
-                    node('span', item.durationSeconds > 0 ? time(item.durationSeconds) : '', 'now-queue-length'));
-        row.append(play);
+        play.append(info, node('span', item.durationSeconds > 0 ? time(item.durationSeconds) : '', 'now-queue-length'));
+        const commands = [];
+        if (index > 0) commands.push(['Move Up', () => player.action({action:'moveTrack', from:index, to:index - 1})]);
+        if (index + 1 < nowQueue.length) commands.push(['Move Down', () => player.action({action:'moveTrack', from:index, to:index + 1})]);
+        commands.push(['Remove from Queue', () => player.action({action:'removeTrack', index})]);
+        row.append(drag, play, actions('Queue actions for ' + item.title, commands));
         rows.append(row);
       });
       queue.replaceChildren(rows);
@@ -397,8 +493,8 @@
       nowIndex = null;
     }
     if (nowIndex !== state.trackIndex) {
-      queue.children[nowIndex]?.firstElementChild?.removeAttribute('aria-current');
-      queue.children[state.trackIndex]?.firstElementChild?.setAttribute('aria-current', 'true');
+      queue.children[nowIndex]?.querySelector('.now-queue-play')?.removeAttribute('aria-current');
+      queue.children[state.trackIndex]?.querySelector('.now-queue-play')?.setAttribute('aria-current', 'true');
       nowIndex = state.trackIndex;
     }
   }

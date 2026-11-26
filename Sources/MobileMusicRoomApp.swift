@@ -211,6 +211,9 @@ private struct MusicLibraryScreen: View {
                             #else
                             .buttonStyle(.plain)
                             #endif
+                            .contextMenu {
+                                if !entry.kind.isGroup { LibraryQueueActions(library: library, entry: entry) }
+                            }
                         }
                         if library.more && !library.busy && library.message == nil {
                             Color.clear.frame(height: 1).accessibilityHidden(true)
@@ -250,18 +253,23 @@ private struct MusicLibraryScreen: View {
                     if !description.isEmpty { Text(description).foregroundStyle(.secondary) }
                     Button(album.kind.playLabel) { library.play(at: 0) }
                         .buttonStyle(.borderedProminent).disabled(library.tracks.isEmpty)
+                    Menu("Queue", systemImage: "list.bullet") { LibraryQueueActions(library: library, entry: album) }
+                        .disabled(library.tracks.isEmpty)
                 }
                 Spacer(minLength: 0)
             }
+            let popular = library.popularTrackIDs
             ForEach(Array(library.tracks.enumerated()), id: \.offset) { index, track in
                 Button { library.play(at: index) } label: {
                     HStack {
                         Text(String(track.number)).monospacedDigit().foregroundStyle(.secondary)
                         Text(track.title).lineLimit(1)
+                        if popular.contains(track.id) { PopularTrackBadge() }
                         Spacer()
                         if let duration = track.duration { Text(clock(duration)).monospacedDigit() }
                     }.frame(maxWidth: .infinity).padding(.vertical, 6)
                 }.buttonStyle(.bordered)
+                    .contextMenu { LibraryQueueActions(library: library, entry: album, track: track) }
             }
         }.frame(maxWidth: 1000, alignment: .leading)
     }

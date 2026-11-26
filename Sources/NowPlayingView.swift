@@ -121,7 +121,7 @@ struct NowPlayingView: View {
                         .padding(.horizontal, compact ? 5 : 12)
                 }
                 .onAppear {
-                    if let index = library.state.index { scroll.scrollTo(index, anchor: .center) }
+                    if let track = currentTrack { scroll.scrollTo(track.id, anchor: .center) }
                 }
             }
         }
@@ -222,48 +222,109 @@ struct NowPlayingView: View {
 
     private func queue(compact: Bool) -> some View {
         LazyVStack(alignment: .leading, spacing: 5) {
-            ForEach(library.playingTracks.indices, id: \.self) { index in
-                let track = library.playingTracks[index]
-                let current = index == library.state.index
-                Button { library.player.selectTrack(index) } label: {
-                    HStack(spacing: 12) {
-                        if !compact {
-                            Group {
-                                if current { Image(systemName: "waveform") }
-                                else { Text(String(track.number)).monospacedDigit() }
-                            }
-                            .frame(width: 29)
-                            .accessibilityHidden(true)
-                        }
-                        VStack(alignment: .leading, spacing: 3) {
-                            Text(track.title).lineLimit(1)
-                            if let artist = track.artist { Text(artist).font(.caption).foregroundStyle(.secondary) }
-                        }
-                        Spacer()
-                        if !compact, let length = track.duration { Text(clock(length)).font(.caption.monospacedDigit()) }
-                    }
-                    .padding(9)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .foregroundStyle(current ? accent : .primary)
-                    .background(current ? accent.opacity(0.16) : Color.primary.opacity(0.055),
-                                in: RoundedRectangle(cornerRadius: 10))
-                    .contentShape(Rectangle())
-                }
-                #if os(tvOS)
-                .buttonStyle(.bordered)
-                #else
-                .buttonStyle(.plain)
-                #endif
-                .accessibilityAddTraits(current ? .isSelected : [])
-                .id(index)
+            ForEach(Array(library.playingTracks.enumerated()), id: \.element.id) { index, track in
+                queueRow(track, index: index, compact: compact)
+                    .id(track.id)
             }
         }
         .padding(.bottom, 16)
+    }
+
+    private func queueRow(_ track: LiveTrack, index: Int, compact: Bool) -> some View {
+        let current = index == library.state.index
+        return HStack(spacing: compact ? 4 : 8) {
+            #if !os(tvOS)
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(.secondary)
+                .frame(width: compact ? 16 : 25, height: 30)
+                .contentShape(Rectangle())
+                .draggable(track.id.uuidString)
+                .accessibilityHidden(true)
+            #endif
+            Button { library.player.selectTrack(index) } label: {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(track.title).lineLimit(1)
+                    if let artist = track.artist { Text(artist).font(.caption).foregroundStyle(.secondary).lineLimit(1) }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+            }
+            #if os(tvOS)
+            .buttonStyle(.bordered)
+            #else
+            .buttonStyle(.plain)
+            #endif
+            .accessibilityAddTraits(current ? .isSelected : [])
+            if !compact, let length = track.duration { Text(clock(length)).font(.caption.monospacedDigit()) }
+            Menu {
+                if index > 0 {
+                    Button("Move Up", systemImage: "arrow.up") {
+                        move(track.id, by: -1)
+                    }
+                }
+                if index + 1 < library.playingTracks.count {
+                    Button("Move Down", systemImage: "arrow.down") {
+                        move(track.id, by: 1)
+                    }
+                }
+                Button("Remove from Queue", systemImage: "trash", role: .destructive) {
+                    library.player.removeQueuedTrack(track.id)
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+            }
+            .accessibilityLabel("Queue actions for " + track.title)
+            #if os(macOS)
+            .menuIndicator(.hidden)
+            #endif
+        }
+        .padding(compact ? 4 : 9)
+        .foregroundStyle(current ? accent : .primary)
+        .background(current ? accent.opacity(0.16) : Color.primary.opacity(0.055),
+                    in: RoundedRectangle(cornerRadius: 10))
+        #if !os(tvOS)
+        .dropDestination(for: String.self) { values, _ in
+            guard let value = values.first, let id = UUID(uuidString: value), id != track.id,
+                  library.playingTracks.contains(where: { $0.id == id }) else { return false }
+            library.player.moveQueuedTrack(id, to: track.id)
+            return true
+        }
+        #endif
+    }
+
+    private func move(_ id: UUID, by offset: Int) {
+        let queue = library.playingTracks
+        guard let index = queue.firstIndex(where: { $0.id == id }), queue.indices.contains(index + offset) else { return }
+        library.player.moveQueuedTrack(id, to: queue[index + offset].id)
     }
 
     private func clock(_ seconds: Double) -> String {
         let value = seconds.isFinite ? Int(min(359_999, max(0, seconds))) : 0
         return value < 3_600 ? String(format: "%d:%02d", value / 60, value % 60) :
             String(format: "%d:%02d:%02d", value / 3_600, value / 60 % 60, value % 60)
+    }
+}
+
+struct LibraryQueueActions: View {
+    let library: LibraryModel
+    let entry: MusicEntry
+    var track: LiveTrack?
+
+    var body: some View {
+        Button("Play Next", systemImage: "text.line.first.and.arrowtriangle.forward") {
+            library.enqueue(entry, track: track, playNext: true)
+        }
+        Button("Add to Queue", systemImage: "text.append") {
+            library.enqueue(entry, track: track, playNext: false)
+        }
+    }
+}
+
+struct PopularTrackBadge: View {
+    var body: some View {
+        Image(systemName: "flame.fill")
+            .foregroundStyle(.orange)
+            .accessibilityLabel("Popular track")
+            .help("Popular track")
     }
 }

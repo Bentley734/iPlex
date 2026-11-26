@@ -405,9 +405,11 @@ namespace MusicRoom
         readonly SemaphoreSlim artSlots = new SemaphoreSlim(4);
         List<MediaTrack> albumTracks = new List<MediaTrack>();
         string albumID = "", albumTitle = "";
+        int musicGeneration;
 
         void ClearMusic()
         {
+            musicGeneration++;
             StopCoverCache(false);
             items.Clear();
             art.Clear();
@@ -556,7 +558,7 @@ namespace MusicRoom
             {".aif","audio/aiff"}, {".aiff","audio/aiff"}, {".caf","audio/x-caf"}
         };
 
-        async Task Album(Dictionary<string, object> request, long id, CancellationToken token)
+        async Task Album(Dictionary<string, object> request, long id, CancellationToken token, bool enqueue = false)
         {
             string key = Str(request, "album");
             Server server;
@@ -565,12 +567,39 @@ namespace MusicRoom
                 (item.Kind != "album" && item.Kind != "playlist" && item.Kind != "track") ||
                 !servers.TryGetValue(selectedServer, out server) || selectedSection.Length == 0)
                 throw Problem("Choose an album, playlist, or track from the library.");
-            string section = selectedSection;
-            bool playlist = item.Kind == "playlist";
-            bool album = item.Kind == "album";
+            int generation = musicGeneration;
+            var tracks = enqueue && key == albumID ? albumTracks :
+                await LoadAlbumTracks(server, selectedSection, key, item.Kind, token);
+            token.ThrowIfCancellationRequested();
+            if (generation != musicGeneration) return;
+            if (enqueue)
+            {
+                var position = Num(request, "track");
+                bool single = request.ContainsKey("track");
+                if (tracks.Count == 0 || (single && (position < 0 || position >= tracks.Count)))
+                    throw Problem("No playable tracks were found.");
+                if (single) tracks = new List<MediaTrack> { tracks[(int)position] };
+                Send("musicEnqueued", new { id, context = item.Title, tracks = QueueEntries(tracks, key, false) });
+                return;
+            }
+            albumID = key;
+            albumTitle = item.Title;
+            albumTracks = tracks;
+            long highest = tracks.Count == 0 ? 0 : tracks.Max(track => track.ratingCount);
+            var popular = item.Kind == "album" && highest > 0 ? new HashSet<MediaTrack>(
+                tracks.OrderByDescending(track => track.ratingCount).Take(Math.Min(3, Math.Max(1, tracks.Count / 4)))
+                    .Where(track => track.ratingCount >= highest * 0.25)) : new HashSet<MediaTrack>();
+            Send("musicAlbum", new { id, tracks = tracks.Select(track => new
+                { track.number, track.title, track.durationSeconds, popular = popular.Contains(track) }).ToArray() });
+        }
+
+        async Task<List<MediaTrack>> LoadAlbumTracks(Server server, string section, string key, string kind, CancellationToken token)
+        {
+            bool playlist = kind == "playlist";
+            bool album = kind == "album";
             string path = playlist ? "/playlists/" + key + "/items" :
                 "/library/metadata/" + key + (album ? "/children" : "");
-            var tracks = await WithServer(server, async url =>
+            return await WithServer(server, async url =>
             {
                 const int batch = 200, playlistLimit = 10000;
                 int start = 0;
@@ -601,6 +630,7 @@ namespace MusicRoom
                                 durationSeconds = duration > 0 ? (double?)duration / 1000 : null,
                                 artwork = ArtworkPath(row, "parentThumb", "thumb"),
                                 artist = Str(row, "grandparentTitle"), album = Str(row, "parentTitle"),
+                                ratingCount = Math.Max(0, Num(row, "ratingCount")),
                                 remote = new Uri(url, partPath), token = server.Token, mime = mime,
                                 directMp4 = Str(part, "audioCodec") == "aac" || Str(row, "audioCodec") == "aac" });
                             break;
@@ -614,11 +644,6 @@ namespace MusicRoom
                 } while (more);
                 return found;
             }, token);
-            token.ThrowIfCancellationRequested();
-            albumID = key;
-            albumTitle = item.Title;
-            albumTracks = tracks;
-            Send("musicAlbum", new { id, tracks = tracks.Select(track => new { track.number, track.title, track.durationSeconds }).ToArray() });
         }
 
         void PlayAlbum(Dictionary<string, object> body, long id)
@@ -626,19 +651,27 @@ namespace MusicRoom
             long index = Num(body, "index");
             if (Str(body, "album") != albumID || index < 0 || index >= albumTracks.Count)
                 throw Problem("Open the library item before playing it.");
+            Send("musicQueue", new { id, context = albumTitle, origin = "plex", startIndex = index,
+                tracks = QueueEntries(albumTracks, albumID, true) });
+        }
+
+        List<object> QueueEntries(List<MediaTrack> tracks, string collection, bool replace)
+        {
             var entries = new List<object>();
             lock (handles)
             {
-                ReleaseHandles();
-                foreach (var track in albumTracks)
+                if (replace) ReleaseHandles();
+                if (handles.Count + tracks.Count > 10000)
+                    throw Problem("The playback queue can hold up to 10,000 tracks.");
+                foreach (var track in tracks)
                 {
                     string handle = Guid.NewGuid().ToString("N");
-                    handles.Add(handle, track);
-                    entries.Add(new { track.title, track.durationSeconds, track.artist, track.album,
+                    handles.Add(handle, track.CopyForQueue());
+                    entries.Add(new { track.title, track.durationSeconds, track.artist, track.album, collection,
                         artwork = RegisterArtwork(track.artwork), url = "https://media.musicroom.invalid/" + handle });
                 }
             }
-            Send("musicQueue", new { id, context = albumTitle, origin = "plex", startIndex = index, tracks = entries });
+            return entries;
         }
 
         public async Task Handle(Dictionary<string, object> body)
@@ -653,6 +686,16 @@ namespace MusicRoom
                 return;
             }
             if (action == "release") { ReleaseHandles(); return; }
+            if (action == "releaseTrack")
+            {
+                var handle = Str(body, "handle");
+                lock (handles)
+                {
+                    DropReaders(readerHandle => readerHandle == handle);
+                    handles.Remove(handle);
+                }
+                return;
+            }
             if (action == "cancel")
             {
                 if (plexJob != null) plexJob.Cancel();
@@ -664,6 +707,16 @@ namespace MusicRoom
             bool first = !initialized;
             InitPlex();
             if (action == "status" && !(first && account.Length > 0)) { PlexState(); return; }
+            if (action == "enqueue")
+            {
+                try { await Album(body, id, shutdown.Token, true); }
+                catch (Exception error)
+                {
+                    Send("musicEnqueueError", new { id, message = error is InvalidDataException ? error.Message :
+                        "Couldn’t add this item to the queue." });
+                }
+                return;
+            }
             if (plexJob != null) plexJob.Cancel();
             var job = CancellationTokenSource.CreateLinkedTokenSource(shutdown.Token);
             plexJob = job;

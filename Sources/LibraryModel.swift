@@ -52,6 +52,7 @@ final class LibraryModel: ObservableObject {
     private var artworkRequests = [ArtworkKey: ArtworkRequest]()
     private var artworkCollection = UUID()
     private var playingArtworkKey: ArtworkKey?
+    private var originalQueueIDs = Set<UUID>()
     private var cancelCoverCache: (() -> Void)?
     private var cacheGeneration = UUID()
 
@@ -92,6 +93,15 @@ final class LibraryModel: ObservableObject {
         if let values = defaults.array(forKey: "PlaybackEqualizer") as? [Double], values.count == 3 {
             equalizer = PlaybackEQSettings(bass: values[0], mid: values[1], treble: values[2])
             player.setEqualizer(equalizer)
+        }
+        player.onQueueChange = { [weak self] queue in
+            self?.playingTracks = queue
+            if queue.isEmpty {
+                self?.playingAlbum = nil
+                self?.originalQueueIDs.removeAll()
+                self?.playingArtwork = nil
+                self?.playingArtworkKey = nil
+            }
         }
         player.onEqualizerAvailability = { [weak self] in self?.equalizerAvailable = $0 }
         player.onStateChange = { [weak self] value in
@@ -293,18 +303,58 @@ final class LibraryModel: ObservableObject {
 
     func play(at index: Int) {
         guard let album = selectedDetail, tracks.indices.contains(index) else { return }
+        startQueue(tracks, entry: album, index: index, autoplay: true)
+    }
+
+    func enqueue(_ entry: MusicEntry, track: LiveTrack? = nil, playNext: Bool) {
+        if let track {
+            insertIntoQueue([track], entry: entry, playNext: playNext)
+        } else if entry == selectedDetail, !tracks.isEmpty {
+            insertIntoQueue(tracks, entry: entry, playNext: playNext)
+        } else if !entry.kind.isGroup, !busy {
+            perform {
+                let additions = try await self.request { self.service.musicTracks(entry: entry, completion: $0) }
+                try Task.checkCancellation()
+                self.insertIntoQueue(additions, entry: entry, playNext: playNext)
+            }
+        }
+    }
+
+    private func insertIntoQueue(_ additions: [LiveTrack], entry: MusicEntry, playNext: Bool) {
+        guard !additions.isEmpty else { return }
+        if playingTracks.isEmpty || state.status == "finished" {
+            startQueue(additions, entry: entry, index: 0, autoplay: playNext)
+        } else if playingTracks.count + additions.count <= PlexParser.musicPlaylistLimit {
+            player.enqueue(additions, playNext: playNext)
+        } else {
+            message = "The playback queue can hold up to 10,000 tracks."
+            return
+        }
+        message = playNext ? "Added to Play Next." : "Added to the queue."
+    }
+
+    var popularTrackIDs: Set<UUID> {
+        guard selectedDetail?.kind == .albums else { return [] }
+        let ranked = tracks.filter { $0.ratingCount > 0 }.sorted { $0.ratingCount > $1.ratingCount }
+        guard let highest = ranked.first?.ratingCount else { return [] }
+        return Set(ranked.prefix(min(3, max(1, tracks.count / 4)))
+            .filter { Double($0.ratingCount) >= Double(highest) * 0.25 }.map(\.id))
+    }
+
+    private func startQueue(_ tracks: [LiveTrack], entry album: MusicEntry, index: Int, autoplay: Bool) {
         playingAlbum = album
-        playingTracks = tracks
+        originalQueueIDs = Set(tracks.map(\.id))
         playingArtworkKey = nil
         playingArtwork = nil
-        player.loadRemoteTracks(tracks, collection: album.title, artist: album.artist, startTrack: index,
+        player.loadRemoteTracks(tracks, collection: album.title, artist: album.artist, startTrack: index, autoplay: autoplay,
                                 maximumTracks: album.kind == .playlists ? PlexParser.musicPlaylistLimit : 250)
     }
 
     private func refreshPlayingArtwork(at index: Int) {
         guard let album = playingAlbum, playingTracks.indices.contains(index) else { return }
-        let trackPath = playingTracks[index].artworkPath
-        let path = album.kind == .playlists ? trackPath : album.artworkPath ?? trackPath
+        let track = playingTracks[index]
+        let loadingOriginalArtwork = album.kind != .playlists && originalQueueIDs.contains(track.id)
+        let path = loadingOriginalArtwork ? album.artworkPath ?? track.artworkPath : track.artworkPath
         let key = path.map { ArtworkKey(collection: artworkCollection, path: $0) }
         guard key != playingArtworkKey else { return }
         playingArtworkKey = key

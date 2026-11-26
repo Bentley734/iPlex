@@ -11,12 +11,14 @@ final class PlayerController {
 
     var onStateChange: EventHandler?
     var onTrackListChange: EventHandler?
+    var onQueueChange: (([LiveTrack]) -> Void)?
     var onVisualizerLevels: (([Double]) -> Void)?
     var onEqualizerAvailability: ((Bool?) -> Void)?
 
     private let player = AVQueuePlayer()
     private var currentItemObservation: NSKeyValueObservation?
     private var activeItem: AVPlayerItem?
+    private var nextPreparation = UUID()
     private var upcoming: (item: AVPlayerItem, tap: AudioAnalysis, index: Int)?
     private var tracks = [LiveTrack]()
     private var index = 0
@@ -160,12 +162,14 @@ final class PlayerController {
     private func primeNext(after item: AVPlayerItem) {
         let following = index + 1
         guard tracks.indices.contains(following) else { return }
+        let preparation = UUID()
+        nextPreparation = preparation
         let next = AVPlayerItem(url: tracks[following].url)
         let tap = AudioAnalysis()
         next.asset.loadValuesAsynchronously(forKeys: ["tracks"]) { [weak self, weak item] in
             DispatchQueue.main.async {
-                guard let self = self, let item = item, self.activeItem === item,
-                      self.player.currentItem === item, self.player.canInsert(next, after: item) else { return }
+                guard let self = self, let item = item, self.nextPreparation == preparation,
+                      self.activeItem === item, self.player.currentItem === item, self.player.canInsert(next, after: item) else { return }
                 if next.asset.statusOfValue(forKey: "tracks", error: nil) == .loaded,
                    let track = next.asset.tracks(withMediaType: .audio).first {
                     next.audioMix = tap.mix(for: track)
@@ -330,6 +334,65 @@ final class PlayerController {
             self.retryCount = 0
             self.loadCurrentTrack(autoplay: true)
         }
+    }
+
+    func enqueue(_ additions: [LiveTrack], playNext: Bool) {
+        onMain { [weak self] in
+            guard let self, !additions.isEmpty, !self.tracks.isEmpty else { return }
+            self.adoptQueuedItem()
+            let position = playNext ? self.index + 1 : self.tracks.count
+            self.tracks.insert(contentsOf: additions.map { $0.queuedCopy() }, at: position)
+            self.queueDidChange()
+        }
+    }
+
+    func moveQueuedTrack(_ id: UUID, to target: UUID) {
+        onMain { [weak self] in
+            guard let self, id != target else { return }
+            self.adoptQueuedItem()
+            guard let from = self.tracks.firstIndex(where: { $0.id == id }),
+                  let to = self.tracks.firstIndex(where: { $0.id == target }) else { return }
+            let current = self.tracks[self.index].id
+            let track = self.tracks.remove(at: from)
+            self.tracks.insert(track, at: to)
+            self.index = self.tracks.firstIndex(where: { $0.id == current }) ?? self.index
+            self.queueDidChange()
+        }
+    }
+
+    func removeQueuedTrack(_ id: UUID) {
+        onMain { [weak self] in
+            guard let self else { return }
+            self.adoptQueuedItem()
+            guard let removed = self.tracks.firstIndex(where: { $0.id == id }) else { return }
+            self.tracks.remove(at: removed)
+            if self.tracks.isEmpty {
+                self.stop()
+            } else if removed == self.index {
+                let hasNext = removed < self.tracks.count
+                self.index = min(removed, self.tracks.count - 1)
+                self.retryCount = 0
+                self.emitTracks()
+                self.loadCurrentTrack(autoplay: hasNext && self.userWantsPlayback)
+            } else {
+                if removed < self.index { self.index -= 1 }
+                self.queueDidChange()
+            }
+        }
+    }
+
+    private func queueDidChange() {
+        nextPreparation = UUID()
+        if let next = upcoming?.item {
+            upcoming = nil
+            player.remove(next)
+        }
+        if let activeItem, player.currentItem === activeItem, !preparingAudioMix, retryWork == nil {
+            primeNext(after: activeItem)
+        }
+        emitTracks()
+        emitState()
+        updateNowPlaying()
     }
 
     func play() {
@@ -576,6 +639,7 @@ final class PlayerController {
     private func handlePlaybackFailure(_ error: Error?) {
         guard userWantsPlayback, retryWork == nil else { return }
         let position = max(initialPosition, Self.seconds(activeItem?.currentTime()) ?? 0)
+        nextPreparation = UUID()
         if let next = upcoming?.item {
             upcoming = nil
             player.remove(next)
@@ -608,6 +672,7 @@ final class PlayerController {
     }
 
     private func clearItemObservers() {
+        nextPreparation = UUID()
         player.pause()
         activeItem = nil
         upcoming = nil
@@ -621,6 +686,7 @@ final class PlayerController {
     private func cancelRetry() { retryWork?.cancel(); retryWork = nil }
 
     private func emitTracks() {
+        onQueueChange?(tracks)
         var event: [String: Any] = ["kind": "tracks", "tracks": tracks.map(\.summary)]
         if let showID = showID { event["showID"] = showID }
         if let sourceID = sourceID { event["sourceID"] = sourceID }

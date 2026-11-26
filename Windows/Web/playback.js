@@ -280,7 +280,7 @@ window.windowsPlayback = (() => {
     if (autoplay) play();
     publish();
   }
-  function queue(payload, start=0, expectedRevision, position) {
+  function queue(payload, start=0, expectedRevision, position, autoplay=true) {
     if (expectedRevision !== undefined && expectedRevision !== revision) return;
     if (!Array.isArray(payload?.tracks) || !payload.tracks.length) { fail('No playable tracks were found.'); return; }
     tracks = payload.tracks; collection = payload.context || collection; origin = payload.origin || origin;
@@ -292,7 +292,7 @@ window.windowsPlayback = (() => {
         return;
       }
       select(trackIndex,true,seconds);
-    } else select(Math.min(Math.max(0,Number(start)||0),tracks.length-1),true);
+    } else select(Math.min(Math.max(0,Number(start)||0),tracks.length-1),autoplay);
   }
   function pause() {
     cancelRetry(); wantsPlay = false; attempt++; audio.pause();
@@ -316,6 +316,46 @@ window.windowsPlayback = (() => {
       audio.currentTime = Math.max(0, Math.min(audio.duration,time));
     }
   }
+  function updateQueue(next) {
+    const current = tracks[index];
+    const following = tracks[index + 1];
+    tracks = next;
+    index = tracks.indexOf(current);
+    if (decoded?.node && tracks[index + 1] !== following) {
+      cancelDecode();
+      stopBuffer(scheduled);
+      scheduled = null;
+      monitorDecoded(decoded);
+    }
+    publish();
+  }
+  function enqueue(additions, playNext) {
+    if (!tracks[index] || !additions.length) return;
+    const next = tracks.slice();
+    next.splice(playNext ? index + 1 : next.length, 0, ...additions);
+    updateQueue(next);
+  }
+  function moveTrack(from, to) {
+    if (!Number.isInteger(from) || !Number.isInteger(to) || !tracks[from] || !tracks[to] || from === to) return;
+    const next = tracks.slice();
+    next.splice(to, 0, next.splice(from, 1)[0]);
+    updateQueue(next);
+  }
+  function releaseTrack(track) {
+    const match = /^https:\/\/media\.musicroom\.invalid\/([a-f0-9]{32})$/.exec(track?.url || '');
+    if (match) window.chrome?.webview?.postMessage({action:'releaseTrack', handle:match[1]});
+  }
+  function removeTrack(position) {
+    if (!Number.isInteger(position) || !tracks[position]) return;
+    const next = tracks.slice();
+    const removed = next.splice(position, 1)[0];
+    if (!next.length) reset();
+    else if (position === index) {
+      tracks = next;
+      select(Math.min(position, next.length - 1), position < next.length && wantsPlay);
+    } else updateQueue(next);
+    releaseTrack(removed);
+  }
   function action(p) {
     switch(p.action) {
       case 'toggle': if (wantsPlay) pause(); else play(); break;
@@ -333,6 +373,8 @@ window.windowsPlayback = (() => {
         break;
       }
       case 'playTrack': select(Number(p.index),true); break;
+      case 'moveTrack': moveTrack(p.from, p.to); break;
+      case 'removeTrack': removeTrack(p.index); break;
       case 'close': reset(); break;
     }
   }
@@ -363,5 +405,5 @@ window.windowsPlayback = (() => {
   window.addEventListener('pagehide', release, {once:true});
   window.addEventListener('beforeunload', release, {once:true});
   const decodedUpdates=setInterval(()=>{ if (decoded?.node) publish(); },250);
-  return {prepareAudio,action,visualize,eq,queue,reset,fail, get revision(){return revision;}, get origin(){return origin;}};
+  return {prepareAudio,action,visualize,eq,queue,reset,fail,enqueue,releaseTrack, get queueItems(){return tracks;}, get revision(){return revision;}, get origin(){return origin;}};
 })();

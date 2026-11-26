@@ -503,7 +503,8 @@ enum PlexParser {
             }
             // Preserve the original, already authenticated URL. UI callbacks use LiveTrack.summary, which omits it.
             return LiveTrack(number: track.number, title: title, duration: track.duration, url: track.url,
-                             artworkPath: track.artworkPath, artist: track.artist, album: track.album)
+                             artworkPath: track.artworkPath, artist: track.artist, album: track.album,
+                             ratingCount: track.ratingCount, id: track.id)
         }
     }
 
@@ -1567,7 +1568,8 @@ extension PlexParser {
             let artwork = musicArtworkPath(row["parentThumb"] as? String) ?? musicArtworkPath(row["thumb"] as? String)
             let track = LiveTrack(number: 0, title: title, duration: milliseconds(row["duration"]), url: url,
                                   artworkPath: artwork, artist: string(row["grandparentTitle"], maximum: 300),
-                                  album: string(row["parentTitle"], maximum: 300))
+                                  album: string(row["parentTitle"], maximum: 300),
+                                  ratingCount: max(0, integer(row["ratingCount"]) ?? 0))
             tracks.append((integer(row["parentIndex"]) ?? 1, integer(row["index"]) ?? (position + 1), track))
         }
         if entry.kind == .albums {
@@ -1578,7 +1580,8 @@ extension PlexParser {
         return (tracks.enumerated().map { index, row in
             let track = row.track
             return LiveTrack(number: offset + index + 1, title: track.title, duration: track.duration, url: track.url,
-                             artworkPath: track.artworkPath, artist: track.artist, album: track.album)
+                             artworkPath: track.artworkPath, artist: track.artist, album: track.album,
+                             ratingCount: track.ratingCount, id: track.id)
         }, rows.count, integer(container["totalSize"]))
     }
 }

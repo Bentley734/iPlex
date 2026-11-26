@@ -431,6 +431,9 @@ private struct MusicWindow: View {
                         .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .contextMenu {
+                        if !entry.kind.isGroup { LibraryQueueActions(library: model, entry: entry) }
+                    }
                 }
                 if model.more && !model.busy && model.message == nil {
                     Color.clear.frame(height: 1).accessibilityHidden(true)
@@ -457,26 +460,32 @@ private struct MusicWindow: View {
                         if !info.isEmpty { Text(info.joined(separator: " · ")).foregroundStyle(.secondary) }
                         Button { model.play(at: 0) } label: { Label(album.kind.playLabel, systemImage: "play.fill") }
                             .buttonStyle(.borderedProminent).disabled(model.tracks.isEmpty)
+                        Menu("Queue", systemImage: "list.bullet") { LibraryQueueActions(library: model, entry: album) }
+                            .disabled(model.tracks.isEmpty)
                     }
                 }
                 if model.busy { ProgressView("Loading tracks…") }
                 if let message = model.message, model.tracks.isEmpty {
                     Button("Retry") { model.open(album) }.help(message)
                 }
+                let popular = model.popularTrackIDs
                 ForEach(Array(model.tracks.enumerated()), id: \.offset) { index, track in
                     Button { model.play(at: index) } label: {
                         HStack(spacing: 14) {
-                            if model.playingAlbum == album && model.state.index == index {
+                            if let current = model.state.index, model.playingTracks.indices.contains(current),
+                               model.playingTracks[current].id == track.id {
                                 Image(systemName: "waveform").foregroundStyle(copper).frame(width: 30)
                             } else {
                                 Text(String(track.number)).monospacedDigit().foregroundStyle(.secondary).frame(width: 30)
                             }
                             Text(track.title).lineLimit(1)
+                            if popular.contains(track.id) { PopularTrackBadge() }
                             Spacer()
                             if let duration = track.duration { Text(clock(duration)).monospacedDigit().foregroundStyle(.secondary) }
                         }
                         .padding(.vertical, 8).contentShape(Rectangle())
                     }.buttonStyle(.plain)
+                        .contextMenu { LibraryQueueActions(library: model, entry: album, track: track) }
                     Divider()
                 }
             }
