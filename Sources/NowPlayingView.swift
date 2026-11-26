@@ -1,10 +1,29 @@
 import SwiftUI
 
+struct NowPlayingPresentation: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    let showing: Bool
+
+    func body(content: Content) -> some View {
+        content.animation(reduceMotion ? .easeInOut(duration: 0.15) : .spring(duration: 0.4, bounce: 0.13), value: showing)
+    }
+}
+
+struct NowPlayingPopTransition: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    func body(content: Content) -> some View {
+        content.zIndex(1).clipShape(Rectangle())
+            .transition(reduceMotion ? .opacity : .scale(scale: 0.92, anchor: .bottomLeading).combined(with: .opacity))
+    }
+}
+
 struct NowPlayingView: View {
     @ObservedObject var library: LibraryModel
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @State private var showingQueue = false
+    @State private var showingArtwork = false
     @State private var showingLyrics = false
     @State private var showingSignalPath = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -45,6 +64,17 @@ struct NowPlayingView: View {
                 }
                 .ignoresSafeArea()
         }
+        .accessibilityHidden(showingArtwork)
+        .disabled(showingArtwork)
+        .overlay {
+            if showingArtwork, let album = library.playingAlbum {
+                expandedArtwork(album)
+            }
+        }
+        .animation(.easeInOut(duration: 0.18), value: showingArtwork)
+        .onChange(of: library.playingAlbum == nil) { _, ended in
+            if ended { showingArtwork = false }
+        }
         .tint(accent)
         .sheet(isPresented: $showingLyrics) {
             NowPlayingLyrics(library: library).preferredColorScheme(theme.scheme).tint(accent)
@@ -53,7 +83,10 @@ struct NowPlayingView: View {
             signalPath
         }
         #if os(tvOS)
-        .onExitCommand(perform: close)
+        .onExitCommand {
+            if showingArtwork { showingArtwork = false }
+            else { close() }
+        }
         #endif
     }
 
@@ -70,6 +103,7 @@ struct NowPlayingView: View {
             Button("Queue", systemImage: "list.bullet") {
                 withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { showingQueue.toggle() }
             }
+                .musicGlass(theme, radius: 12, interactive: true)
                 .tint(showingQueue ? accent : nil)
                 .accessibilityAddTraits(showingQueue ? .isSelected : [])
                 .disabled(library.playingTracks.isEmpty)
@@ -95,8 +129,12 @@ struct NowPlayingView: View {
                         ? AnyLayout(HStackLayout(alignment: .center, spacing: min(78, geometry.size.width * 0.055)))
                         : AnyLayout(VStackLayout(alignment: .center, spacing: compact ? 12 : 26))
                     layout {
-                        artwork(album)
-                            .frame(width: max(1, coverWidth), height: max(1, coverWidth))
+                        Button { showingArtwork = true } label: {
+                            artwork(album)
+                                .frame(width: max(1, coverWidth), height: max(1, coverWidth))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Enlarge album artwork")
                         playback(album, compact: compact)
                             .frame(maxWidth: 510, alignment: .leading)
                             .frame(maxWidth: .infinity)
@@ -134,8 +172,12 @@ struct NowPlayingView: View {
             }
         }
         .frame(maxHeight: .infinity)
-        .background(theme.surface(using: palette))
-        .overlay(alignment: .leading) { Divider().opacity(0.5) }
+        .background(theme == .liquidGlass ? .clear : theme.surface(using: palette))
+        .overlay(alignment: .leading) {
+            if theme != .liquidGlass { Divider().opacity(0.5) }
+        }
+        .musicGlass(theme, radius: 20)
+        .padding(theme == .liquidGlass ? 8 : 0)
         #if os(tvOS)
         .focusSection()
         #endif
@@ -143,22 +185,55 @@ struct NowPlayingView: View {
 
     private func artwork(_ album: MusicEntry) -> some View {
         Color.primary.opacity(0.08)
-            .overlay {
-                if let image = library.playingArtwork {
-                    #if os(macOS)
-                    Image(nsImage: image).resizable().scaledToFill()
-                    #else
-                    Image(uiImage: image).resizable().scaledToFill()
-                    #endif
-                } else if album.kind != .playlists {
-                    PlexArtwork(item: album, library: library) { artworkPlaceholder }
-                } else {
-                    artworkPlaceholder
-                }
-            }
+            .overlay { artworkImage(album, fit: false) }
             .clipShape(.rect(cornerRadius: 19))
             .shadow(color: .black.opacity(0.3), radius: 15, y: 7)
             .accessibilityHidden(true)
+    }
+
+    @ViewBuilder private func artworkImage(_ album: MusicEntry, fit: Bool) -> some View {
+        if let image = library.playingArtwork {
+            #if os(macOS)
+            let cover = Image(nsImage: image)
+            #else
+            let cover = Image(uiImage: image)
+            #endif
+            cover.resizable().aspectRatio(contentMode: fit ? .fit : .fill)
+        } else if album.kind != .playlists {
+            PlexArtwork(item: album, library: library) { artworkPlaceholder }
+        } else {
+            artworkPlaceholder
+        }
+    }
+
+    private func expandedArtwork(_ album: MusicEntry) -> some View {
+        GeometryReader { geometry in
+            let side = min(geometry.size.width, geometry.size.height)
+            Button { showingArtwork = false } label: {
+                artworkImage(album, fit: true)
+                    .frame(width: side, height: side)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .overlay(alignment: .topTrailing) {
+                        Image(systemName: "xmark")
+                            .font(.headline)
+                            .foregroundStyle(.white)
+                            .padding(13)
+                            .background(.black.opacity(0.72), in: Circle())
+                            .padding(16)
+                    }
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Close album artwork")
+            #if !os(tvOS)
+            .keyboardShortcut(.cancelAction)
+            #endif
+        }
+        .background(.black)
+        .transition(.opacity)
+        #if os(tvOS)
+        .focusSection()
+        #endif
     }
 
     private var artworkPlaceholder: some View {
@@ -327,8 +402,14 @@ struct NowPlayingView: View {
         }
         .padding(compact ? 4 : 9)
         .foregroundStyle(current ? accent : .primary)
-        .background(current ? accent.opacity(0.16) : Color.primary.opacity(0.055),
+        .background(current ? accent.opacity(theme == .liquidGlass ? 0.25 : 0.16) : Color.primary.opacity(0.055),
                     in: RoundedRectangle(cornerRadius: 10))
+        .overlay {
+            if theme == .liquidGlass {
+                RoundedRectangle(cornerRadius: 10).strokeBorder(.white.opacity(current ? 0.22 : 0.12))
+                    .allowsHitTesting(false)
+            }
+        }
         #if !os(tvOS)
         .dropDestination(for: String.self) { values, _ in
             guard let value = values.first, let id = UUID(uuidString: value), id != track.id,

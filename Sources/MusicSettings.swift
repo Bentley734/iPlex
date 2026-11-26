@@ -70,8 +70,9 @@ enum MusicTheme: String, CaseIterable, Identifiable {
     func backdrop(using palette: ArtworkPalette?) -> some View {
         backdrop.overlay {
             if let palette {
-                LinearGradient(colors: [palette.wash(in: scheme).opacity(0.88), .clear],
-                               startPoint: .topLeading, endPoint: .bottomTrailing)
+                ArtworkColorWash(palette: palette, scheme: scheme)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
             }
         }
     }
@@ -89,6 +90,37 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         #endif
         }
         return LinearGradient(colors: [surface, end], startPoint: .topLeading, endPoint: .bottomTrailing)
+    }
+}
+
+private struct ArtworkColorWash: View {
+    static let motionPreference = "AnimateArtworkColors"
+    let palette: ArtworkPalette
+    let scheme: ColorScheme
+    @AppStorage(ArtworkColorWash.motionPreference) private var animate = true
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
+
+    var body: some View {
+        if animate && !reduceMotion {
+            GeometryReader { geometry in
+                TimelineView(.animation(minimumInterval: 1.0 / 20, paused: scenePhase != .active)) { timeline in
+                    let phase = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 36) * .pi / 18
+                    let radius = max(geometry.size.width, geometry.size.height)
+                    ZStack {
+                        RadialGradient(colors: [palette.wash(in: scheme).opacity(0.95), .clear],
+                                       center: UnitPoint(x: 0.34 + 0.18 * cos(phase), y: 0.27 + 0.12 * sin(phase)),
+                                       startRadius: 0, endRadius: radius * 0.8)
+                        RadialGradient(colors: [palette.accent(in: scheme).opacity(0.17), .clear],
+                                       center: UnitPoint(x: 0.72 - 0.16 * cos(phase), y: 0.75 - 0.10 * sin(phase)),
+                                       startRadius: 0, endRadius: radius * 0.65)
+                    }
+                }
+            }
+        } else {
+            LinearGradient(colors: [palette.wash(in: scheme).opacity(0.88), .clear],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+        }
     }
 }
 
@@ -132,14 +164,33 @@ enum MiniPlayerStyle: String, CaseIterable, Identifiable {
     }
 }
 
+enum LibraryArtworkSize: String, CaseIterable, Identifiable {
+    static let preferenceKey = "LibraryArtworkSize"
+    case small, medium, large, extraLarge
+
+    var id: Self { self }
+    var label: String { self == .extraLarge ? "XL" : rawValue.capitalized }
+
+    var scale: CGFloat {
+        switch self {
+        case .small: 0.76
+        case .medium: 1
+        case .large: 1.34
+        case .extraLarge: 1.72
+        }
+    }
+}
+
 struct MusicSettings: View {
     @ObservedObject var library: LibraryModel
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
+    @AppStorage(ArtworkColorWash.motionPreference) private var animateArtworkColors = true
     @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
     @AppStorage(HeaderWordmark.preferenceKey) private var headerWordmark = HeaderWordmark.iplex
     @AppStorage(HeaderMarkSize.preferenceKey) private var headerMarkSize = HeaderMarkSize.medium
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
+    @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
     @AppStorage(LibraryPageSize.preferenceKey) private var pageSize = LibraryPageSize.standard
     @Environment(\.dismiss) private var dismiss
     #if os(macOS)
@@ -170,6 +221,9 @@ struct MusicSettings: View {
                     }
                     Toggle("Artwork Colors", isOn: $artworkColors)
                         .help("Match the interface to the artwork for the current track.")
+                    Toggle("Animate Artwork Colors", isOn: $animateArtworkColors)
+                        .disabled(!artworkColors)
+                        .help("Let the album colors drift slowly across the background.")
                     Picker("Mini-player", selection: $miniPlayerStyle) {
                         ForEach(MiniPlayerStyle.allCases) { style in
                             Text(style.label).tag(style)
@@ -202,6 +256,11 @@ struct MusicSettings: View {
                         #endif
                     }
                     Divider()
+                    Picker("Library Artwork Size", selection: $libraryArtworkSize) {
+                        ForEach(LibraryArtworkSize.allCases) { size in
+                            Text(size.label).tag(size)
+                        }
+                    }
                     Picker("Results per Page", selection: $pageSize) {
                         ForEach(LibraryPageSize.allCases) { size in
                             Text(size.label).tag(size)

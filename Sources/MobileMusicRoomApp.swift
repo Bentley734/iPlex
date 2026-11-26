@@ -24,6 +24,7 @@ private struct MusicLibraryScreen: View {
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @State private var showSettings = false
+    @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
     @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @State private var showAppIcons = false
@@ -43,6 +44,11 @@ private struct MusicLibraryScreen: View {
         #endif
     }
 
+    private var artworkColumns: GridItem.Size {
+        let width = (columnWidth * libraryArtworkSize.scale).rounded()
+        return .adaptive(minimum: width, maximum: libraryArtworkSize == .medium ? .infinity : (width * 1.25).rounded())
+    }
+
     var body: some View {
         ZStack {
             libraryScreen
@@ -53,12 +59,14 @@ private struct MusicLibraryScreen: View {
                 #endif
             if showPlayer {
                 NowPlayingView(library: library) { showPlayer = false }
+                    .modifier(NowPlayingPopTransition())
             }
             if showMiniPlayer, let style = selectedMiniPlayer {
                 Color.black.ignoresSafeArea()
                 MiniPlayerContent(library: library, style: style) { showMiniPlayer = false }
             }
         }
+        .modifier(NowPlayingPresentation(showing: showPlayer))
         .tint(accent)
         #if os(iOS)
         .statusBarHidden(showMiniPlayer)
@@ -209,7 +217,7 @@ private struct MusicLibraryScreen: View {
                     }
                     if !library.busy && library.entries.isEmpty { Text("No matches in this library.").foregroundStyle(.secondary) }
                     let trackList = library.kind == .tracks && library.selectedGroup == nil
-                    LazyVGrid(columns: [GridItem(trackList ? .flexible() : .adaptive(minimum: columnWidth), spacing: 20)],
+                    LazyVGrid(columns: [GridItem(trackList ? .flexible() : artworkColumns, spacing: 20)],
                               spacing: trackList ? 8 : 20) {
                         ForEach(library.entries) { entry in
                             Button { search?.cancel(); library.open(entry) } label: {

@@ -66,6 +66,9 @@ private struct MusicWindow: View {
     @State private var searchTask: Task<Void, Never>?
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
+    @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
+    @AppStorage("LibrarySidebarWidth") private var sidebarPreference = 0
+    @GestureState private var sidebarDrag: CGFloat = 0
     @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @State private var showSettings = false
@@ -88,8 +91,10 @@ private struct MusicWindow: View {
                 .disabled(showNowPlaying)
             if showNowPlaying {
                 NowPlayingView(library: model) { showNowPlaying = false }
+                    .modifier(NowPlayingPopTransition())
             }
         }
+        .modifier(NowPlayingPresentation(showing: showNowPlaying))
         .background(theme.backdrop(using: palette))
         .sheet(isPresented: $showSettings) { MusicSettings(library: model) }
         .tint(copper)
@@ -102,29 +107,76 @@ private struct MusicWindow: View {
         }
     }
 
-    @ViewBuilder private var libraryContent: some View {
-        if plexify {
-            plexifyWorkspace
-        } else if graphite {
-            HStack(spacing: 0) {
-                sidebar.frame(width: 206)
-                Divider()
-                VStack(spacing: 0) {
-                    mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
-                    graphiteTransport
-                        .padding(.horizontal, 23).padding(.bottom, 17).padding(.top, 7)
-                }
-            }
-        } else {
-            VStack(spacing: 0) {
+    private var libraryContent: some View {
+        GeometryReader { geometry in
+            let width = geometry.size.width
+            if plexify {
+                plexifyWorkspace
+            } else if graphite {
                 HStack(spacing: 0) {
-                    sidebar.frame(width: 216)
-                    Rectangle().fill(Color.primary.opacity(0.12)).frame(width: 1)
-                    mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    resizableSidebar(availableWidth: width, defaultWidth: 206)
+                    VStack(spacing: 0) {
+                        mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
+                        graphiteTransport
+                            .padding(.horizontal, 23).padding(.bottom, 17).padding(.top, 7)
+                    }
                 }
-                Rectangle().fill(Color.primary.opacity(0.12)).frame(height: 1)
-                transport
+            } else {
+                VStack(spacing: 0) {
+                    HStack(spacing: 0) {
+                        resizableSidebar(availableWidth: width, defaultWidth: 216)
+                        mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    Rectangle().fill(Color.primary.opacity(0.12)).frame(height: 1)
+                    transport
+                }
             }
+        }
+    }
+
+    private func resizableSidebar(availableWidth: CGFloat, defaultWidth: CGFloat) -> some View {
+        let minimum: CGFloat = 164
+        let maximum = max(minimum, min(420, availableWidth - 400))
+        let preferred = sidebarPreference > 0 ? CGFloat(sidebarPreference) : defaultWidth
+        let limit: (CGFloat) -> CGFloat = { min(maximum, max(minimum, $0)) }
+        let startingWidth = limit(preferred)
+        let width = limit(startingWidth + sidebarDrag)
+
+        return HStack(spacing: 0) {
+            sidebar(width: width).frame(width: width)
+            Rectangle().fill(Color.primary.opacity(0.14)).frame(width: 1)
+                .frame(width: 9)
+                .frame(maxHeight: .infinity)
+                .background(.primary.opacity(0.01))
+                .contentShape(Rectangle())
+                .onHover { hovering in
+                    if hovering { NSCursor.resizeLeftRight.set() }
+                    else { NSCursor.arrow.set() }
+                }
+                .gesture(DragGesture(minimumDistance: 1, coordinateSpace: .global)
+                    .updating($sidebarDrag) { value, translation, _ in translation = value.translation.width }
+                    .onEnded { value in
+                        sidebarPreference = Int(limit(startingWidth + value.translation.width).rounded())
+                    })
+                .onTapGesture(count: 2) { sidebarPreference = 0 }
+                .focusable()
+                .onKeyPress(.leftArrow) {
+                    sidebarPreference = Int(limit(width - 16).rounded())
+                    return .handled
+                }
+                .onKeyPress(.rightArrow) {
+                    sidebarPreference = Int(limit(width + 16).rounded())
+                    return .handled
+                }
+                .accessibilityLabel("Sidebar width")
+                .accessibilityValue("\(Int(width.rounded())) points")
+                .accessibilityAdjustableAction { direction in
+                    switch direction {
+                    case .increment: sidebarPreference = Int(limit(width + 16).rounded())
+                    case .decrement: sidebarPreference = Int(limit(width - 16).rounded())
+                    @unknown default: break
+                    }
+                }
         }
     }
 
@@ -149,7 +201,8 @@ private struct MusicWindow: View {
                 .padding(.horizontal, 18).padding(.vertical, 8)
                 .background(slate)
                 HStack(spacing: 1) {
-                    sidebar.frame(width: 178)
+                    resizableSidebar(availableWidth: geometry.size.width - (wide && showPlexifyDeck ? 224 : 0),
+                                     defaultWidth: 178)
                     mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
                     if wide && showPlexifyDeck { plexifyDeck.frame(width: 224) }
                 }
@@ -188,10 +241,11 @@ private struct MusicWindow: View {
         .background(slate)
     }
 
-    private var sidebar: some View {
-        ScrollView {
+    private func sidebar(width: CGFloat) -> some View {
+        let padding: CGFloat = graphite || plexify ? 16 : 24
+        return ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                if !plexify { HeaderBrand(mark: headerMark, theme: theme, width: 155, height: 46) }
+                if !plexify { HeaderBrand(mark: headerMark, theme: theme, width: min(155, width - padding * 2), height: 46) }
                 if graphite {
                     librarySearch
                         .disabled(model.libraryID.isEmpty)
@@ -206,7 +260,7 @@ private struct MusicWindow: View {
                     ForEach(model.visibleKinds, id: \.self) { tab($0) }
                 }
             }
-            .padding(graphite || plexify ? 16 : 24)
+            .padding(padding)
         }
         .background {
             if theme == .liquidGlass {
@@ -423,7 +477,10 @@ private struct MusicWindow: View {
                 Text("No matches in this library.").foregroundStyle(.secondary).padding(26)
             }
             let trackList = model.kind == .tracks && model.selectedGroup == nil
-            LazyVGrid(columns: [GridItem(trackList ? .flexible() : .adaptive(minimum: graphite ? 133 : 145, maximum: 190), spacing: 21)],
+            let scale = libraryArtworkSize.scale
+            let artwork = GridItem.Size.adaptive(minimum: ((graphite ? 133 : 145) * scale).rounded(),
+                                                 maximum: (190 * scale).rounded())
+            LazyVGrid(columns: [GridItem(trackList ? .flexible() : artwork, spacing: 21)],
                       alignment: .leading, spacing: trackList ? 8 : 24) {
                 ForEach(model.entries) { entry in
                     Button { searchTask?.cancel(); model.open(entry) } label: {

@@ -70,6 +70,67 @@
     const secs = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
     return Math.floor(secs / 60) + ':' + String(secs % 60).padStart(2, '0');
   }
+  const layout = document.documentElement;
+  const separator = get('sidebar-resize');
+  const sidebarWidth = () => Math.round(separator.getBoundingClientRect().left - document.body.getBoundingClientRect().left);
+  const wideLayout = matchMedia('(min-width: 1040px)');
+  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  let sidebarDrag = null;
+  let savedSidebarWidth = 0;
+
+  function sidebarMaximum() {
+    const deckWidth = selectedTheme === 'plexify' && deckOpen && wideLayout.matches ? 218 : 0;
+    return Math.max(164, Math.min(420, window.innerWidth - deckWidth - 408));
+  }
+  function updateSidebar(width = savedSidebarWidth) {
+    if (width) layout.style.setProperty('--sidebar-width', Math.max(164, Math.min(420, Math.round(width))) + 'px');
+    else layout.style.removeProperty('--sidebar-width');
+    separator.setAttribute('aria-valuemin', '164');
+    separator.setAttribute('aria-valuemax', String(sidebarMaximum()));
+    separator.setAttribute('aria-valuenow', String(sidebarWidth()));
+  }
+  function saveSidebar(width) {
+    savedSidebarWidth = width ? Math.max(164, Math.min(sidebarMaximum(), Math.round(width))) : 0;
+    updateSidebar();
+    try { localStorage.setItem('musicroom-sidebar-width', String(savedSidebarWidth)); } catch {}
+  }
+  separator.addEventListener('pointerdown', event => {
+    if (event.button !== 0 || sidebarDrag) return;
+    separator.setPointerCapture(event.pointerId);
+    sidebarDrag = {id:event.pointerId, x:event.clientX, width:sidebarWidth()};
+    layout.dataset.sidebarDragging = '';
+  });
+  separator.addEventListener('pointermove', event => {
+    if (sidebarDrag?.id !== event.pointerId) return;
+    updateSidebar(Math.max(164, sidebarDrag.width + event.clientX - sidebarDrag.x));
+  });
+  separator.addEventListener('pointerup', event => {
+    if (sidebarDrag?.id !== event.pointerId) return;
+    if (event.clientX !== sidebarDrag.x) saveSidebar(Math.max(164, sidebarDrag.width + event.clientX - sidebarDrag.x));
+    finishSidebarDrag();
+  });
+  function finishSidebarDrag() {
+    sidebarDrag = null;
+    delete layout.dataset.sidebarDragging;
+    updateSidebar();
+  }
+  separator.addEventListener('lostpointercapture', finishSidebarDrag);
+  separator.addEventListener('dblclick', () => saveSidebar(0));
+  separator.addEventListener('keydown', event => {
+    const keys = {ArrowLeft:sidebarWidth() - 16, ArrowRight:sidebarWidth() + 16, Home:164, End:sidebarMaximum()};
+    if (!Object.hasOwn(keys, event.key)) return;
+    event.preventDefault();
+    saveSidebar(keys[event.key]);
+  });
+  window.addEventListener('resize', () => updateSidebar());
+
+  function selectArtworkSize(value) {
+    const size = ['small','large','extraLarge'].includes(value) ? value : 'medium';
+    layout.dataset.libraryArtwork = size;
+    get('library-artwork-size').value = size;
+    try { localStorage.setItem('musicroom-library-artwork-size', size); } catch {}
+  }
+
   function cover(item) {
     const frame = node('div', '', 'cover');
     frame.setAttribute('aria-hidden', 'true');
@@ -436,8 +497,14 @@
   function chooseArtworkColors(enabled) {
     artworkColors = enabled;
     get('artwork-colors').checked = enabled;
+    get('animate-artwork-colors').disabled = !enabled;
     try { localStorage.setItem('musicroom-artwork-colors', enabled ? '1' : '0'); } catch {}
     updateArtworkColors(playbackState);
+  }
+  function chooseArtworkMotion(enabled) {
+    layout.toggleAttribute('data-artwork-motion', enabled);
+    get('animate-artwork-colors').checked = enabled;
+    try { localStorage.setItem('musicroom-animate-artwork-colors', enabled ? '1' : '0'); } catch {}
   }
   let footerKey = '';
   window.macPlayerState = state => {
@@ -496,6 +563,8 @@
     if (path !== nowCover) {
       nowCover = path;
       get('now-art').replaceChildren(cover({...playing, artwork:path}));
+      get('now-art').disabled = !artworkPattern.test(path);
+      if (expandedArtwork.open) refreshExpandedArtwork();
     }
     get('signal-path-button').textContent = signalBadge(track.format);
     get('now-title').textContent = track.title || state.title || playing.title;
@@ -586,6 +655,19 @@
       get('now-queue-heading').focus({preventScroll:true});
     }
   }
+  const expandedArtwork = get('expanded-artwork');
+  const expandedImage = get('expanded-artwork-image');
+  function refreshExpandedArtwork() {
+    if (artworkPattern.test(nowCover)) expandedImage.src = nowCover;
+    else expandedArtwork.close();
+  }
+  get('now-art').onclick = () => {
+    if (!nowPlaying.open || closingNowPlaying || !artworkPattern.test(nowCover)) return;
+    expandedArtwork.showModal();
+    refreshExpandedArtwork();
+  };
+  get('expanded-artwork-cover').onclick = get('close-expanded-artwork').onclick = () => expandedArtwork.close();
+  expandedImage.addEventListener('error', () => { if (expandedArtwork.open) expandedArtwork.close(); });
   const lyricsSheet = get('lyrics-sheet');
   const signalSheet = get('signal-path-sheet');
   let lyricsRequest = 0;
@@ -594,6 +676,7 @@
   let activeCue = -1;
 
   function closePlaybackSheets() {
+    if (expandedArtwork.open) expandedArtwork.close();
     if (lyricsSheet.open) lyricsSheet.close();
     if (signalSheet.open) signalSheet.close();
   }
@@ -681,14 +764,54 @@
   };
   get('close-signal-path').onclick = () => signalSheet.close();
 
+  let nowPlayingAnimation = null;
+  let closingNowPlaying = false;
+  let nowPlayingCloseTimer;
+  function animateNowPlaying(closing) {
+    const current = getComputedStyle(nowPlaying);
+    const open = reduceMotion.matches ? {opacity:current.opacity} : {opacity:current.opacity, transform:current.transform};
+    const closed = reduceMotion.matches ? {opacity:0} : {opacity:0, transform:'scale(0.92)'};
+    nowPlayingAnimation?.cancel();
+    nowPlayingAnimation = nowPlaying.animate(closing ? [open, closed] : [closed, open], {
+      duration:reduceMotion.matches ? 150 : closing ? 230 : 360,
+      easing:closing ? 'ease-in' : 'cubic-bezier(.16,1,.3,1)', fill:closing ? 'forwards' : 'none'
+    });
+    return nowPlayingAnimation;
+  }
+  function dismissNowPlaying() {
+    if (closingNowPlaying || !nowPlaying.open) return;
+    closingNowPlaying = true;
+    const animation = animateNowPlaying(true);
+    const finish = () => {
+      if (nowPlayingAnimation !== animation) return;
+      clearTimeout(nowPlayingCloseTimer);
+      if (nowPlaying.open) nowPlaying.close();
+    };
+    nowPlayingCloseTimer = setTimeout(finish, Number(animation.effect.getTiming().duration) + 60);
+    animation.finished.then(finish, () => {});
+  }
+  nowPlaying.addEventListener('cancel', event => {
+    event.preventDefault();
+    if (expandedArtwork.open) expandedArtwork.close();
+    else dismissNowPlaying();
+  });
+  nowPlaying.addEventListener('close', () => {
+    if (nowPlaying.open) return;
+    clearTimeout(nowPlayingCloseTimer);
+    nowPlayingAnimation?.cancel();
+    nowPlayingAnimation = null;
+    closingNowPlaying = false;
+  });
   get('playing').onclick = () => {
     if (!playing || nowPlaying.open) return;
     renderNowPlaying(playbackState);
     showNowQueue(false);
+    closingNowPlaying = false;
     nowPlaying.showModal();
+    animateNowPlaying(false);
     nowPlaying.querySelector('.now-playing-scroll').scrollTop = 0;
   };
-  get('close-now-playing').onclick = () => nowPlaying.close();
+  get('close-now-playing').onclick = dismissNowPlaying;
   get('jump-now-queue').onclick = () => showNowQueue(!nowPlaying.classList.contains('queue-open'));
   get('now-prev').onclick = () => player.action({action:'previous'});
   get('now-play').onclick = () => player.action({action:'toggle'});
@@ -755,6 +878,7 @@
     toggle.hidden = !plexify;
     toggle.setAttribute('aria-expanded', String(visible));
     document.documentElement.dataset.plexifyDeck = visible ? 'open' : 'closed';
+    updateSidebar();
   }
   function renderHeaderWordmark() {
     const choice = get('header-wordmark');
@@ -818,6 +942,8 @@
   }
   get('theme').onchange = event => chooseTheme(event.target.value);
   get('artwork-colors').onchange = event => chooseArtworkColors(event.target.checked);
+  get('animate-artwork-colors').onchange = event => chooseArtworkMotion(event.target.checked);
+  get('library-artwork-size').onchange = event => selectArtworkSize(event.target.value);
   get('library-page-size').onchange = event => {
     selectPageSize(event.target.value);
     clearTimeout(timer);
@@ -882,8 +1008,11 @@
   } catch {}
   try {
     selectPageSize(localStorage.getItem('musicroom-library-page-size'));
+    selectArtworkSize(localStorage.getItem('musicroom-library-artwork-size'));
+    savedSidebarWidth = Number(localStorage.getItem('musicroom-sidebar-width')) || 0;
     chooseTheme(localStorage.getItem('musicroom-theme'));
     chooseArtworkColors(localStorage.getItem('musicroom-artwork-colors') === '1');
+    chooseArtworkMotion(localStorage.getItem('musicroom-animate-artwork-colors') !== '0');
     chooseMiniPlayer(localStorage.getItem('musicroom-mini-player'));
     chooseHeaderLogo(localStorage.getItem('musicroom-header-logo'));
     chooseHeaderWordmark(localStorage.getItem('musicroom-header-wordmark'));
