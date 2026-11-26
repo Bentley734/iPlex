@@ -101,10 +101,17 @@
   <dialog id="video-dialog" aria-labelledby="video-playing-title">
     <header>
       <div><h2 id="video-playing-title"></h2><span id="video-mode" role="status"></span></div>
+      <label id="video-version-field" hidden>Version <select id="video-version" aria-label="Video version"></select></label>
+      <button id="video-version-play" type="button" hidden>Resume</button>
       <button id="video-compatibility" type="button" hidden>Use Compatibility Mode</button>
       <button id="video-watch-toggle" type="button">Mark Watched</button>
       <button id="video-done" type="button">Done</button>
     </header>
+    <section id="video-up-next" aria-label="Up Next" hidden>
+      <div><strong id="video-up-next-heading" role="status">Up Next</strong><p id="video-up-next-title"></p></div>
+      <button id="video-next-cancel" type="button" hidden>Cancel</button>
+      <button id="video-next-play" type="button" hidden>Play Next</button>
+    </section>
     <video id="video-player" controls playsinline></video>
     <p id="video-error" role="alert" hidden></p>
     <p id="video-playing-summary"></p>

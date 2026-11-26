@@ -128,6 +128,7 @@ namespace MusicRoom
         readonly Uri source;
         readonly Action<string, double> completion;
         readonly double startAt;
+        readonly bool advanceOnEnd;
         readonly NativeVideoRuntime vlc;
         readonly Panel surface = new Panel { BackColor = Color.Black, Dock = DockStyle.Fill };
         readonly Button toggle = new Button { Text = "Pause", Width = 85 };
@@ -140,10 +141,11 @@ namespace MusicRoom
         bool ready, scrubbing, stopping, startedAtPosition, endedReported;
         string result = "closed";
 
-        internal NativeVideoWindow(Uri source, string title, double startAt, Action<string, double> completion)
+        internal NativeVideoWindow(Uri source, string title, double startAt, bool advanceOnEnd, bool hasVersions, Action<string, double> completion)
         {
             this.source = source;
             this.startAt = startAt;
+            this.advanceOnEnd = advanceOnEnd;
             this.completion = completion;
             vlc = NativeVideoRuntime.Load();
             Text = title;
@@ -156,6 +158,12 @@ namespace MusicRoom
             var next = new Button { Text = "+10 s", Width = 65 };
             var fallback = new Button { Text = "Compatibility Mode", Width = 155 };
             controls.Controls.AddRange(new Control[] { previous, toggle, next, timeline, elapsed, fallback });
+            if (hasVersions)
+            {
+                var versions = new Button { Text = "Versions…", Width = 92 };
+                versions.Click += delegate { result = "versions"; Close(); };
+                controls.Controls.Add(versions);
+            }
             Controls.Add(surface);
             Controls.Add(controls);
             toggle.Click += delegate { TogglePlayback(); };
@@ -228,6 +236,12 @@ namespace MusicRoom
             if (state == 6 && !endedReported)
             {
                 endedReported = true;
+                if (advanceOnEnd)
+                {
+                    result = "ended";
+                    Close();
+                    return;
+                }
                 completion("ended", 0);
             }
             else if (ready && !endedReported && DateTime.UtcNow >= nextReport && (startedAtPosition || startAt < 5))

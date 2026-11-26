@@ -17,6 +17,14 @@
   const watchShelf = get('continue-video');
   const watchItems = get('continue-video-items');
   const alternate = get('video-compatibility');
+  const versionField = get('video-version-field');
+  const versionPicker = get('video-version');
+  const versionPlay = get('video-version-play');
+  const upNext = get('video-up-next');
+  const nextTitle = get('video-up-next-title');
+  const nextHeading = get('video-up-next-heading');
+  const nextCancel = get('video-next-cancel');
+  const nextPlay = get('video-next-play');
   const tabs = new Map([['movie', get('movies')], ['show', get('television')]]);
   const titles = {movie:'Movies', show:'TV Shows'};
   const validSource = /^https:\/\/media\.musicroom\.invalid\/video\/[a-f0-9]{32}$/;
@@ -25,6 +33,8 @@
   const rendered = new Set();
   let watchRecords = new Map(), watchSequence = 0, activeItem, activeScope, lastReport = 0;
   let lastSaved = 0, awaitingSeek = false, nativeActive = false;
+  let selectedVersion = -1, activeVersion = null, nextEpisode = null, nextTimer = null;
+  let ended = false;
 
   function watchContext() { return {kind, library, server:state?.serverId}; }
 
@@ -269,27 +279,104 @@
     loadMore.hidden = next === null;
   };
 
+  function clearNext() {
+    clearInterval(nextTimer);
+    nextTimer = null;
+    nextEpisode = null;
+    upNext.hidden = true;
+    nextCancel.hidden = true;
+    nextPlay.hidden = true;
+    nextTitle.textContent = '';
+  }
+
   function open(item) {
-    source = null;
-    failed = false;
-    usingFallback = false;
-    nativeActive = false;
     activeItem = item;
     activeScope = watchContext();
-    resumeAt = watchRecords.get(item.key)?.seconds || 0;
-    lastSaved = resumeAt;
-    lastReport = Date.now();
-    awaitingSeek = resumeAt >= 5;
+    selectedVersion = -1;
+    versionField.hidden = true;
+    lastSaved = watchRecords.get(item.key)?.seconds || 0;
     renderWatch();
     get('video-playing-title').textContent = item.title;
     get('video-playing-summary').textContent = item.summary || '';
+    if (!dialog.open) dialog.showModal();
+    requestPlayback();
+  }
+
+  function requestPlayback() {
+    clearNext();
+    source = null;
+    candidates = [];
+    failed = false;
+    usingFallback = false;
+    nativeActive = false;
+    activeVersion = null;
+    ended = false;
+    resumeAt = lastSaved;
+    lastReport = Date.now();
+    awaitingSeek = resumeAt >= 5;
     mode.textContent = 'Preparing video…';
     error.hidden = true;
     alternate.hidden = true;
+    versionPlay.hidden = true;
+    versionPicker.disabled = true;
     video.hidden = true;
-    dialog.showModal();
-    host({action:'videoPlay', kind, library, id:++pending, item:item.key, type:item.type});
+    video.pause();
+    if (hls) { hls.destroy(); hls = null; }
+    video.removeAttribute('src');
+    video.load();
+    host({action:'videoPlay', ...activeScope, id:++pending, item:activeItem.key,
+      type:activeItem.type, version:selectedVersion});
   }
+
+  function onEnded() {
+    if (ended || !activeItem) return;
+    ended = true;
+    saveWatch(0, true, true);
+    if (!source?.canAdvance) return;
+    upNext.hidden = false;
+    nextHeading.textContent = 'Finding the next unwatched episode…';
+    host({action:'videoNext', ...activeScope, id:pending, item:activeItem.key});
+  }
+
+  window.plexVideoNext = reply => {
+    if (!dialog.open || !ended || reply.id !== pending) return;
+    nextEpisode = reply.item || null;
+    if (!nextEpisode) {
+      nextHeading.textContent = reply.error ? 'Couldn’t look up the next episode.' : 'You’re caught up with this show.';
+      return;
+    }
+    nextTitle.textContent = [nextEpisode.title, nextEpisode.subtitle].filter(Boolean).join(' · ');
+    nextPlay.hidden = false;
+    nextCancel.hidden = false;
+    const deadline = Date.now() + 5000;
+    nextHeading.textContent = 'Up Next in 5s';
+    nextTimer = setInterval(() => {
+      const seconds = Math.ceil((deadline - Date.now()) / 1000);
+      if (seconds <= 0) {
+        clearInterval(nextTimer);
+        nextTimer = null;
+        if (dialog.open && nextEpisode) open(nextEpisode);
+      } else nextHeading.textContent = 'Up Next in ' + seconds + 's';
+    }, 200);
+  };
+
+  nextCancel.onclick = () => {
+    clearInterval(nextTimer);
+    nextTimer = null;
+    nextHeading.textContent = 'Up Next';
+    nextCancel.hidden = true;
+  };
+
+  nextPlay.onclick = () => { if (nextEpisode) open(nextEpisode); };
+
+  versionPicker.onchange = () => {
+    if (!activeItem) return;
+    if (!nativeActive && !awaitingSeek && !failed) saveWatch(video.currentTime);
+    selectedVersion = Number(versionPicker.value);
+    requestPlayback();
+  };
+
+  versionPlay.onclick = () => { if (activeItem) requestPlayback(); };
 
   // Let the runtime decide which codecs it can decode. A file extension alone can't establish that.
   function directScore(candidate) {
@@ -305,6 +392,7 @@
   function direct() {
     const candidate = candidates.shift();
     if (!candidate) { compatibility(); return; }
+    activeVersion = candidate.index;
     if (candidate.native) {
       nativeActive = true;
       video.removeAttribute('src');
@@ -313,7 +401,8 @@
       mode.textContent = 'Direct Play · VLC';
       alternate.hidden = true;
       window.windowsPlayback.action({action:'pause'});
-      host({action:'videoNative', id:pending, url:candidate.url, title:get('video-playing-title').textContent, resume:lastSaved});
+      host({action:'videoNative', id:pending, url:candidate.url, title:get('video-playing-title').textContent, resume:lastSaved,
+        advance:Boolean(source.canAdvance), versions:(source.versions || []).length > 1});
       return;
     }
     nativeActive = false;
@@ -325,7 +414,8 @@
   }
 
   function compatibility(position) {
-    if (usingFallback || !source?.hls) { showError('Plex couldn’t start this video. Check transcoding on your Plex server.'); return; }
+    const fallback = source?.fallbacks?.[activeVersion] || source?.hls;
+    if (usingFallback || !validSource.test(fallback)) { showError('Plex couldn’t start this video. Check transcoding on your Plex server.'); return; }
     usingFallback = true;
     nativeActive = false;
     resumeAt = Number.isFinite(position) && position >= 5 ? position :
@@ -342,10 +432,10 @@
         if (data.fatal) showError('Plex couldn’t transcode this video. Check that transcoding is enabled and available on your server.');
       });
       hls.on(window.Hls.Events.MANIFEST_PARSED, () => video.play().catch(() => {}));
-      hls.loadSource(source.hls);
+      hls.loadSource(fallback);
       hls.attachMedia(video);
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = source.hls;
+      video.src = fallback;
       video.play().catch(() => {});
     } else {
       showError('This WebView2 runtime cannot play Plex compatibility streams.');
@@ -355,7 +445,15 @@
   window.plexNativeVideo = reply => {
     if (!dialog.open || reply.id !== pending) return;
     if (reply.result === 'progress') { saveWatch(reply.seconds); return; }
-    if (reply.result === 'ended') { saveWatch(0, true, true); return; }
+    if (reply.result === 'ended') { nativeActive = false; onEnded(); return; }
+    if (reply.result === 'versions') {
+      nativeActive = false;
+      saveWatch(reply.seconds);
+      mode.textContent = 'Choose a version';
+      versionPlay.hidden = false;
+      versionPicker.focus();
+      return;
+    }
     if (reply.result === 'closed') {
       saveWatch(reply.seconds);
       dialog.close();
@@ -379,7 +477,7 @@
     }
   });
   video.addEventListener('ended', () => {
-    if (dialog.open && !nativeActive && !failed) saveWatch(0, true, true);
+    if (dialog.open && !nativeActive && !failed) onEnded();
   });
   video.addEventListener('play', () => window.windowsPlayback.action({action:'pause'}));
   video.addEventListener('error', () => {
@@ -390,6 +488,7 @@
   get('video-done').onclick = () => dialog.close();
   dialog.addEventListener('close', () => {
     if (!nativeActive && !awaitingSeek && !failed) saveWatch(video.currentTime);
+    clearNext();
     activeItem = activeScope = null;
     ++pending;
     video.pause();
@@ -411,12 +510,19 @@
     alternate.hidden = true;
     error.textContent = message;
     error.hidden = false;
+    versionPicker.disabled = false;
     mode.textContent = '';
   }
 
   window.plexVideoSource = payload => {
     if (!dialog.open || payload.id !== pending || !validSource.test(payload.hls)) return;
     source = payload;
+    const versions = payload.versions || [];
+    versionPicker.replaceChildren(new Option('Automatic', '-1'),
+      ...versions.map(row => new Option(row.label, String(row.index))));
+    versionPicker.value = String(selectedVersion);
+    versionField.hidden = versions.length < 2;
+    versionPicker.disabled = false;
     candidates = (payload.direct || []).filter(row => validSource.test(row.url))
       .map(row => ({...row, score:row.native ? 3 : directScore(row)}))
       .sort((a, b) => b.score - a.score);

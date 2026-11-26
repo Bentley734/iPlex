@@ -22,13 +22,14 @@ namespace MusicRoom
         readonly Dictionary<string, VideoResource> videoResources = new Dictionary<string, VideoResource>();
         readonly Dictionary<Uri, string> videoAliases = new Dictionary<Uri, string>();
         CancellationTokenSource videoJob;
+        string activeVideoServer, activeVideoLibrary, activeVideoKey, activeVideoShow;
 
         sealed class VideoResource
         {
             public Server Server;
             public Uri Target;
             public string Mime;
-            public bool Matroska;
+            public bool Matroska, Started;
         }
 
         static readonly Dictionary<string, string> VideoMimes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase) {
@@ -81,11 +82,11 @@ namespace MusicRoom
         void ReleaseVideoPlayback()
         {
             if (videoJob != null) videoJob.Cancel();
-            var session = videoResources.Values.FirstOrDefault(value =>
-                value.Target.AbsolutePath == VideoPrefix + "start.m3u8");
+            var sessions = videoResources.Values.Where(value => value.Started).ToArray();
+            activeVideoServer = activeVideoLibrary = activeVideoKey = activeVideoShow = null;
             videoAliases.Clear();
             videoResources.Clear();
-            if (session != null) StopVideo(session);
+            foreach (var session in sessions) StopVideo(session);
         }
 
         async void StopVideo(VideoResource resource)
@@ -130,6 +131,8 @@ namespace MusicRoom
                 Send("plexVideoError", new { id, message = "Choose a video library first." });
                 return;
             }
+            if (action == "videoNext" && (Str(request, "server") != server.Id || kind != "show"
+                || activeVideoServer != server.Id || activeVideoLibrary != library || activeVideoKey != key)) return;
             bool watchAction = action == "videoWatchState" || action == "videoWatchUpdate" || action == "videoWatchClear";
             if (watchAction && Str(request, "server") != server.Id) return;
             if (action == "videoWatchState")
@@ -219,44 +222,156 @@ namespace MusicRoom
                     var item = Metadata(result.Data, library).FirstOrDefault(row =>
                         Str(row, "type") == expected && Str(row, "ratingKey") == key);
                     if (item == null) throw Problem("This video is unavailable in the selected library.");
-                    var direct = new List<object>();
-                    foreach (var media in Rows(Get(item, "Media")).Take(16))
-                    {
-                        var parts = Rows(Get(media, "Part")).Take(2).ToArray();
-                        if (parts.Length != 1) continue;
-                        string part = Str(parts[0], "key"), mime;
-                        if (!PartPath(part)) continue;
-                        if (!VideoMimes.TryGetValue(Path.GetExtension(part), out mime))
-                            mime = "application/octet-stream";
-                        string container = Str(media, "container").ToLowerInvariant();
-                        bool native = mime == "video/x-matroska" || mime == "video/webm" ||
-                                      container == "mkv" || container == "matroska" || container == "webm";
-                        direct.Add(new { url = RegisterVideoResource(server, new Uri(result.Base, part), mime, native), mime, native,
-                            video = Str(media, "videoCodec").ToLowerInvariant(), audio = Str(media, "audioCodec").ToLowerInvariant() });
-                    }
-                    var query = VideoQuery(new Dictionary<string, string> {
-                        { "path", path }, { "protocol", "hls" }, { "directPlay", "0" }, { "directStream", "0" },
-                        { "mediaIndex", "0" }, { "session", Guid.NewGuid().ToString("N") }, { "subtitles", "burn" },
-                        { "videoQuality", "100" }, { "videoResolution", "1920x1080" }, { "maxVideoBitrate", "20000" },
-                        { "X-Plex-Client-Profile-Name", "iOS" },
-                        { "X-Plex-Client-Profile-Extra", "add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mpegts&videoCodec=h264&audioCodec=aac&replace=true)" }
+                    var versions = Rows(Get(item, "Media")).Take(16).Select((media, index) =>
+                        DescribeVideoVersion(media, index, server, result.Base)).ToArray();
+                    long requested = -1;
+                    var requestVersion = Str(request, "version");
+                    if (requestVersion.Length != 0 && (!Int64.TryParse(requestVersion, out requested) ||
+                        requested < -1 || (requested >= 0 && requested >= versions.Length)))
+                        throw Problem("That video version is no longer available.");
+                    var options = requested < 0 ? versions : versions.Where(option => option.index == requested).ToArray();
+                    var direct = options.Where(option => option.url.Length != 0).ToArray();
+                    var fallbackIndices = options.Select(option => option.index).DefaultIfEmpty(0);
+                    var fallbacks = fallbackIndices.ToDictionary(index => index,
+                        index => RegisterVideoFallback(server, result.Base, path, index));
+                    var showID = Str(item, "grandparentRatingKey");
+                    activeVideoServer = server.Id;
+                    activeVideoLibrary = library;
+                    activeVideoKey = key;
+                    activeVideoShow = expected == "episode" && ItemID.IsMatch(showID) ? showID : null;
+                    Send("plexVideoSource", new {
+                        id, direct, hls = fallbacks[options.Length > 0 ? options[0].index : 0], fallbacks = fallbacks.ToDictionary(
+                            pair => pair.Key.ToString(CultureInfo.InvariantCulture), pair => pair.Value),
+                        versions = versions.Select(option => new { option.index, option.label }).ToArray(),
+                        canAdvance = activeVideoShow != null
                     });
-                    var hls = RegisterVideoResource(server,
-                        new Uri(result.Base, VideoPrefix + "start.m3u8?" + query), "application/vnd.apple.mpegurl");
-                    Send("plexVideoSource", new { id, direct, hls });
+                }
+                else if (action == "videoNext")
+                {
+                    var advance = activeVideoShow == null ? null :
+                        await FindNextEpisode(server, library, activeVideoShow, key, job.Token);
+                    job.Token.ThrowIfCancellationRequested();
+                    Send("plexVideoNext", new { id, item = advance });
                 }
             }
             catch (Exception error)
             {
                 if (!job.IsCancellationRequested)
-                    Send("plexVideoError", new { id, message = error is InvalidDataException ?
+                {
+                    if (action == "videoNext") Send("plexVideoNext", new { id, error = true });
+                    else Send("plexVideoError", new { id, message = error is InvalidDataException ?
                         error.Message : "Couldn’t load video from Plex." });
+                }
             }
             finally
             {
                 if (videoJob == job) videoJob = null;
                 job.Dispose();
             }
+        }
+
+        sealed class VideoVersion
+        {
+            public int index { get; set; }
+            public string label { get; set; }
+            public string url { get; set; }
+            public string mime { get; set; }
+            public bool native { get; set; }
+            public string video { get; set; }
+            public string audio { get; set; }
+        }
+
+        static string MediaLabel(string value)
+        { return value.Length > 24 ? "" : value.Trim().ToUpperInvariant(); }
+
+        VideoVersion DescribeVideoVersion(Dictionary<string, object> media, int index, Server server, Uri basis)
+        {
+            string container = Str(media, "container").ToLowerInvariant();
+            string resolution = MediaLabel(Str(media, "videoResolution"));
+            long height = Num(media, "height"), pixels;
+            if (resolution.Length == 0 && height > 0) resolution = height.ToString(CultureInfo.InvariantCulture);
+            if (Int64.TryParse(resolution, out pixels)) resolution += "p";
+            long bitrate = Num(media, "bitrate");
+            string label = String.Join(" · ", new[] { "Version " + (index + 1), resolution,
+                MediaLabel(Str(media, "videoCodec")), MediaLabel(container), MediaLabel(Str(media, "audioCodec")),
+                bitrate > 0 ? bitrate.ToString(CultureInfo.InvariantCulture) + " kbps" : "" }
+                .Where(value => value.Length > 0));
+            var parts = Rows(Get(media, "Part")).Take(2).ToArray();
+            string part = parts.Length == 1 ? Str(parts[0], "key") : "", mime = "application/octet-stream", url = "";
+            string matchedMime;
+            bool direct = PartPath(part);
+            if (direct && VideoMimes.TryGetValue(Path.GetExtension(part), out matchedMime)) mime = matchedMime;
+            bool native = mime == "video/x-matroska" || mime == "video/webm" ||
+                          container == "mkv" || container == "matroska" || container == "webm";
+            if (direct) url = RegisterVideoResource(server, new Uri(basis, part), mime, native);
+            return new VideoVersion { index = index, label = label, url = url, mime = mime, native = native,
+                video = Str(media, "videoCodec").ToLowerInvariant(), audio = Str(media, "audioCodec").ToLowerInvariant() };
+        }
+
+        string RegisterVideoFallback(Server server, Uri basis, string path, int index)
+        {
+            var query = VideoQuery(new Dictionary<string, string> {
+                { "path", path }, { "protocol", "hls" }, { "directPlay", "0" }, { "directStream", "0" },
+                { "mediaIndex", index.ToString(CultureInfo.InvariantCulture) }, { "session", Guid.NewGuid().ToString("N") },
+                { "subtitles", "burn" }, { "videoQuality", "100" }, { "videoResolution", "1920x1080" },
+                { "maxVideoBitrate", "20000" }, { "X-Plex-Client-Profile-Name", "iOS" },
+                { "X-Plex-Client-Profile-Extra", "add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mpegts&videoCodec=h264&audioCodec=aac&replace=true)" }
+            });
+            return RegisterVideoResource(server, new Uri(basis, VideoPrefix + "start.m3u8?" + query), "application/vnd.apple.mpegurl");
+        }
+
+        static long EpisodeOrder(Dictionary<string, object> row, string key)
+        {
+            long value;
+            return Int64.TryParse(Str(row, key), out value) && value >= 0 ? value : Int64.MaxValue;
+        }
+
+        internal static Dictionary<string, object> NextEpisodeRow(IEnumerable<Dictionary<string, object>> rows,
+            string current, HashSet<string> watched)
+        {
+            var ordered = rows.OrderBy(row => EpisodeOrder(row, "parentIndex")).ThenBy(row => EpisodeOrder(row, "index")).ToArray();
+            int start = Array.FindIndex(ordered, row => Str(row, "ratingKey") == current);
+            return start < 0 ? null : ordered.Skip(start + 1).FirstOrDefault(row =>
+                Num(row, "viewCount") <= 0 && !watched.Contains(Str(row, "ratingKey")));
+        }
+
+        async Task<object> FindNextEpisode(Server server, string library, string show, string current, CancellationToken token)
+        {
+            var watched = videoWatch.WatchedIds(server.Id, library);
+            var candidate = await WithServer(server, async basis =>
+            {
+                var episodes = new List<Dictionary<string, object>>();
+                var seen = new HashSet<string>();
+                const int size = 100;
+                int offset = 0;
+                while (offset < 20000)
+                {
+                    string path = "/library/metadata/" + show + "/allLeaves?X-Plex-Container-Size=" + size +
+                        "&X-Plex-Container-Start=" + offset.ToString(CultureInfo.InvariantCulture);
+                    var result = await FetchPlex(HttpMethod.Get, new Uri(basis, path), server.Token, token, 8 * 1024 * 1024);
+                    var container = Map(Get(Map(result), "MediaContainer"));
+                    var rows = Metadata(result, library).Where(row => Str(row, "type") == "episode"
+                        && ItemID.IsMatch(Str(row, "ratingKey")) && Str(row, "title").Length > 0
+                        && (!row.ContainsKey("grandparentRatingKey") || Str(row, "grandparentRatingKey") == show)
+                        && seen.Add(Str(row, "ratingKey"))).ToArray();
+                    episodes.AddRange(rows);
+                    int count = Rows(Get(container, "Metadata")).Count();
+                    offset += count;
+                    long total = Num(container, "totalSize");
+                    if (count == 0 || rows.Length == 0 || (total > 0 ? offset >= total : count < size)) break;
+                }
+                return NextEpisodeRow(episodes, current, watched);
+            }, token);
+            if (candidate == null) return null;
+            string thumb = ArtworkPath(candidate, "thumb");
+            var index = EpisodeOrder(candidate, "index");
+            var season = EpisodeOrder(candidate, "parentIndex");
+            return new {
+                key = Str(candidate, "ratingKey"), type = "episode", title = Str(candidate, "title"),
+                summary = Str(candidate, "summary"), subtitle = index != Int64.MaxValue && season != Int64.MaxValue ?
+                    "Season " + season + " · Episode " + index : "",
+                thumb, artwork = RegisterVideoArt(server, library, thumb)
+            };
         }
 
         void SendVideoWatchState(Server server, string library, long id)
@@ -337,6 +452,7 @@ namespace MusicRoom
 
             try
             {
+                if (resource.Target.AbsolutePath == VideoPrefix + "start.m3u8") resource.Started = true;
                 var req = PlexRequest(HttpMethod.Get, resource.Target, resource.Server.Token);
                 req.Headers.Remove("Accept");
                 req.Headers.Add("Accept", resource.Mime);

@@ -87,6 +87,21 @@ namespace MusicRoom
                 statement => sqlite3_step(statement), server, library, item);
         }
 
+        internal HashSet<string> WatchedIds(string server, string library)
+        {
+            var result = new HashSet<string>();
+            Statement("SELECT item_id FROM watch_state WHERE server_id = ? AND library_id = ? AND watched = 1",
+                statement =>
+                {
+                    while (sqlite3_step(statement) == 100)
+                    {
+                        var pointer = sqlite3_column_text(statement, 0);
+                        if (pointer != IntPtr.Zero) result.Add(Marshal.PtrToStringAnsi(pointer));
+                    }
+                }, server, library);
+            return result;
+        }
+
         internal List<object> Records(string server, string library)
         {
             var result = new List<object>();

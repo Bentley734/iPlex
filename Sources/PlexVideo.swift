@@ -42,9 +42,38 @@ struct PlexVideoFile {
     }
 }
 
+struct PlexVideoVersion: Identifiable {
+    let id: Int
+    let label: String
+    let file: PlexVideoFile?
+}
+
 struct PlexVideoSource {
-    let direct: [PlexVideoFile]
-    let fallback: URL
+    let versions: [PlexVideoVersion]
+    let showID: String?
+    let transcodeEndpoint: URL
+
+    func fallback(version: Int) -> URL? {
+        guard var parts = URLComponents(url: transcodeEndpoint, resolvingAgainstBaseURL: false) else { return nil }
+        parts.queryItems = (parts.queryItems ?? []) + [
+            .init(name: "mediaIndex", value: String(version)),
+            .init(name: "session", value: UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased())
+        ]
+        return parts.url
+    }
+}
+
+struct PlexOrderedEpisode {
+    let item: PlexVideoItem
+    let season: Int?
+    let number: Int?
+    let watched: Bool
+}
+
+struct PlexEpisodePage {
+    let episodes: [PlexOrderedEpisode]
+    let count: Int
+    let total: Int?
 }
 
 struct PlexVideoBrowser: View {
@@ -172,8 +201,7 @@ struct PlexVideoBrowser: View {
             refreshWatchState()
         }
         .sheet(item: $presentation, onDismiss: refreshWatchState) { item in
-            PlexVideoPlayback(title: item.title, server: server, section: selection, item: item,
-                             service: service, pauseMusic: pauseMusic)
+            PlexVideoSession(item: item, server: server, section: selection, service: service, pauseMusic: pauseMusic)
         }
     }
 
@@ -308,6 +336,21 @@ private struct PlexVideoPoster: View {
     }
 }
 
+private struct PlexVideoSession: View {
+    @State var item: PlexVideoItem
+    let server: String
+    let section: String
+    let service: PlexService
+    let pauseMusic: () -> Void
+
+    var body: some View {
+        PlexVideoPlayback(title: item.title, server: server, section: section, item: item,
+                          service: service, pauseMusic: pauseMusic) { next in
+            item = next
+        }.id(item.id)
+    }
+}
+
 private struct PlexVideoPlayback: View {
     let title: String
     let server: String
@@ -315,6 +358,7 @@ private struct PlexVideoPlayback: View {
     let item: PlexVideoItem
     let service: PlexService
     let pauseMusic: () -> Void
+    let advance: (PlexVideoItem) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var player = AVPlayer()
     @State private var relay: PlexVideoManifest?
@@ -329,16 +373,48 @@ private struct PlexVideoPlayback: View {
     @State private var watched = false
     @State private var hasPrepared = false
     @State private var avReady = false
+    @State private var selectedVersion = -1
+    @State private var activeVersion: Int?
+    @State private var activeFallback: URL?
+    @State private var nextEpisode: PlexVideoItem?
+    @State private var autoAdvance = true
+    @State private var countdown = 5
+    @State private var nextStatus: String?
+
+    private var playbackKey: [Int] { [selectedVersion, forceTranscode ? 1 : 0] }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(title).font(.headline).lineLimit(1)
-                Spacer()
-                if !mode.isEmpty { Text(mode).font(.caption).foregroundStyle(.secondary) }
-                if mode == "Direct Play" { Button("Use Compatibility Mode", action: switchToCompatibility) }
-                Button("Done") { dismiss() }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text(title).font(.headline).lineLimit(1)
+                    Spacer()
+                    if !mode.isEmpty { Text(mode).font(.caption).foregroundStyle(.secondary) }
+                    Button("Done") { dismiss() }
+                }
+                if (source?.versions.count ?? 0) > 1 || mode == "Direct Play" {
+                    ViewThatFits(in: .horizontal) {
+                        HStack { versionControls }
+                        VStack(alignment: .leading) { versionControls }
+                    }
+                }
             }.padding(12)
+            if let nextEpisode {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(autoAdvance ? "Up Next in \(countdown)s" : "Up Next").font(.headline)
+                        Text(nextEpisode.title).lineLimit(1)
+                        if !nextEpisode.subtitle.isEmpty {
+                            Text(nextEpisode.subtitle).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
+                    Spacer()
+                    if autoAdvance { Button("Cancel") { autoAdvance = false } }
+                    Button("Play Next") { advance(nextEpisode) }.buttonStyle(.borderedProminent)
+                }.padding(12)
+            } else if let nextStatus {
+                Text(nextStatus).font(.callout).foregroundStyle(.secondary).padding(.horizontal, 12)
+            }
             if let failure {
                 Text(failure).padding(20).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if pending {
@@ -357,7 +433,9 @@ private struct PlexVideoPlayback: View {
         #endif
         .background(.black)
         .environment(\.colorScheme, .dark)
-        .task(id: forceTranscode) { await prepare() }
+        .task(id: playbackKey) { await prepare() }
+        .task(id: watched) { if watched { await queueNext() } }
+        .task(id: nextEpisode?.id) { await runCountdown() }
         .onReceive(NotificationCenter.default.publisher(for: .AVPlayerItemFailedToPlayToEndTime)) { event in
             guard let failed = event.object as? AVPlayerItem, failed === player.currentItem else { return }
             playbackFailed()
@@ -376,9 +454,73 @@ private struct PlexVideoPlayback: View {
             if avReady { saveProgress(player.currentTime().seconds, false) }
             player.pause()
             player.replaceCurrentItem(with: nil)
-            relay = nil
-            if mode == "Plex Transcode", let source { service.stopVideo(source.fallback) }
+            stopFallback()
         }
+    }
+
+    @ViewBuilder
+    private var versionControls: some View {
+        if let versions = source?.versions, versions.count > 1 {
+            Picker("Version", selection: Binding(get: { selectedVersion }, set: selectVersion)) {
+                Text("Automatic").tag(-1)
+                ForEach(versions) { Text($0.label).tag($0.id) }
+            }
+            .accessibilityLabel("Video version")
+        }
+        if mode == "Direct Play" { Button("Use Compatibility Mode", action: switchToCompatibility) }
+    }
+
+    private func selectVersion(_ index: Int) {
+        guard index != selectedVersion else { return }
+        let position = watched ? 0 : avReady ? player.currentTime().seconds : lastSaved
+        if position.isFinite && position >= 0 {
+            resumeAt = CMTime(seconds: position, preferredTimescale: 1_000)
+        }
+        watched = false
+        autoAdvance = true
+        nextEpisode = nil
+        nextStatus = nil
+        selectedVersion = index
+        activeVersion = nil
+        forceTranscode = false
+    }
+
+    private func stopFallback() {
+        relay = nil
+        if let activeFallback {
+            service.stopVideo(activeFallback)
+            self.activeFallback = nil
+        }
+    }
+
+    private func queueNext() async {
+        guard item.type == "episode" else { return }
+        guard let showID = source?.showID else {
+            nextStatus = "Couldn’t identify this show for Up Next."
+            return
+        }
+        nextStatus = "Finding the next unwatched episode…"
+        let played = VideoWatchStore.shared.watchedIDs(server: server, library: section)
+        do {
+            let next = try await service.nextVideoEpisode(server: server, section: section,
+                                                         showID: showID, after: item.id, excluding: played)
+            try Task.checkCancellation()
+            nextStatus = next == nil ? "You’re caught up with this show." : nil
+            countdown = 5
+            nextEpisode = next
+        } catch {
+            if !Task.isCancelled { nextStatus = "Couldn’t look up the next episode." }
+        }
+    }
+
+    private func runCountdown() async {
+        guard let nextEpisode else { return }
+        for seconds in (1...5).reversed() {
+            guard autoAdvance, !Task.isCancelled else { return }
+            countdown = seconds
+            do { try await Task.sleep(for: .seconds(1)) } catch { return }
+        }
+        if autoAdvance && !Task.isCancelled { advance(nextEpisode) }
     }
 
     private func saveProgress(_ seconds: Double, _ ended: Bool) {
@@ -423,6 +565,7 @@ private struct PlexVideoPlayback: View {
         player.pause()
         player.replaceCurrentItem(with: nil)
         native = nil
+        stopFallback()
         do {
             let resolved: PlexVideoSource
             if let source { resolved = source }
@@ -431,30 +574,48 @@ private struct PlexVideoPlayback: View {
                 try Task.checkCancellation()
                 source = resolved
             }
+            let versions = selectedVersion < 0 ? resolved.versions : resolved.versions.filter { $0.id == selectedVersion }
             var direct: AVURLAsset?
+            var directVersion: Int?
             if !forceTranscode {
-                for file in resolved.direct where !file.isMatroska {
+                for version in versions {
+                    guard let file = version.file, !file.isMatroska else { continue }
                     let asset = AVURLAsset(url: file.url)
-                    if (try? await canDirectPlay(asset)) == true { direct = asset; break }
+                    if (try? await canDirectPlay(asset)) == true {
+                        direct = asset
+                        directVersion = version.id
+                        break
+                    }
                     try Task.checkCancellation()
                 }
             }
             try Task.checkCancellation()
-            if !forceTranscode, direct == nil, let file = resolved.direct.first(where: \.isMatroska) ?? resolved.direct.first {
-                pauseMusic()
-                native = file.url
-                mode = "Direct Play · VLC"
-                pending = false
-                return
+            if !forceTranscode, direct == nil {
+                let nativeVersion = versions.first { $0.file?.isMatroska == true } ?? versions.first { $0.file != nil }
+                if let nativeVersion, let file = nativeVersion.file {
+                    pauseMusic()
+                    native = file.url
+                    activeVersion = nativeVersion.id
+                    mode = "Direct Play · VLC"
+                    pending = false
+                    return
+                }
             }
             let playback: AVPlayerItem
             if let direct {
                 playback = AVPlayerItem(asset: direct)
+                activeVersion = directVersion
                 mode = "Direct Play"
             } else {
+                let version = activeVersion ?? versions.first?.id ?? 0
+                guard let fallback = resolved.fallback(version: version) else {
+                    throw PlexServiceError("Couldn’t prepare Plex video playback.")
+                }
                 let loader = PlexVideoManifest()
-                playback = AVPlayerItem(asset: loader.asset(resolved.fallback))
+                playback = AVPlayerItem(asset: loader.asset(fallback))
                 relay = loader
+                activeFallback = fallback
+                activeVersion = version
                 mode = "Plex Transcode"
             }
             pauseMusic()

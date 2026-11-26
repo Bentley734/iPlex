@@ -140,8 +140,10 @@ namespace MusicRoom
                 if (!Double.TryParse(WindowsMediaService.Str(request, "resume"),
                     System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out resume)) resume = 0;
                 if (Double.IsNaN(resume) || resume < 0 || resume > 2592000) resume = 0;
-                nativeVideo = new NativeVideoWindow(url, title, resume, (result, seconds) => {
-                    if (result != "progress" && result != "ended") nativeVideo = null;
+                bool advance = Object.Equals(request.ContainsKey("advance") ? request["advance"] : null, true);
+                bool versions = Object.Equals(request.ContainsKey("versions") ? request["versions"] : null, true);
+                nativeVideo = new NativeVideoWindow(url, title, resume, advance, versions, (result, seconds) => {
+                    if (result != "progress" && (result != "ended" || advance)) nativeVideo = null;
                     Emit("plexNativeVideo", new { id, result, seconds });
                 });
                 nativeVideo.Show(this);
@@ -180,7 +182,7 @@ namespace MusicRoom
                     BeginInvoke(new Action(() => { if (!closing && floatingPlayer) DragFloatingPlayer(); }));
                 else if (action == "updateApp") await UpdateApp();
                 else if (action == "videoNative") OpenNativeVideo(request);
-                else if (action == "videoClose")
+                else if (action == "videoClose" || action == "videoPlay")
                 {
                     if (nativeVideo != null) nativeVideo.Close();
                     await media.Handle(request);

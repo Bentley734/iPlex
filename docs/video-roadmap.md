@@ -37,8 +37,8 @@ Start with the existing `PlexService.swift` and `Windows/Video.cs` as the Plex n
 | Roadmap feature | iPlex today | Remaining |
 | --- | --- | --- |
 | 1. Metadata | Plex supplies listings, summaries and artwork. Selected libraries can pre-cache covers. | Parse filenames, match TMDB and optionally TVDB, add localized metadata caching and manual corrections for ambiguous matches. |
-| 2. Continue Watching | This increment adds per-device progress, resume, watched state and Continue Watching for Plex movies and episodes. | Next-unwatched selection across seasons, auto-advance, and cross-device or Plex watch-state sync. |
-| 3. Grouping and stacking | Plex shows already group into seasons and episodes. Playback can inspect alternate Plex media files. | Visible version picker, edition handling, and franchise collections. |
+| 2. Continue Watching | Per-device progress, resume, watched state and Continue Watching. Up Next locates the next unwatched episode across seasons and auto-advances after a cancelable countdown. | Cross-device or Plex watch-state sync. |
+| 3. Grouping and stacking | Plex shows already group into seasons and episodes. The video player offers a version picker for alternate Plex media files. | Edition handling and franchise collections. |
 | 4. Trakt | Pending. | OAuth, two-way history/progress/ratings sync, account scoping, retry and conflict handling. |
 | 5. Network shares | iPlex streams from Plex directly when supported. | Direct SMB, NFS, WebDAV and SFTP sources, credentials, scanning and seekable byte ranges. |
 | 6. Direct Play and HDR | OS-native and VideoLAN playback cover common sources including MP4, MKV and WebM, with Plex fallback. | Verify hardware decoding by platform and codec, AVI coverage, Dolby Vision Profiles 5/7/8, HDR10+, and SDR tone mapping on real displays. Profile 7 base-layer playback and full enhancement-layer rendering need separate checks. |
@@ -47,4 +47,4 @@ Start with the existing `PlexService.swift` and `Windows/Video.cs` as the Plex n
 | 9. Chapters and skip controls | Players already offer seeking. | Chapter lists, Plex intro/credits markers, Skip Intro and Next Episode controls. Consider fingerprinting after sources without markers are supported. |
 | 10. Playback diagnostics | Video shows Direct Play or Plex Transcode. | A HUD sourced from each player adapter for codecs, bitrate, resolution, HDR, buffer health, dropped frames, and hardware decoder status. |
 
-Build next-unwatched playback and the Plex version picker next. Then add a local-file scanner and metadata matching so the catalog can ingest network sources without redesigning title identity. Add Trakt after the watch-state merge rules are in place.
+Add a local-file scanner and metadata matching so the catalog can ingest network sources without redesigning title identity. Add Trakt after the watch-state merge rules are in place.

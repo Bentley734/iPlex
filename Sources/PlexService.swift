@@ -1900,17 +1900,10 @@ extension PlexParser {
         let rows = try metadataRows(container, sectionID: section)
         var seen = Set<String>()
         let items = rows.compactMap { row -> PlexVideoItem? in
-            guard row["type"] as? String == expected, let id = numericIdentifier(row["ratingKey"]),
-                  id.allSatisfy({ $0.isASCII && $0.isNumber }),
-                  let title = string(row["title"], maximum: 400),
+            guard let item = videoItem(row, expected: expected),
                   parent == nil || row["parentRatingKey"] == nil || numericIdentifier(row["parentRatingKey"]) == parent,
-                  seen.insert(id).inserted else { return nil }
-            let year = integer(row["year"]).map(String.init) ?? ""
-            let index = integer(row["index"])
-            let subtitle = expected == "episode" ? index.map { "Episode \($0)" } ?? "" : year
-            return PlexVideoItem(id: id, type: expected, title: title, subtitle: subtitle,
-                                 summary: string(row["summary"], maximum: 4_000) ?? "",
-                                 thumb: musicArtworkPath(row["thumb"] as? String))
+                  seen.insert(item.id).inserted else { return nil }
+            return item
         }
         let count = (container["Metadata"] as? [[String: Any]])?.count ?? 0
         let end = offset + count
@@ -1918,17 +1911,67 @@ extension PlexParser {
         return PlexVideoPage(items: items, next: more ? end : nil)
     }
 
-    static func videoParts(_ data: Data, section: String, item: PlexVideoItem,
-                           base: URL, token: String) throws -> [PlexVideoFile] {
+    private static func videoItem(_ row: [String: Any], expected: String) -> PlexVideoItem? {
+        guard row["type"] as? String == expected, let id = numericIdentifier(row["ratingKey"]),
+              id.allSatisfy({ $0.isASCII && $0.isNumber }), let title = string(row["title"], maximum: 400) else { return nil }
+        let year = integer(row["year"]).map(String.init) ?? ""
+        let index = integer(row["index"])
+        let subtitle = expected == "episode" ? index.map { "Episode \($0)" } ?? "" : year
+        return PlexVideoItem(id: id, type: expected, title: title, subtitle: subtitle,
+                             summary: string(row["summary"], maximum: 4_000) ?? "",
+                             thumb: musicArtworkPath(row["thumb"] as? String))
+    }
+
+    static func episodePage(_ data: Data, section: String, showID: String) throws -> PlexEpisodePage {
+        let container = try metadataContainer(data)
+        let rows = try metadataRows(container, sectionID: section)
+        let episodes = rows.compactMap { row -> PlexOrderedEpisode? in
+            guard row["grandparentRatingKey"] == nil || numericIdentifier(row["grandparentRatingKey"]) == showID,
+                  let item = videoItem(row, expected: "episode") else { return nil }
+            return PlexOrderedEpisode(item: item, season: integer(row["parentIndex"]),
+                                      number: integer(row["index"]), watched: (integer(row["viewCount"]) ?? 0) > 0)
+        }
+        return PlexEpisodePage(episodes: episodes, count: (container["Metadata"] as? [[String: Any]])?.count ?? 0,
+                               total: integer(container["totalSize"]))
+    }
+
+    static func nextEpisode(in episodes: [PlexOrderedEpisode], after id: String, excluding watched: Set<String>) -> PlexVideoItem? {
+        let ordered = episodes.enumerated().sorted {
+            ($0.element.season ?? Int.max, $0.element.number ?? Int.max, $0.offset) <
+            ($1.element.season ?? Int.max, $1.element.number ?? Int.max, $1.offset)
+        }.map(\.element)
+        guard let current = ordered.firstIndex(where: { $0.item.id == id }) else { return nil }
+        guard let next = ordered.dropFirst(current + 1).first(where: { !$0.watched && !watched.contains($0.item.id) }) else { return nil }
+        guard let season = next.season, let number = next.number else { return next.item }
+        return PlexVideoItem(id: next.item.id, type: next.item.type, title: next.item.title,
+                             subtitle: "Season \(season) · Episode \(number)", summary: next.item.summary, thumb: next.item.thumb)
+    }
+
+    static func videoVersions(_ data: Data, section: String, item: PlexVideoItem,
+                              base: URL, token: String) throws -> (versions: [PlexVideoVersion], showID: String?) {
         guard let row = try metadataRows(data, sectionID: section).first(where: {
             numericIdentifier($0["ratingKey"]) == item.id && $0["type"] as? String == item.type
         }) else { throw PlexServiceError("This video is unavailable in the selected library.") }
-        return (row["Media"] as? [[String: Any]] ?? []).prefix(16).compactMap { media in
-            guard let parts = media["Part"] as? [[String: Any]], parts.count == 1,
-                  let path = parts[0]["key"] as? String else { return nil }
-            guard let url = try? playbackURL(base: base, partPath: path, token: token) else { return nil }
-            return PlexVideoFile(url: url, container: media["container"] as? String ?? "")
+        let showID = item.type == "episode" ? numericIdentifier(row["grandparentRatingKey"]) : nil
+        let versions = (row["Media"] as? [[String: Any]] ?? []).prefix(16).enumerated().map { index, media in
+            let container = string(media["container"], maximum: 24) ?? ""
+            let resolution = string(media["videoResolution"], maximum: 20)
+                ?? integer(media["height"]).flatMap { $0 > 0 ? String($0) : nil }
+            let components = [resolution.map { Int($0) != nil ? $0 + "p" : $0.uppercased() },
+                              string(media["videoCodec"], maximum: 24)?.uppercased(),
+                              container.isEmpty ? nil : container.uppercased(),
+                              string(media["audioCodec"], maximum: 24)?.uppercased(),
+                              integer(media["bitrate"]).flatMap { $0 > 0 ? "\($0) kbps" : nil }].compactMap { $0 }
+            let label = (["Version \(index + 1)"] + components).joined(separator: " · ")
+            let parts = media["Part"] as? [[String: Any]] ?? []
+            let file: PlexVideoFile?
+            if parts.count == 1, let path = parts[0]["key"] as? String,
+               let url = try? playbackURL(base: base, partPath: path, token: token) {
+                file = PlexVideoFile(url: url, container: container)
+            } else { file = nil }
+            return PlexVideoVersion(id: index, label: label, file: file)
         }
+        return (versions, showID)
     }
 }
 
@@ -1993,11 +2036,10 @@ extension PlexService {
         try await videoRequest(server: server) { record, base, operation in
             let path = "/library/metadata/\(item.id)"
             let request = try self.serverRequest(base: base, path: path, query: [], token: record.token)
-            let direct = try PlexParser.videoParts(operation.fetch(request, limit: 8 * 1024 * 1024),
-                                                   section: section, item: item, base: base, token: record.token)
-            let session = UUID().uuidString.replacingOccurrences(of: "-", with: "").lowercased()
+            let metadata = try PlexParser.videoVersions(operation.fetch(request, limit: 8 * 1024 * 1024),
+                                                        section: section, item: item, base: base, token: record.token)
             let params = ["path": path, "protocol": "hls", "directPlay": "0", "directStream": "0",
-                          "mediaIndex": "0", "session": session, "videoQuality": "100",
+                          "videoQuality": "100",
                           "videoResolution": "1920x1080", "maxVideoBitrate": "20000", "subtitles": "burn",
                           "X-Plex-Client-Identifier": self.clientIdentifier, "X-Plex-Token": record.token,
                           "X-Plex-Product": "iPlex", "X-Plex-Platform": "iOS", "X-Plex-Client-Profile-Name": "iOS",
@@ -2005,7 +2047,35 @@ extension PlexService {
             let fallback = try self.serverRequest(base: base, path: PlexVideoManifest.prefix + "start.m3u8",
                 query: params.map { URLQueryItem(name: $0.key, value: $0.value) }, token: record.token)
             guard let url = fallback.url else { throw PlexServiceError("Couldn’t prepare Plex video playback.") }
-            return PlexVideoSource(direct: direct, fallback: url)
+            return PlexVideoSource(versions: metadata.versions, showID: metadata.showID, transcodeEndpoint: url)
+        }
+    }
+
+    func nextVideoEpisode(server: String, section: String, showID: String, after itemID: String,
+                          excluding watched: Set<String>) async throws -> PlexVideoItem? {
+        guard showID.range(of: #"^[1-9][0-9]{0,19}$"#, options: .regularExpression) != nil else { return nil }
+        return try await videoRequest(server: server) { record, base, operation in
+            var episodes = [PlexOrderedEpisode]()
+            var seen = Set<String>()
+            var offset = 0
+            let size = 100
+            while offset < 20_000 {
+                let query: [URLQueryItem] = [
+                    .init(name: "X-Plex-Container-Start", value: String(offset)),
+                    .init(name: "X-Plex-Container-Size", value: String(size))
+                ]
+                let request = try self.serverRequest(base: base, path: "/library/metadata/\(showID)/allLeaves",
+                                                     query: query, token: record.token)
+                let page = try PlexParser.episodePage(operation.fetch(request, limit: 8 * 1024 * 1024),
+                                                      section: section, showID: showID)
+                let fresh = page.episodes.filter { seen.insert($0.item.id).inserted }
+                episodes.append(contentsOf: fresh)
+                offset += page.count
+                if page.count == 0 || fresh.isEmpty || (page.total.map { offset >= $0 } ?? (page.count < size)) {
+                    return PlexParser.nextEpisode(in: episodes, after: itemID, excluding: watched)
+                }
+            }
+            return PlexParser.nextEpisode(in: episodes, after: itemID, excluding: watched)
         }
     }
 
