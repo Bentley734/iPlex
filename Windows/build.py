@@ -85,6 +85,8 @@ def main():
                 web.write(ASSETS / name, name)
             for mark in sorted((ASSETS / "HeaderMarks").glob("*.png")):
                 web.write(mark, "HeaderMarks/" + mark.name)
+            for background in sorted((ASSETS / "GlassBackgrounds").glob("*.jpg")):
+                web.write(background, "GlassBackgrounds/" + background.name)
         embed(site, "site.zip")
         flags.append("/win32icon:" + str(stage / (DEFAULT_ICON + ".ico")))
         command = [str(args.compiler)]

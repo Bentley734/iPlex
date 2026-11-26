@@ -207,11 +207,31 @@
       <input id="glass-transparency" type="range" min="0" max="100" step="5" value="40">
       <output id="glass-transparency-value" for="glass-transparency">40%</output>
     </label>
+    <label id="glass-tint-setting" class="theme-choice">
+      <span>Liquid Glass Tint</span>
+      <select id="glass-tint">
+        <option value="themeDefault">Theme Default</option>
+        <option value="none">No Tint</option>
+        <option value="blue">Blue</option>
+        <option value="mint">Mint</option>
+        <option value="violet">Violet</option>
+        <option value="rose">Rose</option>
+        <option value="amber">Amber</option>
+      </select>
+    </label>
     <section id="glass-wallpaper-setting">
-      <label for="glass-wallpaper-file">Liquid Glass Background</label>
+      <label for="glass-wallpaper-choice">Liquid Glass Background</label>
+      <select id="glass-wallpaper-choice">
+        <option value="themeDefault">Theme Default</option>
+        <option value="prism-tide">Prism Tide</option>
+        <option value="ember-fold">Ember Fold</option>
+        <option value="violet-orbit">Violet Orbit</option>
+        <option value="custom" hidden>Custom Image</option>
+      </select>
+      <label for="glass-wallpaper-file">Choose a custom image</label>
       <input id="glass-wallpaper-file" type="file" accept="image/*">
       <img id="glass-wallpaper-preview" alt="Current Liquid Glass background" hidden>
-      <button id="remove-glass-wallpaper" type="button" hidden>Remove Background</button>
+      <button id="remove-glass-wallpaper" type="button" hidden>Remove Custom Image</button>
       <p id="glass-wallpaper-status" role="status"></p>
     </section>
     <label class="theme-choice">Artwork Colors <input id="artwork-colors" type="checkbox"></label>

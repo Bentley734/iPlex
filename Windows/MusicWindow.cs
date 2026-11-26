@@ -211,6 +211,7 @@ namespace MusicRoom
                 case ".js": return "text/javascript; charset=utf-8";
                 case ".css": return "text/css; charset=utf-8";
                 case ".png": return "image/png";
+                case ".jpg": return "image/jpeg";
                 case ".ico": return "image/x-icon";
                 default: return "application/octet-stream";
             }

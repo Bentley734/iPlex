@@ -5,15 +5,37 @@ import UniformTypeIdentifiers
 import PhotosUI
 #endif
 
+enum GlassBackground: String, CaseIterable, Identifiable {
+    case themeDefault, prismTide = "prism-tide", emberFold = "ember-fold", violetOrbit = "violet-orbit", custom
+
+    var id: Self { self }
+    var label: String {
+        switch self {
+        case .themeDefault: "Theme Default"
+        case .prismTide: "Prism Tide"
+        case .emberFold: "Ember Fold"
+        case .violetOrbit: "Violet Orbit"
+        case .custom: "Custom Image"
+        }
+    }
+    var isPreset: Bool { self != .themeDefault && self != .custom }
+}
+
 @MainActor
 final class GlassWallpaper: ObservableObject {
     static let shared = GlassWallpaper()
     @Published private(set) var image: MusicImage?
+    @Published private(set) var customImage: MusicImage?
+    @Published private(set) var background: GlassBackground
+    private static let backgroundKey = "GlassBackgroundChoice"
     @Published private(set) var working = false
     @Published private(set) var message: String?
     private var modified = false
 
     private init() {
+        background = UserDefaults.standard.string(forKey: Self.backgroundKey)
+            .flatMap(GlassBackground.init(rawValue:)) ?? .custom
+        refreshImage()
         let file = Self.location
         Task.detached(priority: .utility) {
             guard let source = CGImageSourceCreateWithURL(file as CFURL, nil),
@@ -23,7 +45,28 @@ final class GlassWallpaper: ObservableObject {
     }
 
     private func restore(_ artwork: CGImage) {
-        if !modified && image == nil { image = MusicPlatform.image(artwork) }
+        guard !modified && customImage == nil else { return }
+        customImage = MusicPlatform.image(artwork)
+        if background == .custom { refreshImage() }
+    }
+
+    func choose(_ choice: GlassBackground) {
+        background = choice
+        UserDefaults.standard.set(choice.rawValue, forKey: Self.backgroundKey)
+        refreshImage()
+    }
+
+    private func refreshImage() {
+        if background == .custom {
+            image = customImage
+        } else if background.isPreset,
+                  let url = Bundle.main.url(forResource: background.rawValue, withExtension: "jpg", subdirectory: "GlassBackgrounds"),
+                  let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+                  let artwork = CGImageSourceCreateImageAtIndex(source, 0, nil) {
+            image = MusicPlatform.image(artwork)
+        } else {
+            image = nil
+        }
     }
 
     private nonisolated static var location: URL {
@@ -93,7 +136,8 @@ final class GlassWallpaper: ObservableObject {
             return
         }
         modified = true
-        image = nil
+        customImage = nil
+        if background == .custom { choose(.themeDefault) }
         message = nil
     }
 
@@ -117,7 +161,8 @@ final class GlassWallpaper: ObservableObject {
                     return try Self.save(data)
                 }.value
                 modified = true
-                image = MusicPlatform.image(artwork)
+                customImage = MusicPlatform.image(artwork)
+                choose(.custom)
             } catch {
                 message = (error as? WallpaperError)?.errorDescription ?? "Couldn’t load the background image."
             }
@@ -158,6 +203,7 @@ final class GlassWallpaper: ObservableObject {
 
 struct GlassWallpaperBackdrop: View {
     let image: MusicImage
+    let isPreset: Bool
 
     var body: some View {
         GeometryReader { geometry in
@@ -165,7 +211,7 @@ struct GlassWallpaperBackdrop: View {
                 .scaledToFill()
                 .frame(width: geometry.size.width, height: geometry.size.height)
                 .clipped()
-                .overlay(.black.opacity(0.40))
+                .overlay(.black.opacity(isPreset ? 0.24 : 0.40))
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
@@ -197,7 +243,15 @@ struct GlassWallpaperSettings: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 9) {
-            Text("Liquid Glass Background").font(.headline)
+            Picker("Liquid Glass Background", selection: Binding(
+                get: { wallpaper.background == .custom && wallpaper.customImage == nil ? .themeDefault : wallpaper.background },
+                set: wallpaper.choose
+            )) {
+                ForEach(GlassBackground.allCases) { choice in
+                    if choice != .custom || wallpaper.customImage != nil { Text(choice.label).tag(choice) }
+                }
+            }
+            .disabled(wallpaper.working)
             if let image = wallpaper.image {
                 GlassWallpaperImage(image: image)
                     .scaledToFill().frame(width: 132, height: 74)
@@ -222,8 +276,8 @@ struct GlassWallpaperSettings: View {
                 #endif
             }
             #endif
-            if wallpaper.image != nil {
-                Button("Remove Background", systemImage: "xmark.circle", action: wallpaper.remove)
+            if wallpaper.customImage != nil {
+                Button("Remove Custom Image", systemImage: "xmark.circle", action: wallpaper.remove)
                     .disabled(wallpaper.working)
             }
             if wallpaper.working { ProgressView("Saving background…") }

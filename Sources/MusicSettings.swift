@@ -112,7 +112,7 @@ private struct ThemeArtworkBackdrop: View {
     var body: some View {
         theme.backdrop.overlay {
             if theme.supportsGlassWallpaper, !reduceTransparency, let image = wallpaper.image {
-                GlassWallpaperBackdrop(image: image)
+                GlassWallpaperBackdrop(image: image, isPreset: wallpaper.background.isPreset)
             } else if let palette, !theme.keepsBlackCanvas {
                 ArtworkColorWash(palette: palette, scheme: theme.scheme)
                     .allowsHitTesting(false)
@@ -162,43 +162,75 @@ enum LiquidGlassAppearance {
     }
 }
 
+enum LiquidGlassTint: String, CaseIterable, Identifiable {
+    static let preferenceKey = "LiquidGlassTint"
+    case themeDefault, none, blue, mint, violet, rose, amber
+
+    var id: Self { self }
+    var label: String {
+        switch self {
+        case .themeDefault: "Theme Default"
+        case .none: "No Tint"
+        default: rawValue.capitalized
+        }
+    }
+
+    func color(for theme: MusicTheme) -> Color? {
+        switch self {
+        case .themeDefault: theme.accent
+        case .none: nil
+        case .blue: Color(red: 0.41, green: 0.70, blue: 1)
+        case .mint: Color(red: 0.43, green: 0.93, blue: 0.74)
+        case .violet: Color(red: 0.72, green: 0.59, blue: 1)
+        case .rose: Color(red: 1, green: 0.53, blue: 0.72)
+        case .amber: Color(red: 1, green: 0.73, blue: 0.38)
+        }
+    }
+}
+
 private struct MusicGlassSurface: ViewModifier {
     let theme: MusicTheme
     let radius: CGFloat
     let interactive: Bool
     @AppStorage(LiquidGlassAppearance.transparencyKey) private var transparency = LiquidGlassAppearance.defaultTransparency
+    @AppStorage(LiquidGlassTint.preferenceKey) private var tint = LiquidGlassTint.themeDefault
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     func body(content: Content) -> some View {
         let density = reduceTransparency ? 1 : LiquidGlassAppearance.density(transparency)
         let shape = RoundedRectangle(cornerRadius: radius)
+        let color = tint.color(for: theme)
+        let edgeColor = color ?? .white
+        let base = tint == .themeDefault || theme.keepsBlackCanvas ? theme.surface : Color(white: 0.12)
         let edge = 0.38 + (1 - density) * 0.28
         let sheen = (theme.keepsBlackCanvas ? 0.045 : 0.12) * (1.2 - density * 0.45)
         content.background {
             ZStack {
                 if reduceTransparency {
-                    shape.fill(theme.keepsBlackCanvas ? Color(white: 0.075) : theme.surface)
+                    shape.fill(theme.keepsBlackCanvas ? Color(white: 0.075) : base)
                 } else if theme.keepsBlackCanvas {
                     shape.fill(.ultraThinMaterial).opacity(0.10 + density * 0.32)
                 } else if #available(macOS 26, iOS 26, tvOS 26, *) {
                     let variant: Glass = density > 0.65 ? .regular : .clear
-                    Color.clear.glassEffect(
-                        variant.tint(theme.accent.opacity(0.035 + density * 0.12)).interactive(interactive), in: shape
-                    )
+                    let material = color.map { variant.tint($0.opacity(0.04 + density * 0.13)) } ?? variant
+                    Color.clear.glassEffect(material.interactive(interactive), in: shape)
                 } else {
                     shape.fill(.thinMaterial).opacity(0.42 + density * 0.50)
                 }
 
-                shape.fill(theme.surface.opacity(0.08 + density * 0.63))
+                shape.fill(base.opacity(0.08 + density * 0.63))
+                if tint != .themeDefault, let color, !reduceTransparency {
+                    shape.fill(color.opacity(theme.keepsBlackCanvas ? 0.045 + density * 0.035 : 0.08 + density * 0.10))
+                }
                 shape.fill(.linearGradient(
-                    colors: [.white.opacity(sheen), theme.accent.opacity(sheen * 0.2), .clear],
+                    colors: [.white.opacity(sheen), edgeColor.opacity(sheen * 0.2), .clear],
                     startPoint: .topLeading, endPoint: .bottomTrailing
                 ))
                 shape.strokeBorder(.linearGradient(
                     stops: [.init(color: .white.opacity(edge), location: 0),
-                            .init(color: theme.accent.opacity(edge * 0.56), location: 0.26),
+                            .init(color: edgeColor.opacity(edge * 0.56), location: 0.26),
                             .init(color: .white.opacity(0.08), location: 0.54),
-                            .init(color: theme.accent.opacity(edge * 0.46), location: 1)],
+                            .init(color: edgeColor.opacity(edge * 0.46), location: 1)],
                     startPoint: .topLeading, endPoint: .bottomTrailing
                 ))
                 shape.inset(by: 1.25).strokeBorder(.linearGradient(
@@ -299,6 +331,7 @@ enum LibraryArtworkSize: String, CaseIterable, Identifiable {
 struct MusicSettings: View {
     @ObservedObject var library: LibraryModel
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
+    @AppStorage(LiquidGlassTint.preferenceKey) private var liquidTint = LiquidGlassTint.themeDefault
     @AppStorage(LiquidGlassAppearance.transparencyKey) private var glassTransparency = LiquidGlassAppearance.defaultTransparency
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @AppStorage(ArtworkColorWash.motionPreference) private var animateArtworkColors = true
@@ -336,7 +369,14 @@ struct MusicSettings: View {
                             Text(option.label).tag(option)
                         }
                     }
-                    if theme.usesLiquidGlass { transparencyControl }
+                    if theme.usesLiquidGlass {
+                        transparencyControl
+                        Picker("Liquid Glass Tint", selection: $liquidTint) {
+                            ForEach(LiquidGlassTint.allCases) { tint in
+                                Text(tint.label).tag(tint)
+                            }
+                        }
+                    }
                     if theme.supportsGlassWallpaper { GlassWallpaperSettings() }
                     Toggle("Artwork Colors", isOn: $artworkColors)
                         .help("Match the interface to the artwork for the current track.")

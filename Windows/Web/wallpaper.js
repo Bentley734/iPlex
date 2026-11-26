@@ -2,14 +2,33 @@
   'use strict';
 
   const root = document.documentElement;
+  const choice = document.getElementById('glass-wallpaper-choice');
+  const tint = document.getElementById('glass-tint');
   const picker = document.getElementById('glass-wallpaper-file');
   const preview = document.getElementById('glass-wallpaper-preview');
   const remove = document.getElementById('remove-glass-wallpaper');
   const status = document.getElementById('glass-wallpaper-status');
   const maximumBytes = 25 * 1024 * 1024;
+  const presets = new Set(['prism-tide', 'ember-fold', 'violet-orbit']);
+  const choiceKey = 'musicroom-glass-background';
+  let selected = 'custom';
+  try { selected = localStorage.getItem(choiceKey) || 'custom'; } catch {}
   let objectURL = '';
 
+  function chooseTint(value) {
+    tint.value = value;
+    if (tint.selectedIndex === -1) tint.value = 'themeDefault';
+    root.dataset.glassTint = tint.value;
+    try { localStorage.setItem('musicroom-liquid-glass-tint', tint.value); } catch {}
+  }
+
+  tint.addEventListener('change', () => chooseTint(tint.value));
+  let savedTint = 'themeDefault';
+  try { savedTint = localStorage.getItem('musicroom-liquid-glass-tint') || savedTint; } catch {}
+  chooseTint(savedTint);
+
   function setWorking(working) {
+    choice.disabled = working;
     picker.disabled = working;
     remove.disabled = working;
   }
@@ -17,16 +36,37 @@
   function display(blob) {
     if (objectURL) URL.revokeObjectURL(objectURL);
     objectURL = blob ? URL.createObjectURL(blob) : '';
-    root.toggleAttribute('data-custom-wallpaper', Boolean(objectURL));
-    preview.hidden = remove.hidden = !objectURL;
-    if (objectURL) {
-      preview.src = objectURL;
-      root.style.setProperty('--glass-wallpaper', 'url("' + objectURL + '")');
+    render();
+  }
+
+  function render() {
+    const preset = presets.has(selected);
+    const source = preset ? 'GlassBackgrounds/' + selected + '.jpg' : selected === 'custom' ? objectURL : '';
+    choice.querySelector('[value="custom"]').hidden = !objectURL;
+    choice.value = source ? selected : 'themeDefault';
+    root.toggleAttribute('data-custom-wallpaper', Boolean(source));
+    root.toggleAttribute('data-preset-wallpaper', preset);
+    preview.hidden = !source;
+    remove.hidden = !objectURL;
+    if (source) {
+      preview.src = source;
+      root.style.setProperty('--glass-wallpaper', 'url("' + source + '")');
     } else {
       preview.removeAttribute('src');
       root.style.removeProperty('--glass-wallpaper');
     }
   }
+
+  function choose(value) {
+    selected = value;
+    try { localStorage.setItem(choiceKey, value); } catch {}
+    render();
+  }
+
+  choice.addEventListener('change', () => {
+    status.textContent = '';
+    choose(choice.value);
+  });
 
   async function database() {
     return new Promise((resolve, reject) => {
@@ -82,6 +122,7 @@
     try {
       const blob = await normalize(file);
       await withWallpaper('readwrite', store => store.put(blob, 'wallpaper'));
+      choose('custom');
       display(blob);
       status.textContent = 'Background updated.';
     } catch {
@@ -95,6 +136,7 @@
     setWorking(true);
     try {
       await withWallpaper('readwrite', store => store.delete('wallpaper'));
+      if (selected === 'custom') choose('themeDefault');
       display(null);
       status.textContent = 'Background removed.';
     } catch {
@@ -104,6 +146,7 @@
     }
   });
 
+  render();
   setWorking(true);
   withWallpaper('readonly', store => store.get('wallpaper'))
     .then(blob => { if (blob instanceof Blob) display(blob); })

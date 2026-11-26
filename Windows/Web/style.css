@@ -615,12 +615,14 @@ button:hover:enabled { border-color:var(--copper); }
 #glass-wallpaper-setting { display:none; }
 :root[data-glass]:not([data-theme="classicOLED"]) #glass-wallpaper-setting { display:grid; justify-items:start; gap:9px; }
 #glass-wallpaper-setting label { font-weight:650; }
+:root[data-custom-wallpaper] { --wallpaper-scrim:#0006; }
+:root[data-preset-wallpaper] { --wallpaper-scrim:#0004; }
 #glass-wallpaper-file { max-width:100%; }
 #glass-wallpaper-preview { width:132px; height:74px; object-fit:cover; border-radius:8px; }
 #glass-wallpaper-status:empty { display:none; }
 :root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) body,
 :root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) #now-playing[open] {
-  background:linear-gradient(#0006,#0006),var(--glass-wallpaper) center / cover no-repeat;
+  background:linear-gradient(var(--wallpaper-scrim),var(--wallpaper-scrim)),var(--glass-wallpaper) center / cover no-repeat;
   animation:none;
 }
 :root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) main {
@@ -631,4 +633,29 @@ button:hover:enabled { border-color:var(--copper); }
   :root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) body,
   :root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) #now-playing[open] { background:var(--ink); }
   :root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) main { background:var(--panel); }
+}
+
+
+#glass-tint-setting { display:none; }
+:root[data-glass] #glass-tint-setting { display:flex; }
+:root[data-glass-tint="blue"] { --custom-tint-rgb:105 179 255; }
+:root[data-glass-tint="mint"] { --custom-tint-rgb:110 237 189; }
+:root[data-glass-tint="violet"] { --custom-tint-rgb:184 150 255; }
+:root[data-glass-tint="rose"] { --custom-tint-rgb:255 135 184; }
+:root[data-glass-tint="amber"] { --custom-tint-rgb:255 186 97; }
+:root[data-glass-tint="none"] { --custom-tint-rgb:210 210 210; }
+:root[data-glass][data-glass-tint]:not([data-glass-tint="themeDefault"]) {
+  --glass-top:rgb(var(--custom-tint-rgb) / calc(.07 + .19 * var(--glass-density)));
+  --glass-bottom:rgb(18 18 18 / calc(.14 + .70 * var(--glass-density)));
+  --glass-border:rgb(var(--custom-tint-rgb) / calc(.37 - .15 * var(--glass-density)));
+  --glass-sheen:rgb(var(--custom-tint-rgb) / calc(.17 - .10 * var(--glass-density)));
+  --glass-control:rgb(var(--custom-tint-rgb) / calc(.07 + .21 * var(--glass-density)));
+}
+:root[data-glass-tint="none"] {
+  --glass-bevel:inset 0 1px 1px rgb(245 245 245 / calc(.55 - .19 * var(--glass-density))),
+                inset 1px 0 1px #e5e5e532, inset 0 -1px 1px #ababab48;
+}
+:root[data-theme="classicOLED"][data-glass][data-glass-tint]:not([data-glass-tint="themeDefault"]) {
+  --glass-top:rgb(var(--custom-tint-rgb) / calc(.02 + .045 * var(--glass-density)));
+  --glass-sheen:rgb(var(--custom-tint-rgb) / calc(.05 - .025 * var(--glass-density)));
 }

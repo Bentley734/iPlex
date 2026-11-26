@@ -8,6 +8,7 @@ for asset in "$project"/Assets/*.png "$project"/Assets/*.icns; do
     if [[ -f "$asset" ]]; then cp "$asset" "$bundle/Contents/Resources/"; fi
 done
 ditto --norsrc --noextattr --noqtn "$project/Assets/HeaderMarks" "$bundle/Contents/Resources/HeaderMarks"
+ditto --norsrc --noextattr --noqtn "$project/Assets/GlassBackgrounds" "$bundle/Contents/Resources/GlassBackgrounds"
 cp "$project/Assets/install-update.sh" "$bundle/Contents/Resources/install-update.sh"
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
