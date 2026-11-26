@@ -69,7 +69,6 @@ private struct MusicWindow: View {
     @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
     @AppStorage("LibrarySidebarWidth") private var sidebarPreference = 0
     @GestureState private var sidebarDrag: CGFloat = 0
-    @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @State private var showSettings = false
     @State private var showNowPlaying = false
@@ -96,6 +95,8 @@ private struct MusicWindow: View {
         }
         .modifier(NowPlayingPresentation(showing: showNowPlaying))
         .background(theme.backdrop(using: palette))
+        .toolbarBackground(theme.surface(using: palette), for: .windowToolbar)
+        .toolbarBackground(.visible, for: .windowToolbar)
         .sheet(isPresented: $showSettings) { MusicSettings(library: model) }
         .tint(copper)
         .onChange(of: model.query) { _, _ in
@@ -126,6 +127,8 @@ private struct MusicWindow: View {
                     HStack(spacing: 0) {
                         resizableSidebar(availableWidth: width, defaultWidth: 216)
                         mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .musicGlass(theme, radius: 22)
+                            .padding(theme == .liquidGlass ? 7 : 0)
                     }
                     Rectangle().fill(Color.primary.opacity(0.12)).frame(height: 1)
                     transport
@@ -159,6 +162,7 @@ private struct MusicWindow: View {
                     })
                 .onTapGesture(count: 2) { sidebarPreference = 0 }
                 .focusable()
+                .focusEffectDisabled()
                 .onKeyPress(.leftArrow) {
                     sidebarPreference = Int(limit(width - 16).rounded())
                     return .handled
@@ -184,7 +188,7 @@ private struct MusicWindow: View {
             let wide = geometry.size.width >= 1040
             VStack(spacing: 1) {
                 HStack(spacing: 20) {
-                    HeaderBrand(mark: headerMark, theme: theme, width: 155, height: 42)
+                    HeaderBrand(theme: theme, width: 155, height: 42)
                     librarySearch.frame(maxWidth: 460).disabled(model.libraryID.isEmpty)
                     Spacer(minLength: 4)
                     Button {
@@ -244,7 +248,7 @@ private struct MusicWindow: View {
         let padding: CGFloat = graphite || plexify ? 16 : 24
         return ScrollView {
             VStack(alignment: .leading, spacing: 18) {
-                if !plexify { HeaderBrand(mark: headerMark, theme: theme, width: min(155, width - padding * 2), height: 46) }
+                if !plexify { HeaderBrand(theme: theme, width: min(155, width - padding * 2), height: 46) }
                 if graphite {
                     librarySearch
                         .disabled(model.libraryID.isEmpty)
@@ -261,16 +265,9 @@ private struct MusicWindow: View {
             }
             .padding(padding)
         }
-        .background {
-            if theme == .liquidGlass {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.regularMaterial)
-                    .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(.white.opacity(0.16)) }
-                    .padding(7)
-            } else {
-                slate
-            }
-        }
+        .background(theme == .liquidGlass ? .clear : slate)
+        .musicGlass(theme, radius: 20)
+        .padding(theme == .liquidGlass ? 7 : 0)
     }
 
     private var settingsButton: some View {

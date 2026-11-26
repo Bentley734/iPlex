@@ -25,7 +25,6 @@ private struct MusicLibraryScreen: View {
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @State private var showSettings = false
     @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
-    @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @State private var showAppIcons = false
     @State private var showPlayer = false
@@ -85,7 +84,7 @@ private struct MusicLibraryScreen: View {
     private var libraryScreen: some View {
         VStack(spacing: 0) {
             HStack {
-                HeaderBrand(mark: headerMark, theme: theme, width: columnWidth, height: 56)
+                HeaderBrand(theme: theme, width: columnWidth, height: 56)
                 Spacer()
                 Button { showAppIcons = true } label: { Image(systemName: "app.dashed") }
                     .accessibilityLabel("App Icon")
@@ -103,8 +102,12 @@ private struct MusicLibraryScreen: View {
             if library.libraryID.isEmpty {
                 connection
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .musicGlass(theme, radius: 22)
+                    .padding(.horizontal, theme == .liquidGlass ? 12 : 0)
             } else {
                 browser
+                    .musicGlass(theme, radius: 22)
+                    .padding(.horizontal, theme == .liquidGlass ? 12 : 0)
                 if let album = library.playingAlbum {
                     HStack(spacing: 8) {
                         Button { showPlayer = true } label: {

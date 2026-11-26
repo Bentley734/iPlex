@@ -25,6 +25,10 @@ aside { background:var(--panel); padding:25px 18px; display:flex; flex-direction
   --header-height:53px; --mark-size:.68;
   display:flex; align-items:center; gap:9px; height:var(--header-height);
 }
+.header-cycle { display:block; padding:0; border:0; background:transparent; min-width:0; }
+#cycle-header-logo { flex:none; line-height:0; }
+#cycle-header-wordmark { flex:1; height:100%; overflow:hidden; }
+#cycle-header-wordmark .wordmark { display:block; width:100%; }
 .header-brand[data-mark-size="small"] { --mark-size:.48; }
 .header-brand[data-mark-size="large"] { --mark-size:.82; }
 .header-brand[data-mark-size="extraLarge"] { --mark-size:.94; }
@@ -47,7 +51,9 @@ nav button { text-align:left; font-weight:650; border:1px solid transparent; bac
 nav button[aria-pressed=true] { color:var(--copper); background:#ffa36c1a; border-color:#ffa36c29; }
 .preferences { margin-top:auto; }
 main { min-width:0; min-height:0; position:relative; }
-#sidebar-resize { cursor:col-resize; touch-action:none; }:root[data-sidebar-dragging] body { cursor:col-resize; user-select:none; }
+#sidebar-resize { cursor:col-resize; touch-action:none; }
+#sidebar-resize:focus-visible { outline:none; }
+:root[data-sidebar-dragging] body { cursor:col-resize; user-select:none; }
 #settings { position:fixed; top:25px; right:29px; z-index:3; }
 #browser > header { padding-right:127px; }
 #welcome { padding:50px; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; height:100%; }
@@ -176,33 +182,17 @@ button:hover:enabled { border-color:var(--copper); }
 :root[data-theme="liquidGlass"] {
   --ink:#0b1425; --panel:#1b2a45; --raised:#2b3956; --text:#f2f7ff; --muted:#bacbe0;
   --copper:#abe3ff; --line:#d1ecff38; --accent-ink:#14233a;
+  --glass-density:.6;
+  --glass-top:rgb(113 148 189 / calc(.08 + .28 * var(--glass-density)));
+  --glass-bottom:rgb(23 36 62 / calc(.22 + .73 * var(--glass-density)));
+  --glass-border:rgb(210 236 255 / calc(.13 + .20 * var(--glass-density)));
+  --glass-control:rgb(173 207 255 / calc(.07 + .21 * var(--glass-density)));
 }
 :root[data-theme="liquidGlass"] body {
   background:radial-gradient(ellipse at 92% 8%,#45387b 0%,transparent 54%),
              radial-gradient(ellipse at 10% 92%,#173b55 0%,transparent 52%), var(--ink);
 }
-:root[data-theme="liquidGlass"] main { background:transparent; }
-:root[data-theme="liquidGlass"] aside,
-:root[data-theme="liquidGlass"] footer,
-:root[data-theme="liquidGlass"] #settings-page {
-  background:linear-gradient(145deg,#7194bd32,#17243ec0);
-  backdrop-filter:blur(24px) saturate(145%);
-  border:1px solid var(--line); border-radius:20px;
-  box-shadow:inset 0 1px #ffffff28,0 5px 24px #05091440;
-}
-:root[data-theme="liquidGlass"] aside { margin:8px 0 0 8px; }
-:root[data-theme="liquidGlass"] footer { margin:0 8px 8px; }
-:root[data-theme="liquidGlass"] header input { background:#28385bae; }
-:root[data-theme="liquidGlass"][data-artwork-colors] {
-  --copper:var(--artwork-accent);
-}
-:root[data-theme="liquidGlass"][data-artwork-colors] main {
-  background:linear-gradient(145deg,var(--artwork-wash),transparent 72%);
-}
-:root[data-theme="liquidGlass"][data-artwork-colors] aside,
-:root[data-theme="liquidGlass"][data-artwork-colors] footer {
-  background:linear-gradient(145deg,color-mix(in srgb,var(--artwork-wash) 55%,transparent),#17243eb0);
-}
+:root[data-theme="liquidGlass"] main { background-image:none; }
 .plex-choice { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:10px 0; }
 .plex-choice select { max-width:70%; min-width:0; }
 #settings-page::backdrop { background:#070b17aa; }
@@ -481,16 +471,41 @@ button:hover:enabled { border-color:var(--copper); }
 }
 #expanded-artwork::backdrop { background:#000; }
 
+:root[data-theme="liquidGlass"] :is(
+  aside, footer, #settings-page, .playback-sheet, .now-playing-header, .now-playing-controls, .now-queue-content
+),
+:root[data-theme="liquidGlass"][data-mini-player="queue"] #wheel-player {
+  background:linear-gradient(145deg,var(--glass-top),var(--glass-bottom));
+  backdrop-filter:blur(24px) saturate(145%);
+  border:1px solid var(--glass-border); border-radius:20px;
+  box-shadow:inset 0 1px #ffffff24,0 5px 24px #05091440;
+}
+:root[data-theme="liquidGlass"] main {
+  border:1px solid var(--glass-border); border-radius:20px;
+  background-color:var(--glass-top);
+  margin:8px 8px 0 0;
+}
+:root[data-theme="liquidGlass"] aside { margin:8px 0 0 8px; }
+:root[data-theme="liquidGlass"] footer { margin:0 8px 8px; }
+:root[data-theme="liquidGlass"] .now-playing-header { margin:8px 8px 0; }
+:root[data-theme="liquidGlass"] .now-playing-controls { padding:clamp(8px,2vw,20px); }
+:root[data-theme="liquidGlass"] :is(
+  header input, nav button[aria-pressed=true], #settings, #quick-library, #settings-page button,
+  #settings-page select, .now-playing-header button, .now-playing-controls button:not(.primary),
+  #now-queue-list .now-queue-play, #now-queue summary, #close-expanded-artwork,
+  .playback-sheet button, #mini-queue button
+) { background:var(--glass-control); border-color:var(--glass-border); }
+:root[data-theme="liquidGlass"] #close-expanded-artwork { backdrop-filter:blur(16px); }
+:root[data-theme="liquidGlass"][data-artwork-colors] {
+  --copper:var(--artwork-accent);
+  --glass-top:color-mix(in srgb,var(--artwork-wash) calc(20% + 55% * var(--glass-density)),transparent);
+}
+#glass-transparency { min-width:0; accent-color:var(--copper); }
+#glass-transparency-value { min-width:3.25em; text-align:right; font-variant-numeric:tabular-nums; }
+
 :root[data-theme="liquidGlass"] .now-queue-content {
   width:calc(var(--queue-width) - 16px); height:calc(100% - 16px); margin:8px;
-  border:1px solid #d2ecff3b; border-radius:20px;
-  background:linear-gradient(145deg,#7194bd38,#17243e77);
-  backdrop-filter:blur(24px) saturate(145%);
-  box-shadow:inset 0 1px #ffffff32, 0 5px 24px #05091440;
 }
-:root[data-theme="liquidGlass"] #now-queue-list .now-queue-play,
-:root[data-theme="liquidGlass"] #now-queue summary,
-:root[data-theme="liquidGlass"] #jump-now-queue { background:#adcfff1c; border-color:#d2ecff3b; }
 :root[data-theme="liquidGlass"] #now-queue-list .now-queue-play[aria-current=true],
 :root[data-theme="liquidGlass"] #jump-now-queue[aria-expanded=true] {
   background:color-mix(in srgb,var(--copper) 22%,transparent); border-color:var(--copper);

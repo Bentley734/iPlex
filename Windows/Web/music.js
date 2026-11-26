@@ -856,12 +856,22 @@
     document.documentElement.dataset.theme = theme;
     window.clickWheel.updateTheme(theme);
     get('theme').value = theme;
+    get('glass-transparency-setting').hidden = theme !== 'liquidGlass';
     applyPalette();
     updateDeckVisibility();
     renderFeature();
     if (theme === 'plexify') renderDeck(playbackState);
     try { localStorage.setItem('musicroom-theme', theme); } catch {}
     renderHeaderWordmark();
+  }
+  function chooseGlassTransparency(saved) {
+    const value = saved === null ? NaN : Number(saved);
+    const percent = Number.isFinite(value) ? Math.min(100, Math.max(0, Math.round(value / 5) * 5)) : 40;
+    get('glass-transparency').value = percent;
+    get('glass-transparency-value').textContent = percent + '%';
+    get('glass-transparency').setAttribute('aria-valuetext', percent + '% transparent');
+    layout.style.setProperty('--glass-density', String(1 - percent / 100));
+    try { localStorage.setItem('musicroom-glass-transparency', String(percent)); } catch {}
   }
   function chooseMiniPlayer(value) {
     const select = get('mini-player-style');
@@ -880,25 +890,37 @@
     document.documentElement.dataset.plexifyDeck = visible ? 'open' : 'closed';
     updateSidebar();
   }
+  function cycleHeaderChoice(id, choose) {
+    const select = get(id);
+    const options = [...select.options].filter(option => option.value !== 'none');
+    const current = options.findIndex(option => option.value === select.value);
+    choose(options[(current + 1) % options.length].value);
+  }
+  get('cycle-header-logo').onclick = () => cycleHeaderChoice('header-logo', chooseHeaderLogo);
+  get('cycle-header-wordmark').onclick = () => cycleHeaderChoice('header-wordmark', chooseHeaderWordmark);
+
   function renderHeaderWordmark() {
     const choice = get('header-wordmark');
     const region = wordmarkRegions.get(choice.value);
     const showMusic = Boolean(region && wordmarkSheet.naturalWidth);
+    const markChoice = get('header-logo');
+    const cycleMark = get('cycle-header-logo');
+    const cycleWordmark = get('cycle-header-wordmark');
+    cycleMark.hidden = markChoice.value === 'none';
+    cycleWordmark.hidden = choice.value === 'none';
+    cycleMark.setAttribute('aria-label', 'Change header logo, ' + markChoice.selectedOptions[0].textContent);
+    cycleWordmark.setAttribute('aria-label', 'Change header wordmark, ' + choice.selectedOptions[0].textContent);
     for (const brand of document.querySelectorAll('.header-brand')) {
       const canvas = brand.querySelector('.music-wordmark');
       if (showMusic) {
         const [x, y, width, height, darkY] = region;
         canvas.dataset.color = darkY !== undefined ? 'original' : 'template';
-        if (canvas.hasAttribute('role')) canvas.setAttribute('aria-label', choice.selectedOptions[0].textContent);
         canvas.width = width;
         canvas.height = height;
         canvas.getContext('2d').drawImage(wordmarkSheet, x, selectedTheme !== 'classic' ? (darkY ?? y) : y, width, height, 0, 0, width, height);
       }
       canvas.hidden = !showMusic;
       brand.querySelector('img.wordmark').hidden = showMusic || choice.value === 'none';
-      const mark = get('header-logo');
-      brand.querySelector('.header-mark').alt = choice.value === 'none' && mark.value !== 'none'
-        ? mark.selectedOptions[0]?.textContent || '' : '';
     }
   }
   function chooseHeaderWordmark(value) {
@@ -941,6 +963,7 @@
     try { localStorage.setItem('musicroom-eq', JSON.stringify(settings)); } catch {}
   }
   get('theme').onchange = event => chooseTheme(event.target.value);
+  get('glass-transparency').oninput = event => chooseGlassTransparency(event.target.value);
   get('artwork-colors').onchange = event => chooseArtworkColors(event.target.checked);
   get('animate-artwork-colors').onchange = event => chooseArtworkMotion(event.target.checked);
   get('library-artwork-size').onchange = event => selectArtworkSize(event.target.value);
@@ -1011,6 +1034,7 @@
     selectArtworkSize(localStorage.getItem('musicroom-library-artwork-size'));
     savedSidebarWidth = Number(localStorage.getItem('musicroom-sidebar-width')) || 0;
     chooseTheme(localStorage.getItem('musicroom-theme'));
+    chooseGlassTransparency(localStorage.getItem('musicroom-glass-transparency'));
     chooseArtworkColors(localStorage.getItem('musicroom-artwork-colors') === '1');
     chooseArtworkMotion(localStorage.getItem('musicroom-animate-artwork-colors') !== '0');
     chooseMiniPlayer(localStorage.getItem('musicroom-mini-player'));

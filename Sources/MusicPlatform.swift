@@ -233,10 +233,11 @@ enum HeaderMarkSize: String, CaseIterable, Identifiable {
 struct HeaderBrand: View {
     @AppStorage(HeaderMarkSize.preferenceKey) private var markSize = HeaderMarkSize.medium
     @AppStorage(HeaderWordmark.preferenceKey) private var wordmark = HeaderWordmark.iplex
-    let mark: HeaderMark
+    @AppStorage(HeaderMark.preferenceKey) private var mark = HeaderMark.none
     let theme: MusicTheme
     let width: CGFloat
     let height: CGFloat
+    var allowsCycling = true
 
     private var ink: Color { theme.scheme == .light ? .black : .white }
     private var markHeight: CGFloat { height * markSize.fraction }
@@ -249,28 +250,53 @@ struct HeaderBrand: View {
     var body: some View {
         HStack(spacing: 8) {
             if mark != .none, let image = MusicPlatform.brandImage(mark.assetName, subdirectory: "HeaderMarks") {
-                image.renderingMode(mark.isMonochrome ? .template : .original)
-                    .resizable()
-                    .scaledToFit()
-                    .foregroundStyle(mark == .black ? .black : .white)
-                    .shadow(color: markOutline, radius: 1)
-                    .frame(width: markHeight, height: markHeight)
-                    .scaleEffect(mark.artworkScale)
-                    .accessibilityLabel(mark.label)
-                    .accessibilityHidden(wordmark != .none)
+                cycleControl(label: "Change header logo", selection: mark.label, advance: cycleMark) {
+                    image.renderingMode(mark.isMonochrome ? .template : .original)
+                        .resizable()
+                        .scaledToFit()
+                        .foregroundStyle(mark == .black ? .black : .white)
+                        .shadow(color: markOutline, radius: 1)
+                        .frame(width: markHeight, height: markHeight)
+                        .scaleEffect(mark.artworkScale)
+                }
             }
             if wordmark != .none {
-                if let image = MusicPlatform.wordmarkImage(wordmark, dark: theme.scheme == .dark) {
-                    image.renderingMode(wordmark.preservesColors ? .original : .template).resizable().scaledToFit()
-                        .foregroundStyle(ink)
-                        .accessibilityLabel(wordmark.title)
-                } else {
-                    Text(wordmark.title).font(.system(size: height * 0.68, weight: wordmark == .musicBold ? .bold : .medium))
-                        .lineLimit(1).minimumScaleFactor(0.6)
+                cycleControl(label: "Change header wordmark", selection: wordmark.label, advance: cycleWordmark) {
+                    if let image = MusicPlatform.wordmarkImage(wordmark, dark: theme.scheme == .dark) {
+                        image.renderingMode(wordmark.preservesColors ? .original : .template).resizable().scaledToFit()
+                            .foregroundStyle(ink)
+                    } else {
+                        Text(wordmark.title).font(.system(size: height * 0.68, weight: wordmark == .musicBold ? .bold : .medium))
+                            .lineLimit(1).minimumScaleFactor(0.6)
+                    }
                 }
             }
         }
         .frame(width: width, height: height, alignment: .leading)
+    }
+
+    @ViewBuilder private func cycleControl<Content: View>(label: String, selection: String, advance: @escaping () -> Void,
+                                                          @ViewBuilder content: () -> Content) -> some View {
+        if allowsCycling {
+            Button(action: advance) { content().contentShape(Rectangle()) }
+                .buttonStyle(.plain)
+                .accessibilityLabel(label)
+                .accessibilityValue(selection)
+        } else {
+            content()
+        }
+    }
+
+    private func cycleMark() {
+        let choices = HeaderMark.allCases.filter { $0 != .none }
+        let current = choices.firstIndex(of: mark) ?? -1
+        mark = choices[(current + 1) % choices.count]
+    }
+
+    private func cycleWordmark() {
+        let choices = HeaderWordmark.allCases.filter { $0 != .none }
+        let current = choices.firstIndex(of: wordmark) ?? -1
+        wordmark = choices[(current + 1) % choices.count]
     }
 }
 

@@ -124,16 +124,54 @@ private struct ArtworkColorWash: View {
     }
 }
 
+enum LiquidGlassAppearance {
+    static let transparencyKey = "LiquidGlassTransparency"
+    static let defaultTransparency = 40.0
+
+    static func density(_ transparency: Double) -> Double {
+        1 - min(100, max(0, transparency.isFinite ? transparency : defaultTransparency)) / 100
+    }
+}
+
+private struct MusicGlassSurface: ViewModifier {
+    let theme: MusicTheme
+    let radius: CGFloat
+    let interactive: Bool
+    @AppStorage(LiquidGlassAppearance.transparencyKey) private var transparency = LiquidGlassAppearance.defaultTransparency
+
+    func body(content: Content) -> some View {
+        let density = LiquidGlassAppearance.density(transparency)
+        let shape = RoundedRectangle(cornerRadius: radius)
+        content.background {
+            ZStack {
+                if #available(macOS 26, iOS 26, tvOS 26, *) {
+                    Color.clear
+                        .glassEffect(.regular.tint(theme.accent.opacity(0.08 + density * 0.15)).interactive(interactive), in: shape)
+                        .opacity(0.30 + density * 0.67)
+                } else {
+                    shape.fill(.regularMaterial).opacity(0.30 + density * 0.67)
+                }
+                shape.fill(theme.surface.opacity(0.12 + density * 0.72))
+                shape.strokeBorder(.white.opacity(0.12 + density * 0.16))
+            }
+            .allowsHitTesting(false)
+        }
+    }
+}
+
 extension View {
     @ViewBuilder func musicGlass(_ theme: MusicTheme, radius: CGFloat, interactive: Bool = false) -> some View {
         if theme == .liquidGlass {
-            let shape = RoundedRectangle(cornerRadius: radius)
-            if #available(macOS 26, iOS 26, tvOS 26, *) {
-                glassEffect(.regular.tint(theme.accent.opacity(0.12)).interactive(interactive), in: shape)
-            } else {
-                background(.regularMaterial, in: shape)
-                    .overlay { shape.strokeBorder(.white.opacity(0.20)).allowsHitTesting(false) }
-            }
+            modifier(MusicGlassSurface(theme: theme, radius: radius, interactive: interactive))
+        } else {
+            self
+        }
+    }
+
+    @ViewBuilder func musicSheet(_ theme: MusicTheme) -> some View {
+        if theme == .liquidGlass {
+            musicGlass(theme, radius: 24)
+                .presentationBackground(.clear)
         } else {
             self
         }
@@ -184,6 +222,7 @@ enum LibraryArtworkSize: String, CaseIterable, Identifiable {
 struct MusicSettings: View {
     @ObservedObject var library: LibraryModel
     @AppStorage("MusicTheme") private var theme = MusicTheme.copper
+    @AppStorage(LiquidGlassAppearance.transparencyKey) private var glassTransparency = LiquidGlassAppearance.defaultTransparency
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @AppStorage(ArtworkColorWash.motionPreference) private var animateArtworkColors = true
     @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
@@ -219,6 +258,7 @@ struct MusicSettings: View {
                             Text(option.label).tag(option)
                         }
                     }
+                    if theme == .liquidGlass { transparencyControl }
                     Toggle("Artwork Colors", isOn: $artworkColors)
                         .help("Match the interface to the artwork for the current track.")
                     Toggle("Animate Artwork Colors", isOn: $animateArtworkColors)
@@ -244,7 +284,7 @@ struct MusicSettings: View {
                             Text(size.label).tag(size)
                         }
                     }
-                    HeaderBrand(mark: headerMark, theme: theme, width: 170, height: 42)
+                    HeaderBrand(theme: theme, width: 170, height: 42, allowsCycling: false)
                         .accessibilityHidden(true)
                     Divider()
                     VStack(alignment: .leading, spacing: 10) {
@@ -334,9 +374,45 @@ struct MusicSettings: View {
         #if os(iOS) || os(tvOS)
         .sheet(isPresented: $showAppIcons) { MusicAppIconPicker() }
         #endif
-        .background(theme.backdrop(using: palette))
+        .musicSheet(theme)
+        .background {
+            if theme != .liquidGlass { theme.backdrop(using: palette) }
+        }
         .tint(theme.accent(using: palette))
         .preferredColorScheme(theme.scheme)
+    }
+
+    private var transparencyControl: some View {
+        #if os(tvOS)
+        HStack {
+            Text("Liquid Glass Transparency")
+            Spacer()
+            Button("Decrease transparency", systemImage: "minus") { glassTransparency = max(0, glassTransparency - 10) }
+                .labelStyle(.iconOnly).disabled(glassTransparency <= 0)
+            Text(glassTransparency.formatted(.number.precision(.fractionLength(0))) + "%").monospacedDigit()
+            Button("Increase transparency", systemImage: "plus") { glassTransparency = min(100, glassTransparency + 10) }
+                .labelStyle(.iconOnly).disabled(glassTransparency >= 100)
+        }
+        #else
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                Text("Liquid Glass Transparency")
+                Spacer()
+                Text(glassTransparency.formatted(.number.precision(.fractionLength(0))) + "%")
+                    .monospacedDigit()
+                    .accessibilityHidden(true)
+            }
+            Slider(value: $glassTransparency, in: 0...100, step: 5) {
+                Text("Liquid Glass Transparency")
+            } minimumValueLabel: {
+                Text("0%")
+            } maximumValueLabel: {
+                Text("100%")
+            }
+            .labelsHidden()
+            .accessibilityValue(glassTransparency.formatted(.number.precision(.fractionLength(0))) + "%")
+        }
+        #endif
     }
 
     private var plexConnection: some View {

@@ -14,9 +14,13 @@
 <body>
   <aside id="library-sidebar" aria-label="iPlex">
     <div class="header-brand">
-      <img class="header-mark" alt="" hidden>
-      <img class="wordmark" src="wordmark.png" alt="iPlex">
-      <canvas class="wordmark music-wordmark" role="img" aria-label="Music" hidden></canvas>
+      <button id="cycle-header-logo" class="header-cycle" type="button" aria-label="Change header logo" hidden>
+        <img class="header-mark" alt="" hidden>
+      </button>
+      <button id="cycle-header-wordmark" class="header-cycle" type="button" aria-label="Change header wordmark, iPlex">
+        <img class="wordmark" src="wordmark.png" alt="">
+        <canvas class="wordmark music-wordmark" aria-hidden="true" hidden></canvas>
+      </button>
     </div>
     <nav aria-label="Library">
       <button id="albums" aria-pressed="true" disabled>Albums</button>
@@ -191,6 +195,11 @@
         <option value="plexify">Plexify</option>
         <option value="liquidGlass">Liquid Glass</option>
       </select>
+    </label>
+    <label id="glass-transparency-setting" class="theme-choice" hidden>
+      <span>Liquid Glass Transparency</span>
+      <input id="glass-transparency" type="range" min="0" max="100" step="5" value="40">
+      <output id="glass-transparency-value" for="glass-transparency">40%</output>
     </label>
     <label class="theme-choice">Artwork Colors <input id="artwork-colors" type="checkbox"></label>
     <label class="theme-choice">Animate Artwork Colors <input id="animate-artwork-colors" type="checkbox" checked></label>

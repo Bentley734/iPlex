@@ -45,6 +45,8 @@ struct NowPlayingView: View {
             VStack(spacing: 0) {
                 header
                     .padding(.horizontal, min(60, geometry.size.width * 0.045))
+                    .musicGlass(theme, radius: 20)
+                    .padding(theme == .liquidGlass ? 8 : 0)
                 HStack(spacing: 0) {
                     player
                     if showingQueue {
@@ -77,10 +79,10 @@ struct NowPlayingView: View {
         }
         .tint(accent)
         .sheet(isPresented: $showingLyrics) {
-            NowPlayingLyrics(library: library).preferredColorScheme(theme.scheme).tint(accent)
+            NowPlayingLyrics(library: library).musicSheet(theme).preferredColorScheme(theme.scheme).tint(accent)
         }
         .sheet(isPresented: $showingSignalPath) {
-            signalPath
+            signalPath.musicSheet(theme)
         }
         #if os(tvOS)
         .onExitCommand {
@@ -136,6 +138,8 @@ struct NowPlayingView: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel("Enlarge album artwork")
                         playback(album, compact: compact)
+                            .padding(theme == .liquidGlass ? (compact ? 8 : 16) : 0)
+                            .musicGlass(theme, radius: 22)
                             .frame(maxWidth: 510, alignment: .leading)
                             .frame(maxWidth: .infinity)
                     }
@@ -218,7 +222,8 @@ struct NowPlayingView: View {
                             .font(.headline)
                             .foregroundStyle(.white)
                             .padding(13)
-                            .background(.black.opacity(0.72), in: Circle())
+                            .background(.black.opacity(theme == .liquidGlass ? 0.25 : 0.72), in: Circle())
+                            .musicGlass(theme, radius: 24, interactive: true)
                             .padding(16)
                     }
                     .contentShape(Rectangle())
