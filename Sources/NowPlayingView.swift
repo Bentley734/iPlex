@@ -27,6 +27,7 @@ struct NowPlayingView: View {
     @State private var showingLyrics = false
     @State private var showingSignalPath = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let close: () -> Void
 
     private var palette: ArtworkPalette? { artworkColors ? library.playingPalette : nil }
@@ -66,6 +67,7 @@ struct NowPlayingView: View {
                                        startRadius: 0, endRadius: 950)
                     }
                 }
+                .overlay { glassArtworkBackdrop }
                 .ignoresSafeArea()
         }
         .accessibilityHidden(showingArtwork)
@@ -92,6 +94,27 @@ struct NowPlayingView: View {
             else { close() }
         }
         #endif
+    }
+
+    @ViewBuilder private var glassArtworkBackdrop: some View {
+        if theme.usesLiquidGlass, !theme.keepsBlackCanvas, !reduceTransparency, let image = library.playingArtwork {
+            GeometryReader { geometry in
+                #if os(macOS)
+                let artwork = Image(nsImage: image)
+                #else
+                let artwork = Image(uiImage: image)
+                #endif
+                artwork.resizable().scaledToFill()
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped().scaleEffect(1.12)
+                    .saturation(artworkColors ? 1.15 : 0)
+                    .blur(radius: 36)
+                    .opacity(artworkColors ? 0.31 : 0.22)
+            }
+            .clipped()
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+        }
     }
 
     private var header: some View {

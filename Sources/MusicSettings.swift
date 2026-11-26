@@ -60,10 +60,12 @@ enum MusicTheme: String, CaseIterable, Identifiable {
             ZStack {
                 LinearGradient(colors: [surface, Color(red: 0.04, green: 0.07, blue: 0.14)],
                                startPoint: .topLeading, endPoint: .bottomTrailing)
-                RadialGradient(colors: [Color.indigo.opacity(0.58), .clear],
-                               center: .topTrailing, startRadius: 20, endRadius: 530)
-                RadialGradient(colors: [Color.cyan.opacity(0.25), .clear],
-                               center: .bottomLeading, startRadius: 15, endRadius: 460)
+                RadialGradient(colors: [Color.indigo.opacity(0.82), .clear],
+                               center: .topTrailing, startRadius: 16, endRadius: 640)
+                RadialGradient(colors: [Color(red: 0.05, green: 0.53, blue: 0.72).opacity(0.52), .clear],
+                               center: .bottomLeading, startRadius: 12, endRadius: 580)
+                RadialGradient(colors: [Color(red: 0.23, green: 0.53, blue: 0.90).opacity(0.25), .clear],
+                               center: UnitPoint(x: 0.24, y: 0.16), startRadius: 16, endRadius: 390)
             }
         } else {
             standardBackdrop
@@ -151,25 +153,48 @@ private struct MusicGlassSurface: ViewModifier {
     let radius: CGFloat
     let interactive: Bool
     @AppStorage(LiquidGlassAppearance.transparencyKey) private var transparency = LiquidGlassAppearance.defaultTransparency
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     func body(content: Content) -> some View {
-        let density = LiquidGlassAppearance.density(transparency)
+        let density = reduceTransparency ? 1 : LiquidGlassAppearance.density(transparency)
         let shape = RoundedRectangle(cornerRadius: radius)
+        let edge = 0.38 + (1 - density) * 0.28
+        let sheen = (theme.keepsBlackCanvas ? 0.045 : 0.12) * (1.2 - density * 0.45)
         content.background {
             ZStack {
-                if theme.keepsBlackCanvas {
-                    shape.fill(.ultraThinMaterial).opacity(0.12 + density * 0.25)
+                if reduceTransparency {
+                    shape.fill(theme.keepsBlackCanvas ? Color(white: 0.075) : theme.surface)
+                } else if theme.keepsBlackCanvas {
+                    shape.fill(.ultraThinMaterial).opacity(0.10 + density * 0.32)
                 } else if #available(macOS 26, iOS 26, tvOS 26, *) {
-                    Color.clear
-                        .glassEffect(.regular.tint(theme.accent.opacity(0.08 + density * 0.15)).interactive(interactive), in: shape)
-                        .opacity(0.30 + density * 0.67)
+                    let variant: Glass = density > 0.65 ? .regular : .clear
+                    Color.clear.glassEffect(
+                        variant.tint(theme.accent.opacity(0.035 + density * 0.12)).interactive(interactive), in: shape
+                    )
                 } else {
-                    shape.fill(.regularMaterial).opacity(0.30 + density * 0.67)
+                    shape.fill(.thinMaterial).opacity(0.42 + density * 0.50)
                 }
-                shape.fill(theme.surface.opacity(0.12 + density * 0.72))
-                shape.strokeBorder(.white.opacity(0.12 + density * 0.16))
+
+                shape.fill(theme.surface.opacity(0.08 + density * 0.63))
+                shape.fill(.linearGradient(
+                    colors: [.white.opacity(sheen), theme.accent.opacity(sheen * 0.2), .clear],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                ))
+                shape.strokeBorder(.linearGradient(
+                    stops: [.init(color: .white.opacity(edge), location: 0),
+                            .init(color: theme.accent.opacity(edge * 0.56), location: 0.26),
+                            .init(color: .white.opacity(0.08), location: 0.54),
+                            .init(color: theme.accent.opacity(edge * 0.46), location: 1)],
+                    startPoint: .topLeading, endPoint: .bottomTrailing
+                ))
+                shape.inset(by: 1.25).strokeBorder(.linearGradient(
+                    colors: [.white.opacity(0.14), .clear, .black.opacity(0.24)],
+                    startPoint: .top, endPoint: .bottom
+                ), lineWidth: 1)
             }
+            .shadow(color: .black.opacity(theme.keepsBlackCanvas ? 0.18 : 0.26), radius: 12, y: 5)
             .allowsHitTesting(false)
+            .accessibilityHidden(true)
         }
     }
 }

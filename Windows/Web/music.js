@@ -649,7 +649,10 @@
     if (path !== nowCover) {
       nowCover = path;
       get('now-art').replaceChildren(cover({...playing, artwork:path}));
-      get('now-art').disabled = !artworkPattern.test(path);
+      const hasArtwork = artworkPattern.test(path);
+      get('now-art').disabled = !hasArtwork;
+      if (hasArtwork) get('now-playing').style.setProperty('--glass-artwork', 'url("' + path + '")');
+      else get('now-playing').style.removeProperty('--glass-artwork');
       if (expandedArtwork.open) refreshExpandedArtwork();
     }
     get('signal-path-button').textContent = signalBadge(track.format);
