@@ -144,10 +144,9 @@ private struct MusicWindow: View {
 
         return HStack(spacing: 0) {
             sidebar(width: width).frame(width: width)
-            Rectangle().fill(Color.primary.opacity(0.14)).frame(width: 1)
+            Color.clear
                 .frame(width: 9)
                 .frame(maxHeight: .infinity)
-                .background(.primary.opacity(0.01))
                 .contentShape(Rectangle())
                 .onHover { hovering in
                     if hovering { NSCursor.resizeLeftRight.set() }

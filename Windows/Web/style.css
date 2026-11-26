@@ -47,11 +47,7 @@ nav button { text-align:left; font-weight:650; border:1px solid transparent; bac
 nav button[aria-pressed=true] { color:var(--copper); background:#ffa36c1a; border-color:#ffa36c29; }
 .preferences { margin-top:auto; }
 main { min-width:0; min-height:0; position:relative; }
-#sidebar-resize { position:relative; cursor:col-resize; touch-action:none; }
-#sidebar-resize::after { content:""; position:absolute; inset:0 4px; background:var(--line); }
-#sidebar-resize:hover::after, #sidebar-resize:focus-visible::after,
-:root[data-sidebar-dragging] #sidebar-resize::after { background:var(--copper); }
-:root[data-sidebar-dragging] body { cursor:col-resize; user-select:none; }
+#sidebar-resize { cursor:col-resize; touch-action:none; }:root[data-sidebar-dragging] body { cursor:col-resize; user-select:none; }
 #settings { position:fixed; top:25px; right:29px; z-index:3; }
 #browser > header { padding-right:127px; }
 #welcome { padding:50px; display:flex; flex-direction:column; align-items:flex-start; justify-content:center; height:100%; }
