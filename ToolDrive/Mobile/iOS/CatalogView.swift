@@ -28,8 +28,11 @@ struct CatalogView: View {
         GeometryReader { geometry in
             archive(width: geometry.size.width)
         }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if sheet != .albums && sheet != .songs { MiniPlayerView() }
+        .sheet(isPresented: Binding(
+            get: { sheet == nil && audio.isExpanded },
+            set: { audio.isExpanded = $0 }
+        )) {
+            PlayerView().presentationDragIndicator(.visible)
         }
         .alert("On This Day", isPresented: $noAnniversaryShow) {
             Button("OK", role: .cancel) {}

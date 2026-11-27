@@ -186,6 +186,16 @@
     <input id="seek" aria-label="Playback position" type="range" min="0" max="1" value="0" disabled>
     <time id="elapsed">0:00</time>
   </footer>
+  <dialog id="tool-drive-player-options" class="playback-sheet" aria-labelledby="tool-drive-player-heading">
+    <header>
+      <h2 id="tool-drive-player-heading">Tool Drive Playback</h2>
+      <form method="dialog"><button>Done</button></form>
+    </header>
+    <button type="button" data-tool-drive-command="tracklist">Tracklist</button>
+    <button type="button" data-tool-drive-command="eq">Equalizer</button>
+    <button type="button" data-tool-drive-command="visualizer">Visualizer</button>
+    <button type="button" data-tool-drive-command="close">Stop Playback</button>
+  </dialog>
   <dialog id="now-playing" aria-labelledby="now-playing-heading">
     <header class="now-playing-header">
       <button id="close-now-playing" type="button">‹ Library</button>

@@ -2,10 +2,12 @@ import SwiftUI
 
 public struct ToolDriveArchiveView: View {
     private let appearance: IPlexArchiveAppearance
+    private let transport: ToolDriveTransport
     private let pauseOutsidePlayback: () -> Void
 
     public init(title: String, text: Color, accent: Color, tint: Color?, density: Double,
-                pauseOutsidePlayback: @escaping () -> Void) {
+                transport: ToolDriveTransport, pauseOutsidePlayback: @escaping () -> Void) {
+        self.transport = transport
         appearance = IPlexArchiveAppearance(title: title, text: text, accent: accent, tint: tint, density: density)
         self.pauseOutsidePlayback = pauseOutsidePlayback
     }
@@ -35,7 +37,12 @@ public struct ToolDriveArchiveView: View {
             .onChange(of: audio.phase) { _, phase in
                 if phase == .playing { pauseOutsidePlayback() }
             }
-            .onDisappear { audio.pause(); audio.saveProgress(force: true) }
+            .onAppear { transport.attach(audio) }
+            .onDisappear {
+                transport.detach(audio)
+                audio.pause()
+                audio.saveProgress(force: true)
+            }
             .onChange(of: scenePhase) { _, phase in
                 if phase != .active { audio.saveProgress(force: true) }
             }

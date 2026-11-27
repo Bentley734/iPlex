@@ -73,6 +73,7 @@ private struct MusicWindow: View {
     @State private var showSettings = false
     @State private var showNowPlaying = false
     @State private var showVolume = false
+    @StateObject private var archiveTransport = ToolDriveTransport()
     @State private var miniPlayer = MacMiniPlayer()
     private var palette: ArtworkPalette? { artworkColors ? model.playingPalette : nil }
     private var copper: Color { theme.accent(using: palette) }
@@ -261,7 +262,8 @@ private struct MusicWindow: View {
                                      accent: LiquidGlassColor.hex(copper) ?? "#abe3ff",
                                      tint: glassTint.color(for: theme).flatMap(LiquidGlassColor.hex),
                                      density: LiquidGlassAppearance.density(glassTransparency),
-                                     hover: glassHoverEffects, pauseOutsidePlayback: model.player.pause)
+                                     hover: glassHoverEffects, transport: archiveTransport,
+                                     volume: model.playbackVolume, pauseOutsidePlayback: model.player.pause)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipShape(.rect(cornerRadius: 22))
             } else if model.downloadsSelected {
@@ -485,7 +487,7 @@ private struct MusicWindow: View {
             miniPlayerButton
             transportButtons
             seekControl.frame(width: 130)
-            Text(clock(model.state.elapsed)).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 40)
+            Text(clock(transportElapsed)).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 40)
             Button { showVolume.toggle() } label: { Image(systemName: "speaker.wave.2") }
                 .buttonStyle(.borderless).accessibilityLabel("Volume")
                 .popover(isPresented: $showVolume) {
@@ -501,7 +503,7 @@ private struct MusicWindow: View {
     }
 
     @ViewBuilder private var miniPlayerButton: some View {
-        if model.playingAlbum != nil {
+        if !model.toolDriveSelected, model.playingAlbum != nil {
             Button("Mini-player", systemImage: "macwindow.on.rectangle") {
                 if let window = NSApp.keyWindow {
                     miniPlayer.show(library: model, style: miniPlayerStyle.resolved, hiding: window)
@@ -512,7 +514,31 @@ private struct MusicWindow: View {
     }
 
     @ViewBuilder private var transportMetadata: some View {
-        if let album = model.playingAlbum {
+        if model.toolDriveSelected {
+            if let title = archiveTransport.title {
+                Menu {
+                    Button("Tracklist", action: archiveTransport.showTracklist)
+                    Button("Equalizer", action: archiveTransport.showEqualizer)
+                    Button("Visualizer", action: archiveTransport.showVisualizer)
+                    Button("Stop Playback", action: archiveTransport.stop)
+                } label: {
+                    HStack(spacing: 11) {
+                        Image(systemName: "waveform").frame(width: 46, height: 46)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(title).font(.headline).lineLimit(1)
+                            Text(archiveTransport.context).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            if !archiveTransport.message.isEmpty {
+                                Text(archiveTransport.message).font(.caption2).foregroundStyle(copper).lineLimit(1)
+                            }
+                        }
+                    }
+                }
+                .menuStyle(.borderlessButton)
+                .accessibilityLabel("Tool Drive playback options, " + title)
+            } else {
+                Text("Nothing playing").foregroundStyle(.secondary)
+            }
+        } else if let album = model.playingAlbum {
             Button { showNowPlaying = true } label: {
                 HStack(spacing: 11) {
                     if let image = model.playingArtwork {
@@ -544,24 +570,37 @@ private struct MusicWindow: View {
         }
     }
 
+    private var transportElapsed: Double { model.toolDriveSelected ? archiveTransport.elapsed : model.state.elapsed }
+    private var transportDuration: Double { model.toolDriveSelected ? archiveTransport.duration : model.state.duration }
+    private var transportPlaying: Bool { model.toolDriveSelected ? archiveTransport.playing : model.state.playing }
+
     private var transportButtons: some View {
-        HStack(spacing: 16) {
-            Button { model.player.previous() } label: { Image(systemName: "backward.fill") }
-                .glassHover().disabled(!model.state.previous).accessibilityLabel("Previous")
-            Button { model.player.toggle() } label: {
-                Image(systemName: model.state.playing ? "pause.fill" : "play.fill").font(.title3)
+        let archive = model.toolDriveSelected
+        return HStack(spacing: 16) {
+            Button(action: archive ? archiveTransport.previous : model.player.previous) { Image(systemName: "backward.fill") }
+                .glassHover().disabled(!(archive ? archiveTransport.canPrevious : model.state.previous)).accessibilityLabel("Previous")
+            Button(action: archive ? archiveTransport.toggle : model.player.toggle) {
+                Image(systemName: transportPlaying ? "pause.fill" : "play.fill").font(.title3)
                     .foregroundStyle(theme.text)
             }
-            .glassHover().disabled(model.playingAlbum == nil).accessibilityLabel(model.state.playing ? "Pause" : "Play")
-            Button { model.player.next() } label: { Image(systemName: "forward.fill") }
-                .glassHover().disabled(!model.state.next).accessibilityLabel("Next")
+            .glassHover().disabled(!(archive ? archiveTransport.canToggle : model.playingAlbum != nil))
+            .accessibilityLabel(transportPlaying ? "Pause" : "Play")
+            Button(action: archive ? archiveTransport.next : model.player.next) { Image(systemName: "forward.fill") }
+                .glassHover().disabled(!(archive ? archiveTransport.canNext : model.state.next)).accessibilityLabel("Next")
         }.buttonStyle(.borderless)
     }
 
     private var seekControl: some View {
-        Slider(value: Binding(get: { min(model.state.elapsed, model.state.duration) }, set: model.player.seek),
-               in: 0...max(1, model.state.duration))
-            .disabled(model.state.duration <= 0).accessibilityLabel("Playback position")
+        let duration = transportDuration
+        let position = Binding<Double>(
+            get: { min(transportElapsed, duration) },
+            set: { seconds in
+                if model.toolDriveSelected { archiveTransport.seek(seconds) }
+                else { model.player.seek(to: seconds) }
+            }
+        )
+        return Slider(value: position, in: 0...max(1, duration))
+            .disabled(duration <= 0).accessibilityLabel("Playback position")
     }
 
     private func clock(_ seconds: Double) -> String {

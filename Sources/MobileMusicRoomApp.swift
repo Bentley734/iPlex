@@ -32,6 +32,7 @@ private struct MusicLibraryScreen: View {
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @State private var showAppIcons = false
     @State private var showPlayer = false
+    @StateObject private var archiveTransport = ToolDriveTransport()
     @State private var showMiniPlayer = false
     @State private var search: Task<Void, Never>?
 
@@ -131,7 +132,7 @@ private struct MusicLibraryScreen: View {
                     ToolDriveArchiveView(title: library.sectionName(.toolDrive), text: theme.text,
                                          accent: accent, tint: glassTint.color(for: theme),
                                          density: LiquidGlassAppearance.density(glassTransparency),
-                                         pauseOutsidePlayback: library.player.pause)
+                                         transport: archiveTransport, pauseOutsidePlayback: library.player.pause)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .musicGlass(theme, radius: 22)
                         .clipShape(.rect(cornerRadius: 22))
@@ -159,43 +160,57 @@ private struct MusicLibraryScreen: View {
                         .musicGlass(theme, radius: 22)
                         .padding(.horizontal, 12)
                 }
-                if !library.toolDriveSelected, let album = library.playingAlbum {
-                        HStack(spacing: 8) {
-                            Button { showPlayer = true } label: {
-                                HStack(spacing: 14) {
-                                    Group {
-                                        if let image = library.playingArtwork {
-                                            Image(uiImage: image).resizable().scaledToFill()
-                                        } else {
-                                            MusicArtwork(item: album, library: library)
-                                        }
-                                    }
-                                    .frame(width: 43, height: 43)
-                                    .clipShape(.rect(cornerRadius: 7))
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(library.state.title.isEmpty ? album.title : library.state.title).font(.headline)
-                                        Text([library.currentTrack?.artist ?? album.artist, library.currentTrack?.album ?? album.title]
-                                            .filter { !$0.isEmpty }.joined(separator: " · "))
-                                            .font(.caption).foregroundStyle(.secondary)
-                                    }.lineLimit(1)
-                                    Spacer()
-                                    Image(systemName: "chevron.up").accessibilityHidden(true)
-                                }.padding(.horizontal, 14).padding(.vertical, 8)
-                            }
-                            .accessibilityLabel("Open Now Playing")
-                            .buttonStyle(.bordered)
-                            .musicGlass(theme, radius: 20, interactive: true)
-                            Button("Mini-player", systemImage: "ipod") { showMiniPlayer = true }
-                                .labelStyle(.iconOnly)
-                                .buttonStyle(.bordered)
+                if library.toolDriveSelected, let title = archiveTransport.title {
+                    playbackBar(title: title, detail: archiveTransport.context, isArchive: true,
+                                open: archiveTransport.showNowPlaying) {
+                        Image(systemName: "waveform").foregroundStyle(accent)
+                    }
+                } else if !library.toolDriveSelected, let album = library.playingAlbum {
+                    playbackBar(title: library.state.title.isEmpty ? album.title : library.state.title,
+                                detail: [library.currentTrack?.artist ?? album.artist, library.currentTrack?.album ?? album.title]
+                                    .filter { !$0.isEmpty }.joined(separator: " · "),
+                                isArchive: false, open: { showPlayer = true }) {
+                        if let image = library.playingArtwork {
+                            Image(uiImage: image).resizable().scaledToFill()
+                        } else {
+                            MusicArtwork(item: album, library: library)
                         }
-                        .padding(.horizontal, 16)
+                    }
                 }
             }
             .pageTransition(on: browseRoute)
             .clipped()
         }
         .background(theme.backdrop(using: palette).ignoresSafeArea())
+    }
+
+    private func playbackBar<Artwork: View>(title: String, detail: String, isArchive: Bool,
+                                            open: @escaping () -> Void,
+                                            @ViewBuilder artwork: () -> Artwork) -> some View {
+        HStack(spacing: 8) {
+            Button(action: open) {
+                HStack(spacing: 14) {
+                    artwork()
+                        .frame(width: 43, height: 43)
+                        .clipShape(.rect(cornerRadius: 7))
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(title).font(.headline)
+                        Text(detail).font(.caption).foregroundStyle(.secondary)
+                    }.lineLimit(1)
+                    Spacer()
+                    Image(systemName: "chevron.up").accessibilityHidden(true)
+                }.padding(.horizontal, 14).padding(.vertical, 8)
+            }
+            .accessibilityLabel("Open Now Playing")
+            .buttonStyle(.bordered)
+            .musicGlass(theme, radius: 20, interactive: true)
+            if !isArchive {
+                Button("Mini-player", systemImage: "ipod") { showMiniPlayer = true }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.bordered)
+            }
+        }
+        .padding(.horizontal, 16)
     }
 
     private var sectionTabs: some View {

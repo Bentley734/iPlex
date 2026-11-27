@@ -2,10 +2,12 @@ import SwiftUI
 
 public struct ToolDriveArchiveView: View {
     private let appearance: IPlexArchiveAppearance
+    private let transport: ToolDriveTransport
     private let pauseOutsidePlayback: () -> Void
 
     public init(title: String, text: Color, accent: Color, tint: Color?, density: Double,
-                pauseOutsidePlayback: @escaping () -> Void) {
+                transport: ToolDriveTransport, pauseOutsidePlayback: @escaping () -> Void) {
+        self.transport = transport
         appearance = IPlexArchiveAppearance(title: title, text: text, accent: accent, tint: tint, density: density)
         self.pauseOutsidePlayback = pauseOutsidePlayback
     }
@@ -36,7 +38,12 @@ public struct ToolDriveArchiveView: View {
                 .onChange(of: player.phase) { _, phase in
                     if phase == .playing { pauseOutsidePlayback() }
                 }
-                .onDisappear { player.pause(); player.saveProgress(force: true) }
+                .onAppear { transport.attach(player) }
+                .onDisappear {
+                    transport.detach(player)
+                    player.pause()
+                    player.saveProgress(force: true)
+                }
                 .onChange(of: scenePhase) { _, phase in
                     if phase != .active { player.saveProgress(force: true) }
                 }
@@ -126,10 +133,7 @@ private struct TVCatalogView: View {
                             .buttonStyle(TVActionStyle())
                             .frame(maxWidth: .infinity)
                         }
-                        if player.isVisible {
-                            Button { player.isExpanded = true } label: { Label("Now Playing", systemImage: "waveform") }
-                                .buttonStyle(TVActionStyle())
-                        } else if let saved = player.resumePoint {
+                        if !player.isVisible, let saved = player.resumePoint {
                             HStack(spacing: 12) {
                                 Button {
                                     Task { await player.resumeLastShow(archive: archive, library: library, plex: plex) }

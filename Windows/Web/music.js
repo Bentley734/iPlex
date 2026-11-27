@@ -800,12 +800,45 @@
     try { localStorage.setItem('musicroom-animate-artwork-colors', enabled ? '1' : '0'); } catch {}
   }
   let footerKey = '';
+  let archiveTransportActive = false;
+  let archiveTransportState = {};
+  function archiveTransportCommand(command) { host({action:'toolDriveTransport', command}); }
+  function footerCommand(command) {
+    if (archiveTransportActive) archiveTransportCommand(command);
+    else player.action(command);
+  }
+  function renderArchiveTransport() {
+    const state = archiveTransportState;
+    const key = JSON.stringify(['archive', state.visible, state.title, state.context, state.message]);
+    if (key !== footerKey) {
+      footerKey = key;
+      const label = get('playing');
+      if (state.visible) {
+        const info = node('div');
+        info.append(node('strong', state.title || 'Loading recording…'), node('small', state.context || ''));
+        if (state.message) info.append(node('small', state.message));
+        label.replaceChildren(info);
+      } else label.textContent = 'Nothing playing';
+    }
+    get('playing').disabled = !state.visible;
+    renderFooterControls(state, state.canToggle);
+  }
+  window.toolDriveTransport = state => {
+    archiveTransportState = state || {};
+    if (archiveTransportActive) renderArchiveTransport();
+  };
+  window.showToolDriveTransport = active => {
+    archiveTransportActive = active;
+    if (active) renderArchiveTransport();
+    else window.macPlayerState(playbackState);
+  };
   window.macPlayerState = state => {
     nowQueue = player.queueItems;
     if (state.status === 'closed') playing = null;
     playbackState = state;
     const currentCover = playingCover(state);
     updateArtworkColors(state);
+    if (archiveTransportActive) return;
     const track = nowQueue[state.trackIndex];
     const title = track?.title || state.title || playing?.title;
     const artist = track?.artist || playing?.artist;
@@ -838,17 +871,20 @@
       else { closePlaybackSheets(); get('now-playing').close(); }
     }
     window.clickWheel.update(playing, state, cover);
+    renderFooterControls(state, Boolean(playing));
+  };
+  function renderFooterControls(state, canToggle) {
     const active = state.status === 'playing';
     get('toggle').textContent = active ? '⏸' : '▶';
     get('toggle').setAttribute('aria-label', active ? 'Pause' : 'Play');
-    get('toggle').disabled = !playing;
-    get('previous').disabled = !state.canPrevious;
-    get('next').disabled = !state.canNext;
+    get('toggle').disabled = !canToggle;
+    get('previous').disabled = !canToggle || !state.canPrevious;
+    get('next').disabled = !canToggle || !state.canNext;
     get('seek').disabled = !state.duration;
     get('seek').max = Math.max(1, state.duration || 0);
     if (document.activeElement !== get('seek')) get('seek').value = state.elapsed || 0;
     get('elapsed').textContent = time(state.elapsed);
-  };
+  }
   function renderNowPlaying(state) {
     const track = nowQueue[state.trackIndex] || {};
     const path = playingCover(state);
@@ -1097,7 +1133,18 @@
     nowPlayingAnimation = null;
     closingNowPlaying = false;
   });
+  const archivePlayerOptions = get('tool-drive-player-options');
+  for (const button of archivePlayerOptions.querySelectorAll('[data-tool-drive-command]')) {
+    button.onclick = () => {
+      archivePlayerOptions.close();
+      archiveTransportCommand({action:button.dataset.toolDriveCommand});
+    };
+  }
   get('playing').onclick = () => {
+    if (archiveTransportActive) {
+      if (archiveTransportState.visible) archivePlayerOptions.showModal();
+      return;
+    }
     if (!playing || nowPlaying.open) return;
     renderNowPlaying(playbackState);
     showNowQueue(false);
@@ -1437,8 +1484,8 @@
     else { group = null; browse(); }
   };
   get('retry-page').onclick = () => browse(true);
-  for (const control of ['previous', 'toggle', 'next']) get(control).onclick = () => player.action({action:control});
-  get('seek').oninput = event => player.action({action:'seek', seconds:event.target.value});
+  for (const control of ['previous', 'toggle', 'next']) get(control).onclick = () => footerCommand({action:control});
+  get('seek').oninput = event => footerCommand({action:'seek', seconds:event.target.value});
   host({action:'status'});
   function selectSection(section) {
     clearTimeout(timer);

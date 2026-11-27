@@ -196,3 +196,9 @@
     backdrop-filter: none;
   }
 }
+
+/* iPlex owns the transport. Keep the embedded tracklist drawer available. */
+:root[data-iplex-archive] .mac-player-main,
+:root[data-iplex-archive] #mac-player:not(:has(#mac-tracklist-panel:not([hidden]))) {
+  display: none !important;
+}

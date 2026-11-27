@@ -33,6 +33,9 @@ final class AppDelegate: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
     let content = NSView()
     var window: NSWindow! { content.window }
     var pauseOutsidePlayback: (() -> Void)?
+    weak var transport: ToolDriveTransport?
+
+    func setPlaybackVolume(_ value: Double) { playerController.setPlaybackVolume(value) }
     var web: WKWebView!
     private var iplexAppearance: NSDictionary?
 
@@ -719,6 +722,7 @@ final class AppDelegate: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
             "tracks": playerTracks
         ]
         if mappedStatus == "error" { state["error"] = lastPlayerState["message"] as? String ?? "Playback unavailable" }
+        transport?.update(state)
         evaluateCallback("macPlayerState", state)
     }
     func handleLive(_ request: [String: Any]) {

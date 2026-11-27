@@ -402,6 +402,7 @@
     }
     archiveOpen = open;
     document.documentElement.toggleAttribute('data-tool-drive-open', open);
+    window.showToolDriveTransport?.(open);
     toolDrivePanel.hidden = !open;
     present();
     reportArchiveBounds();

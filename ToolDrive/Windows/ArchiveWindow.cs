@@ -30,6 +30,8 @@ namespace ToolDriveOffline
         private string appearanceJson;
         private Icon selectedIcon;
 
+        internal Action<object> TransportChanged;
+
         internal ArchiveWindow(Catalog initialCatalog, string warning)
         {
             catalog = initialCatalog;
@@ -203,6 +205,9 @@ namespace ToolDriveOffline
                         UpdateState("app", "Managed in iPlex Settings.", "Check now", false, false);
                         await UpdateCatalog();
                         break;
+                    case "iplexTransport":
+                        if (TransportChanged != null) TransportChanged(body);
+                        break;
                     case "updates":
                         if (body as string == "app") UpdateState("app", "Check for updates in iPlex Settings.", "Check now", false, false);
                         if (body as string == "catalog") await UpdateCatalog();
@@ -247,6 +252,11 @@ namespace ToolDriveOffline
                 Icon = selectedIcon = (Icon)icon.Clone();
                 if (previous != null) previous.Dispose();
             }
+        }
+
+        internal void TransportAction(Dictionary<string, object> request)
+        {
+            Script("window.iplexArchiveTransport?.(" + CatalogUpdater.Serializer().Serialize(request) + ")");
         }
 
         internal void SetAppearance(object settings)

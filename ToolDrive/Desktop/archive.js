@@ -33,5 +33,28 @@
     root.toggleAttribute('data-iplex-hover', settings.hover);
   };
   if (window.initialIPlexArchiveAppearance) window.applyIPlexArchiveAppearance(window.initialIPlexArchiveAppearance);
+  if (window.toolWindows) {
+    const updateArchivePlayer = window.macPlayerState;
+    window.macPlayerState = state => {
+      updateArchivePlayer?.(state);
+      if (!state) return;
+      const {visible, status, title, context, message, elapsed, duration, canPrevious, canNext} = state;
+      window.toolWindows.send('iplexTransport', {
+        visible, status, title, context, message, elapsed, duration, canPrevious, canNext,
+        canToggle: Array.isArray(state.tracks) && state.tracks.length > 0 &&
+          !['loading', 'resolving', 'error'].includes(status)
+      });
+    };
+    window.iplexArchiveTransport = request => {
+      switch (request.action) {
+        case 'toggle': case 'previous': case 'next': case 'seek': case 'close':
+          window.windowsPlayback?.action(request);
+          break;
+        case 'eq': case 'visualizer': case 'tracklist':
+          document.getElementById('mac-player-' + request.action)?.click();
+          break;
+      }
+    };
+  }
   root.removeAttribute('data-iplex-archive-loading');
 })();

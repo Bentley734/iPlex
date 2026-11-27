@@ -18,6 +18,7 @@
 		11F3BB75364189A5F0A3B672 /* MacMiniPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3A4685EF46B49FB6B22D90 /* MacMiniPlayer.swift */; };
 		12EF38926D4024B48E39F1BF /* ArchiveDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9DA536660BDBFEC705648A0 /* ArchiveDiscovery.swift */; };
 		188CBDBB2368F430ACD2DF00 /* PlexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C780AA4CF17CC09BC5ABE45 /* PlexService.swift */; };
+		19180AE7E87DBBE6D746A170 /* ToolDriveTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFB84347A7681B1462518322 /* ToolDriveTransport.swift */; };
 		1A50E93CF51B9E293A751C16 /* MobileVisualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67CBC0D30B927FC05781EA91 /* MobileVisualizerView.swift */; };
 		1A5471FBBEA94D0257B926DD /* NativeVideoPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41756213822D289CE6E5D98A /* NativeVideoPlayer.swift */; };
 		2173BC65A1CDA8D1AD4AC7E6 /* CatalogFilters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57C1069E561396E8408C4EFA /* CatalogFilters.swift */; };
@@ -66,6 +67,7 @@
 		6C4C7A59ED6A720264345604 /* MusicSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81F02BA2B14ABC3859F379BD /* MusicSettings.swift */; };
 		6F53ADB1B1E0AF62BECDE2EF /* GlassAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFAC47C4D8A1C63AB2D5EDD /* GlassAppearance.swift */; };
 		733CA465AF821A663909CC7B /* MobileMusicRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97A49FCD6AC086C13007CEB /* MobileMusicRoomApp.swift */; };
+		7404F1B34EE91157B7144ACD /* ToolDriveTransport.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFB84347A7681B1462518322 /* ToolDriveTransport.swift */; };
 		74F4D192E3D924D24E1E6E57 /* GlassBackgrounds in Resources */ = {isa = PBXBuildFile; fileRef = E359008C174456F0E7E13E19 /* GlassBackgrounds */; };
 		76564F19F8DE83CE1924C29F /* HeaderMarks in Resources */ = {isa = PBXBuildFile; fileRef = DBB6ACEC51BC04DF53298E15 /* HeaderMarks */; };
 		7661F79463DCC90C35126C47 /* TVPlexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136639210F8036CBA68D9A9A /* TVPlexView.swift */; };
@@ -255,6 +257,7 @@
 		D9DA536660BDBFEC705648A0 /* ArchiveDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveDiscovery.swift; sourceTree = "<group>"; };
 		DB2214A23F301E7CB08F0366 /* PlaybackEqualizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackEqualizer.swift; sourceTree = "<group>"; };
 		DBB6ACEC51BC04DF53298E15 /* HeaderMarks */ = {isa = PBXFileReference; lastKnownFileType = folder; name = HeaderMarks; path = Assets/HeaderMarks; sourceTree = SOURCE_ROOT; };
+		DFB84347A7681B1462518322 /* ToolDriveTransport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolDriveTransport.swift; sourceTree = "<group>"; };
 		E359008C174456F0E7E13E19 /* GlassBackgrounds */ = {isa = PBXFileReference; lastKnownFileType = folder; name = GlassBackgrounds; path = Assets/GlassBackgrounds; sourceTree = SOURCE_ROOT; };
 		E3A2C364BE3C8CBE2ED00AE6 /* TVLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVLibraryView.swift; sourceTree = "<group>"; };
 		EA95B8C22D26F273C6476DD1 /* TVKaleidoscopeSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVKaleidoscopeSurface.swift; sourceTree = "<group>"; };
@@ -440,6 +443,7 @@
 				11258FE49A48E51D7EB9F265 /* MobileTheme.swift */,
 				DB2214A23F301E7CB08F0366 /* PlaybackEqualizer.swift */,
 				790F4BA73F153291A9504706 /* PlexService.swift */,
+				DFB84347A7681B1462518322 /* ToolDriveTransport.swift */,
 				3C9BAB797374ADD5B2683083 /* Updates.swift */,
 			);
 			path = Shared;
@@ -695,6 +699,7 @@
 				0D0B4EBF64F1367C4F00D611 /* ShowDetailView.swift in Sources */,
 				3EF2585F30717D69B126A221 /* TVKaleidoscopeSurface.swift in Sources */,
 				A9EAEC209BFD4B9636562A90 /* ToolDriveArchiveView.swift in Sources */,
+				7404F1B34EE91157B7144ACD /* ToolDriveTransport.swift in Sources */,
 				7EB01C7C5A7A57BB11F7AF41 /* Updates.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -729,6 +734,7 @@
 				7661F79463DCC90C35126C47 /* TVPlexView.swift in Sources */,
 				8440B0A38BA6C09E611768FE /* TVTunnelSurface.swift in Sources */,
 				FE2F03EE995187836B4FACA3 /* ToolDriveArchiveView.swift in Sources */,
+				19180AE7E87DBBE6D746A170 /* ToolDriveTransport.swift in Sources */,
 				B622BC84DAD72E7A756E7DFA /* Updates.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -865,7 +871,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 47;
+				CURRENT_PROJECT_VERSION = 48;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -880,7 +886,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
-				MARKETING_VERSION = 0.1.46;
+				MARKETING_VERSION = 0.1.47;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -970,7 +976,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 47;
+				CURRENT_PROJECT_VERSION = 48;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -991,7 +997,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
-				MARKETING_VERSION = 0.1.46;
+				MARKETING_VERSION = 0.1.47;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

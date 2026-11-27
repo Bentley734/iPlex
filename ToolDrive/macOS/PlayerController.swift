@@ -407,6 +407,12 @@ final class PlayerController {
         }
     }
 
+    func setPlaybackVolume(_ value: Double) {
+        guard value.isFinite else { return }
+        let volume = Float(min(1, max(0, value)))
+        onMain { [weak self] in self?.player.volume = volume }
+    }
+
     func toggle() {
         onMain { [weak self] in
             guard let self = self else { return }
