@@ -9,9 +9,14 @@ final class MacMiniPlayer: NSObject, NSWindowDelegate {
     private var lastFrame: NSRect?
 
     func show(library: LibraryModel, style: MiniPlayerStyle, hiding window: NSWindow) {
-        guard panel == nil else { panel?.makeKeyAndOrderFront(nil); return }
-        let size = NSSize(width: 365, height: 478)
-        let screen = window.screen ?? NSScreen.main
+        if let panel {
+            panel.makeKeyAndOrderFront(nil)
+            return
+        }
+        let dragHeight: CGFloat = 22
+        let size = NSSize(width: 365, height: 478 + dragHeight)
+        let screen = lastFrame.flatMap { frame in NSScreen.screens.first { $0.visibleFrame.contains(frame) } }
+            ?? window.screen ?? NSScreen.main
         let visible = screen?.visibleFrame ?? window.frame
         let savedOrigin = lastFrame?.intersects(visible) == true ? lastFrame?.origin : nil
         let origin = savedOrigin ?? NSPoint(x: visible.midX - size.width / 2, y: visible.midY - size.height / 2)
@@ -21,7 +26,7 @@ final class MacMiniPlayer: NSObject, NSWindowDelegate {
             width: size.width,
             height: size.height
         )
-        let panel = MiniPlayerPanel(contentRect: frame, styleMask: [.borderless, .utilityWindow],
+        let panel = MiniPlayerPanel(contentRect: frame, styleMask: .borderless,
                                     backing: .buffered, defer: false)
         panel.title = "Now Playing"
         panel.delegate = self
@@ -32,19 +37,24 @@ final class MacMiniPlayer: NSObject, NSWindowDelegate {
         panel.isFloatingPanel = true
         panel.level = .floating
         panel.hidesOnDeactivate = false
-        panel.isMovableByWindowBackground = true
         panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
-        let host = NSHostingView(rootView:
-            MiniPlayerContent(library: library, style: style) { [weak self] in self?.panel?.close() }
-                .preferredColorScheme(style == .classic || style == .desktop98 ? .light : .dark)
-                .overlay(alignment: .top) {
-                    MiniPlayerDragArea().frame(height: 16).padding(.trailing, style == .desktop98 ? 54 : 0).accessibilityHidden(true)
+        let host = MiniPlayerHostingView(rootView:
+            MiniPlayerContent(library: library, style: style) { [weak panel] in
+                // SwiftUI can request a close while updating the hosted view.
+                DispatchQueue.main.async { [weak panel] in
+                    guard let panel, panel.isVisible else { return }
+                    panel.close()
                 }
+            }
+            .preferredColorScheme(style == .classic || style == .desktop98 ? .light : .dark)
         )
         host.sizingOptions = []
-        host.frame = NSRect(origin: .zero, size: size)
-        panel.contentView = host
-        panel.setContentSize(size)
+        let container = NSView(frame: NSRect(origin: .zero, size: size))
+        host.frame = NSRect(x: 0, y: 0, width: size.width, height: size.height - dragHeight)
+        container.addSubview(host)
+        let grip = MiniPlayerDragView(frame: NSRect(x: 0, y: host.frame.maxY, width: size.width, height: dragHeight))
+        container.addSubview(grip)
+        panel.contentView = container
         self.panel = panel
         libraryWindow = window
         panel.makeKeyAndOrderFront(nil)
@@ -54,14 +64,16 @@ final class MacMiniPlayer: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         guard let closingPanel = notification.object as? MiniPlayerPanel, closingPanel === panel else { return }
         lastFrame = closingPanel.frame
+        let window = libraryWindow
         panel = nil
-        libraryWindow?.makeKeyAndOrderFront(nil)
         libraryWindow = nil
+        window?.makeKeyAndOrderFront(nil)
     }
 }
 
 private final class MiniPlayerPanel: NSPanel {
     override var canBecomeKey: Bool { true }
+    override var canBecomeMain: Bool { true }
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
@@ -76,12 +88,24 @@ private final class MiniPlayerPanel: NSPanel {
     override func cancelOperation(_ sender: Any?) { close() }
 }
 
-private struct MiniPlayerDragArea: NSViewRepresentable {
-    func makeNSView(context: Context) -> DragView { DragView() }
-    func updateNSView(_ nsView: DragView, context: Context) {}
+private final class MiniPlayerHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
 
-    final class DragView: NSView {
-        override func mouseDown(with event: NSEvent) { window?.performDrag(with: event) }
+private final class MiniPlayerDragView: NSView {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func resetCursorRects() { addCursorRect(bounds, cursor: .openHand) }
+
+    override func mouseDown(with event: NSEvent) { window?.performDrag(with: event) }
+
+    override func draw(_ dirtyRect: NSRect) {
+        let grip = NSRect(x: bounds.midX - 21, y: bounds.midY - 3, width: 42, height: 6)
+        let outline = NSBezierPath(roundedRect: grip, xRadius: 3, yRadius: 3)
+        NSColor(white: 0.24, alpha: 1).setFill()
+        outline.fill()
+        NSColor(white: 0.75, alpha: 1).setStroke()
+        outline.stroke()
     }
 }
 #endif
