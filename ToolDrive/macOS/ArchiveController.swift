@@ -36,6 +36,8 @@ final class AppDelegate: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
     weak var transport: ToolDriveTransport?
 
     func setPlaybackVolume(_ value: Double) { playerController.setPlaybackVolume(value) }
+    func setPlaybackEqualizer(_ settings: PlaybackEQSettings) { playerController.setEqualizer(settings) }
+    func setPlaybackVisualizer(_ active: Bool) { playerController.setVisualizerActive(active) }
     var web: WKWebView!
     private var iplexAppearance: NSDictionary?
 
@@ -336,6 +338,7 @@ final class AppDelegate: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
             self?.evaluateCallback("macEqualizerState", ["available": available as Any? ?? NSNull()])
         }
         playerController.onVisualizerLevels = { [weak self] levels in
+            self?.transport?.levels = levels
             self?.evaluateCallback("macVisualizerLevels", levels)
         }
         playerController.onTrackListChange = { [weak self] event in
@@ -355,6 +358,7 @@ final class AppDelegate: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
         }
     }
     func resetRecordingEQ() {
+        transport?.equalizer = .flat
         playerController.setEqualizer(.flat)
         evaluateCallback("macEqualizerState", ["reset": true])
     }

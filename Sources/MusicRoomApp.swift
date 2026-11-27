@@ -86,7 +86,7 @@ private struct MusicWindow: View {
                 .allowsHitTesting(!showNowPlaying)
                 .disabled(showNowPlaying)
             if showNowPlaying {
-                NowPlayingView(library: model) { showNowPlaying = false }
+                NowPlayingView(library: model, archive: model.toolDriveSelected ? archiveTransport : nil) { showNowPlaying = false }
                     .modifier(NowPlayingPopTransition())
             }
         }
@@ -516,12 +516,7 @@ private struct MusicWindow: View {
     @ViewBuilder private var transportMetadata: some View {
         if model.toolDriveSelected {
             if let title = archiveTransport.title {
-                Menu {
-                    Button("Tracklist", action: archiveTransport.showTracklist)
-                    Button("Equalizer", action: archiveTransport.showEqualizer)
-                    Button("Visualizer", action: archiveTransport.showVisualizer)
-                    Button("Stop Playback", action: archiveTransport.stop)
-                } label: {
+                Button { showNowPlaying = true } label: {
                     HStack(spacing: 11) {
                         Image(systemName: "waveform").frame(width: 46, height: 46)
                         VStack(alignment: .leading, spacing: 3) {
@@ -533,8 +528,9 @@ private struct MusicWindow: View {
                         }
                     }
                 }
-                .menuStyle(.borderlessButton)
-                .accessibilityLabel("Tool Drive playback options, " + title)
+                .buttonStyle(.plain)
+                .glassHover()
+                .accessibilityLabel("Open Now Playing, " + title)
             } else {
                 Text("Nothing playing").foregroundStyle(.secondary)
             }

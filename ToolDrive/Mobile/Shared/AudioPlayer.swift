@@ -42,6 +42,8 @@ final class AudioPlayer: ObservableObject {
     @Published private(set) var resumePoint: ResumePoint?
 
     private let transport = AVQueuePlayer()
+    private var startupRetry: Task<Void, Never>?
+    private var startupRetries = 0
     private let defaults: UserDefaults
     private var recordingSource: ResumePoint.Source?
     private var recordingShowID: Int?
@@ -185,7 +187,6 @@ final class AudioPlayer: ObservableObject {
         errorMessage = nil
         phase = .resolving
         wantsPlayback = true
-        isExpanded = true
         updateNowPlaying()
         retryLive = { [weak self] in
             self?.resolve(show: show, source: source, version: version, plex: plex,
@@ -267,7 +268,16 @@ final class AudioPlayer: ObservableObject {
         }
     }
 
+    func setPlaybackVolume(_ value: Double) {
+        if value.isFinite { transport.volume = Float(min(1, max(0, value))) }
+    }
+
     func selectTrack(_ requested: Int, autoplay: Bool = true, startAt: Double = 0) {
+        startupRetries = 0
+        openTrack(requested, autoplay: autoplay, startAt: startAt)
+    }
+
+    private func openTrack(_ requested: Int, autoplay: Bool, startAt: Double) {
         guard audio.indices.contains(requested) else { return }
         clearItem()
         index = requested
@@ -281,6 +291,19 @@ final class AudioPlayer: ObservableObject {
         configureProcessing(startAt: startAt)
         observeActiveItem(item)
         if autoplay { resume() } else { updateNowPlaying() }
+        if autoplay, case .plex? = recordingSource {
+            startupRetry = Task { [weak self, weak item] in
+                do { try await Task.sleep(for: .seconds(4)) } catch { return }
+                guard let self, let item, self.activeItem === item, self.wantsPlayback, !self.isPlaying else { return }
+                if self.startupRetries >= 2 {
+                    self.fail("Plex audio didn’t start. Press Play to retry.")
+                } else {
+                    self.startupRetries += 1
+                    self.openTrack(requested, autoplay: true, startAt: startAt)
+                    self.errorMessage = "Retrying Plex audio…"
+                }
+            }
+        }
     }
 
     private func observeActiveItem(_ item: AVPlayerItem) {
@@ -290,7 +313,9 @@ final class AudioPlayer: ObservableObject {
         itemObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
             Task { @MainActor in
                 guard let self, self.transport.currentItem === item else { return }
-                if item.status == .failed { self.fail("This track couldn’t be played. Retry it or choose another track.") }
+                if item.status == .failed {
+                    if self.startupRetry == nil { self.fail("This track couldn’t be played. Retry it or choose another track.") }
+                }
                 else if item.status == .readyToPlay { self.updateTime(); self.updatePlaybackStatus() }
             }
         }
@@ -354,6 +379,8 @@ final class AudioPlayer: ObservableObject {
     }
 
     func pause() {
+        startupRetry?.cancel()
+        startupRetry = nil
         saveProgress(force: true)
         resumeAfterInterruption = false
         wantsPlayback = false
@@ -406,6 +433,8 @@ final class AudioPlayer: ObservableObject {
     }
 
     private func clearItem() {
+        startupRetry?.cancel()
+        startupRetry = nil
         resumeAfterInterruption = false
         transport.pause()
         preparingNext?.cancel()
@@ -586,6 +615,11 @@ final class AudioPlayer: ObservableObject {
     private func updatePlaybackStatus() {
         guard transport.currentItem != nil, phase != .failed, phase != .finished else { return }
         let next: Phase = !wantsPlayback ? .paused : (transport.timeControlStatus == .playing ? .playing : .buffering)
+        if next == .playing {
+            startupRetry?.cancel()
+            startupRetry = nil
+            if startupRetries > 0 { errorMessage = nil }
+        }
         if phase != next { phase = next }
         updateNowPlaying()
     }

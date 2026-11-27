@@ -3538,7 +3538,8 @@ window.windowsPlayback = (() => {
   audio.preload = 'metadata';
   audio.crossOrigin = 'anonymous';
   let tracks = [], index = 0, collection = '', origin = '', state = 'closed', error = '';
-  let context, filters, analyser, spectrum, meter = 0, attempt = 0, expectedURL = '';
+  let context, filters, analyser, spectrum, output, meter = 0, attempt = 0, expectedURL = '';
+  let volume = 1, startupTimer = 0, hostVisualizer = false;
   let wantsPlay = false, revision = 0;
   let retryTimer = 0, retries = 0, resumeAt = 0, healthySince = 0;
   let decoded = null, scheduled = null, decoding = null, decodeGeneration = 0, pausedOffset = 0;
@@ -3553,7 +3554,7 @@ window.windowsPlayback = (() => {
       trackIndex: index, trackCount: tracks.length, completedTracks, context: collection, title: track.title || collection,
       duration: decoded ? decoded.buffer.duration : Number.isFinite(audio.duration) && audio.currentSrc === expectedURL ? audio.duration : track.durationSeconds || 0,
       elapsed: decoded ? decodedTime() : audio.currentSrc === expectedURL ? audio.currentTime : 0,
-      canPrevious: index > 0, canNext: index + 1 < tracks.length
+      canPrevious: index > 0, canNext: index + 1 < tracks.length, volume, revision
     });
     if ('mediaSession' in navigator) {
       navigator.mediaSession.playbackState = state === 'playing' ? 'playing' : state === 'paused' ? 'paused' : 'none';
@@ -3573,9 +3574,12 @@ window.windowsPlayback = (() => {
         const limiter = context.createDynamicsCompressor();
         limiter.threshold.value = -1; limiter.knee.value = 0; limiter.ratio.value = 20;
         limiter.attack.value = .001; limiter.release.value = .1;
+        output = context.createGain();
+        output.gain.value = volume;
         const source = context.createMediaElementSource(audio);
+        audio.volume = 1;
         let last = source;
-        for (const node of [...filters, limiter, analyser, context.destination]) { last.connect(node); last = node; }
+        for (const node of [...filters, limiter, analyser, output, context.destination]) { last.connect(node); last = node; }
       } catch {
         window.macEqualizerState?.({available:false}); return;
       }
@@ -3590,7 +3594,7 @@ window.windowsPlayback = (() => {
     filters.forEach((filter,i) => filter.gain.setTargetAtTime(gains[i], context.currentTime,.012));
   }
   function measure() {
-    if (!analyser || state !== 'playing' || document.hidden) return;
+    if (!analyser || state !== 'playing' || (document.hidden && !hostVisualizer)) return;
     analyser.getByteFrequencyData(spectrum);
     const ranges = [[35,240],[240,2400],[2400,12000]];
     const scale = analyser.fftSize / context.sampleRate;
@@ -3603,8 +3607,11 @@ window.windowsPlayback = (() => {
   }
   function windowState() { window.macVisualizerWindowState?.({visible:!document.hidden,fullScreen:Boolean(document.fullscreenElement)}); }
   function visualize(p) {
-    if (p.action === 'listen' && !meter) meter = setInterval(measure, 40);
-    if (p.action === 'idle') { clearInterval(meter); meter = 0; }
+    if (p.action === 'listen') {
+      hostVisualizer = p.host === true;
+      if (!meter) meter = setInterval(measure, 70);
+    }
+    if (p.action === 'idle') { clearInterval(meter); meter = 0; hostVisualizer = false; }
     if (p.action === 'window') windowState();
     if (p.action === 'fullscreen') {
       const action = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
@@ -3615,6 +3622,7 @@ window.windowsPlayback = (() => {
   document.addEventListener('visibilitychange',windowState);
   function cancelRetry() {
     clearTimeout(retryTimer);
+    clearTimeout(startupTimer);
     retryTimer = retries = resumeAt = healthySince = 0;
   }
   function decodedTime() {
@@ -3752,6 +3760,7 @@ window.windowsPlayback = (() => {
     return revision;
   }
   function fail(message) {
+    clearTimeout(startupTimer);
     state = 'error'; error = message || 'This audio could not be played.'; wantsPlay = false; publish();
   }
   function play() {
@@ -3765,6 +3774,10 @@ window.windowsPlayback = (() => {
       return;
     }
     const serial = ++attempt;
+    clearTimeout(startupTimer);
+    if (origin === 'plex') startupTimer = setTimeout(() => {
+      if (serial === attempt && state !== 'playing' && wantsPlay) retryOrFail();
+    }, 4000);
     audio.play().catch(e => {
       if (serial !== attempt || e.name === 'AbortError') return;
       if (e.name === 'NotAllowedError') { wantsPlay = false; state = 'paused'; error = 'Press Play to start audio.'; publish(); }
@@ -3845,12 +3858,25 @@ window.windowsPlayback = (() => {
   }
   function action(p) {
     switch(p.action) {
-      case 'toggle': if (wantsPlay) pause(); else play(); break;
+      case 'toggle':
+        if (wantsPlay) pause();
+        else if (state === 'error') select(index, true, audio.currentTime || 0);
+        else play();
+        break;
       case 'pause': pause(); break;
       case 'previous': select(index-1,true); break;
       case 'next': select(index+1,true); break;
       case 'seek': seek(Number(p.seconds)); break;
       case 'playTrack': select(Number(p.index),true); break;
+      case 'volume': {
+        const input = Number(p.value);
+        if (!Number.isFinite(input)) break;
+        volume = Math.max(0, Math.min(1, input));
+        if (output) output.gain.value = volume;
+        else audio.volume = volume;
+        publish();
+        break;
+      }
       case 'close': reset(); break;
     }
   }
@@ -3861,7 +3887,16 @@ window.windowsPlayback = (() => {
     if (healthySince && performance.now() - healthySince >= 5000) { healthySince = 0; retries = 0; }
     publish();
   });
-  audio.addEventListener('playing',() => { if (current()) {state='playing'; error=''; healthySince=performance.now(); publish();} });
+  audio.addEventListener('playing', () => {
+    if (!current()) return;
+    clearTimeout(startupTimer);
+    clearTimeout(retryTimer);
+    retryTimer = 0;
+    state = 'playing';
+    error = '';
+    healthySince = performance.now();
+    publish();
+  });
   audio.addEventListener('pause',() => { if (current() && audio.paused && !audio.ended && !wantsPlay) {state='paused'; publish();} });
   audio.addEventListener('waiting',() => { if (current() && wantsPlay) {state='loading'; publish();} });
   audio.addEventListener('ended', () => {

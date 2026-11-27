@@ -1,4 +1,9 @@
 import SwiftUI
+#if os(macOS)
+import ToolDriveMac
+#else
+import ToolDriveMobile
+#endif
 
 struct NowPlayingPresentation: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -22,6 +27,10 @@ struct NowPlayingPopTransition: ViewModifier {
 
 struct NowPlayingView: View {
     @ObservedObject var library: LibraryModel
+    @ObservedObject private var archive: ToolDriveTransport
+    private let archiveMode: Bool
+    @State private var showingArchiveEQ = false
+    @State private var showingVisualizer = false
     @ObservedObject private var wallpaper = GlassWallpaper.shared
     @MusicAppearance private var theme
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
@@ -33,10 +42,23 @@ struct NowPlayingView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let close: () -> Void
 
-    private var palette: ArtworkPalette? { artworkColors ? library.playingPalette : nil }
+    init(library: LibraryModel, archive: ToolDriveTransport? = nil, close: @escaping () -> Void) {
+        self.library = library
+        self.archive = archive ?? ToolDriveTransport()
+        self.archiveMode = archive != nil
+        self.close = close
+    }
+
+    private var palette: ArtworkPalette? { artworkColors && !archiveMode ? library.playingPalette : nil }
     private var accent: Color { theme.accent(using: artworkColors ? palette : nil) }
-    private var duration: Double { max(0, library.state.duration) }
-    private var elapsed: Double { min(duration, max(0, library.state.elapsed)) }
+    private var duration: Double { max(0, archiveMode ? archive.duration : library.state.duration) }
+    private var elapsed: Double { min(duration, max(0, archiveMode ? archive.elapsed : library.state.elapsed)) }
+    private var playing: Bool { archiveMode ? archive.playing : library.state.playing }
+
+    private func seek(_ seconds: Double) {
+        if archiveMode { archive.seek(seconds) }
+        else { library.player.seek(to: seconds) }
+    }
 
     private var currentTrack: LiveTrack? {
         guard let index = library.state.index, library.playingTracks.indices.contains(index) else { return nil }
@@ -89,6 +111,12 @@ struct NowPlayingView: View {
         .sheet(isPresented: $showingLyrics) {
             NowPlayingLyrics(library: library, theme: theme).musicSheet(theme).preferredColorScheme(theme.scheme).tint(accent)
         }
+        .sheet(isPresented: $showingArchiveEQ) {
+            ArchiveEqualizer(transport: archive)
+                .musicSheet(theme)
+        }
+        .onChange(of: showingVisualizer) { _, active in archive.setVisualizerActive(active) }
+        .onDisappear { if showingVisualizer { archive.setVisualizerActive(false) } }
         .sheet(isPresented: $showingSignalPath) {
             signalPath.musicSheet(theme)
         }
@@ -101,7 +129,7 @@ struct NowPlayingView: View {
     }
 
     @ViewBuilder private var glassArtworkBackdrop: some View {
-        if !reduceTransparency, wallpaper.image == nil, let image = library.playingArtwork {
+        if !archiveMode, !reduceTransparency, wallpaper.image == nil, let image = library.playingArtwork {
             GeometryReader { geometry in
                 #if os(macOS)
                 let artwork = Image(nsImage: image)
@@ -131,13 +159,13 @@ struct NowPlayingView: View {
             Text("Now Playing")
                 .font(.headline)
                 .accessibilityAddTraits(.isHeader)
-            Button("Queue", systemImage: "list.bullet") {
+            Button(archiveMode ? "Tracklist" : "Queue", systemImage: "list.bullet") {
                 withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { showingQueue.toggle() }
             }
                 .musicGlass(theme, radius: 12, interactive: true)
                 .tint(showingQueue ? accent : nil)
                 .accessibilityAddTraits(showingQueue ? .isSelected : [])
-                .disabled(library.playingTracks.isEmpty)
+                .disabled(archiveMode ? archive.trackTitles.isEmpty : library.playingTracks.isEmpty)
                 .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .lineLimit(1)
@@ -155,17 +183,23 @@ struct NowPlayingView: View {
                 ? min(680, geometry.size.width * 0.47, max(220, geometry.size.height - 60))
                 : min(460, geometry.size.width - inset * 2, max(130, geometry.size.height * (showingQueue ? 0.35 : 0.53)))
             ScrollView {
-                if let album = library.playingAlbum {
+                let album = library.playingAlbum
+                if archiveMode ? archive.title != nil : album != nil {
                     let layout = wide
                         ? AnyLayout(HStackLayout(alignment: .center, spacing: min(78, geometry.size.width * 0.055)))
                         : AnyLayout(VStackLayout(alignment: .center, spacing: compact ? 12 : 26))
                     layout {
-                        Button { showingArtwork = true } label: {
-                            artwork(album)
+                        if archiveMode {
+                            archiveArtwork
                                 .frame(width: max(1, coverWidth), height: max(1, coverWidth))
+                        } else if let album {
+                            Button { showingArtwork = true } label: {
+                                artwork(album)
+                                    .frame(width: max(1, coverWidth), height: max(1, coverWidth))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Enlarge album artwork")
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Enlarge album artwork")
                         playback(album, compact: compact)
                             .padding(compact ? 8 : 16)
                             .musicGlass(theme, radius: 22)
@@ -190,13 +224,16 @@ struct NowPlayingView: View {
 
     private func queuePanel(compact: Bool) -> some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Up Next")
+            Text(archiveMode ? "Tracklist" : "Up Next")
                 .font(.headline)
                 .accessibilityAddTraits(.isHeader)
                 .padding(compact ? 10 : 18)
             ScrollViewReader { scroll in
                 ScrollView {
-                    queue(compact: compact)
+                    Group {
+                        if archiveMode { archiveTracklist }
+                        else { queue(compact: compact) }
+                    }
                         .padding(.horizontal, compact ? 5 : 12)
                 }
                 .onAppear {
@@ -271,13 +308,13 @@ struct NowPlayingView: View {
         Image(systemName: "music.note").font(.largeTitle).foregroundStyle(accent)
     }
 
-    private func playback(_ album: MusicEntry, compact: Bool) -> some View {
+    private func playback(_ album: MusicEntry?, compact: Bool) -> some View {
         VStack(alignment: .leading, spacing: compact ? 7 : 15) {
-            Text(currentTrack?.title ?? (library.state.title.isEmpty ? album.title : library.state.title))
-                .font(compact ? .headline : .largeTitle.bold()).lineLimit(compact ? 2 : 3)
-            let artist = currentTrack?.artist ?? album.artist
+            let title = archiveMode ? archive.title ?? "" : currentTrack?.title ?? (library.state.title.isEmpty ? album?.title ?? "" : library.state.title)
+            Text(title).font(compact ? .headline : .largeTitle.bold()).lineLimit(compact ? 2 : 3)
+            let artist = archiveMode ? archive.context : currentTrack?.artist ?? album?.artist ?? ""
             if !artist.isEmpty { Text(artist).font(compact ? .caption : .title3).foregroundStyle(.secondary).lineLimit(compact ? 1 : 2) }
-            if let release = currentTrack?.album ?? (album.kind == .albums ? album.title : nil) {
+            if !archiveMode, let release = currentTrack?.album ?? (album?.kind == .albums ? album?.title : nil) {
                 Text(release).font(compact ? .caption2 : .subheadline).foregroundStyle(.secondary).lineLimit(compact ? 1 : 2)
             }
             ViewThatFits(in: .horizontal) {
@@ -285,14 +322,15 @@ struct NowPlayingView: View {
                 VStack(alignment: .leading) { playbackTools }
             }
             .buttonStyle(.bordered)
-            if !library.state.message.isEmpty {
-                Text(library.state.message).font(.callout).foregroundStyle(accent)
+            let message = archiveMode ? archive.message : library.state.message
+            if !message.isEmpty {
+                Text(message).font(.callout).foregroundStyle(accent)
             }
             VStack(spacing: 6) {
                 #if os(tvOS)
                 ProgressView(value: elapsed, total: max(1, duration)).accessibilityLabel("Playback position")
                 #else
-                Slider(value: Binding(get: { elapsed }, set: library.player.seek),
+                Slider(value: Binding(get: { elapsed }, set: seek),
                        in: 0...max(1, duration))
                     .disabled(duration <= 0).accessibilityLabel("Playback position")
                 #endif
@@ -307,22 +345,24 @@ struct NowPlayingView: View {
             }
             HStack(spacing: compact ? 5 : 14) {
                 Spacer(minLength: 0)
-                Button("Previous Track", systemImage: "backward.end.fill", action: library.player.previous)
-                    .disabled(!library.state.previous)
+                Button("Previous Track", systemImage: "backward.end.fill", action: archiveMode ? archive.previous : library.player.previous)
+                    .disabled(!(archiveMode ? archive.canPrevious : library.state.previous))
                 #if os(tvOS)
-                Button("Back 15 Seconds", systemImage: "gobackward.15") { library.player.seek(to: max(0, elapsed - 15)) }
+                Button("Back 15 Seconds", systemImage: "gobackward.15") { seek(max(0, elapsed - 15)) }
                     .disabled(duration <= 0)
                 #endif
-                Button(library.state.playing ? "Pause" : "Play",
-                       systemImage: library.state.playing ? "pause.fill" : "play.fill", action: library.player.toggle)
+                Button(playing ? "Pause" : "Play",
+                       systemImage: playing ? "pause.fill" : "play.fill",
+                       action: archiveMode ? archive.toggle : library.player.toggle)
+                    .disabled(archiveMode && !archive.canToggle)
                     .buttonStyle(.borderedProminent)
                     .controlSize(compact ? .regular : .large)
                 #if os(tvOS)
-                Button("Forward 15 Seconds", systemImage: "goforward.15") { library.player.seek(to: min(duration, elapsed + 15)) }
+                Button("Forward 15 Seconds", systemImage: "goforward.15") { seek(min(duration, elapsed + 15)) }
                     .disabled(duration <= 0)
                 #endif
-                Button("Next Track", systemImage: "forward.end.fill", action: library.player.next)
-                    .disabled(!library.state.next)
+                Button("Next Track", systemImage: "forward.end.fill", action: archiveMode ? archive.next : library.player.next)
+                    .disabled(!(archiveMode ? archive.canNext : library.state.next))
                 Spacer(minLength: 0)
             }
             .font(.title2)
@@ -331,7 +371,12 @@ struct NowPlayingView: View {
             #if !os(tvOS)
             HStack(spacing: 10) {
                 Image(systemName: "speaker.fill").accessibilityHidden(true)
-                Slider(value: Binding(get: { library.playbackVolume }, set: library.changePlaybackVolume), in: 0...1)
+                Slider(value: Binding(get: { library.playbackVolume }, set: { value in
+                    library.changePlaybackVolume(value)
+                    #if !os(macOS)
+                    if archiveMode { archive.setPlaybackVolume(value) }
+                    #endif
+                }), in: 0...1)
                     .accessibilityLabel("Playback volume")
                 Image(systemName: "speaker.wave.3.fill").accessibilityHidden(true)
             }
@@ -341,12 +386,61 @@ struct NowPlayingView: View {
     }
 
     @ViewBuilder private var playbackTools: some View {
-        if let track = currentTrack {
-            Button(track.format.badge, systemImage: "waveform.path") { showingSignalPath = true }
-                .accessibilityHint("Shows audio signal path")
+        if archiveMode {
+            Button("Equalizer", systemImage: "slider.horizontal.3") { showingArchiveEQ = true }
+            Button("Visualizer", systemImage: "waveform") { showingVisualizer.toggle() }
+                .accessibilityAddTraits(showingVisualizer ? .isSelected : [])
+        } else {
+            if let track = currentTrack {
+                Button(track.format.badge, systemImage: "waveform.path") { showingSignalPath = true }
+                    .accessibilityHint("Shows audio signal path")
+            }
+            Button("Lyrics", systemImage: "quote.bubble") { showingLyrics = true }
+                .disabled(currentTrack?.plexID == nil)
         }
-        Button("Lyrics", systemImage: "quote.bubble") { showingLyrics = true }
-            .disabled(currentTrack?.plexID == nil)
+    }
+
+    private var archiveArtwork: some View {
+        ZStack {
+            Color.primary.opacity(0.08)
+            if showingVisualizer {
+                TimelineView(.animation(minimumInterval: 0.06)) { _ in
+                    GeometryReader { proxy in
+                        let levels = archive.visualizerLevels()
+                        HStack(alignment: .center, spacing: 3) {
+                            ForEach(levels.indices, id: \.self) { index in
+                                Capsule().fill(accent.opacity(0.85))
+                                    .frame(height: max(3, min(1, levels[index]) * proxy.size.height))
+                            }
+                        }.frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }.padding(24)
+                }
+                .accessibilityLabel("Audio Visualizer")
+            } else {
+                Image(systemName: "waveform").font(.largeTitle).foregroundStyle(accent)
+            }
+        }
+        .clipShape(.rect(cornerRadius: 19))
+    }
+
+    private var archiveTracklist: some View {
+        LazyVStack(alignment: .leading, spacing: 5) {
+            ForEach(Array(archive.trackTitles.enumerated()), id: \.offset) { index, title in
+                Button {
+                    archive.selectTrack(index)
+                } label: {
+                    HStack {
+                        Text(index + 1, format: .number).monospacedDigit().foregroundStyle(.secondary)
+                        Text(title).lineLimit(2)
+                        Spacer(minLength: 0)
+                    }.padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .buttonStyle(.bordered)
+                .accessibilityAddTraits(archive.trackIndex == index ? .isSelected : [])
+                .tint(archive.trackIndex == index ? accent : nil)
+            }
+        }.padding(.bottom, 16)
     }
 
     private var signalPath: some View {
@@ -460,6 +554,57 @@ struct NowPlayingView: View {
         let value = seconds.isFinite ? Int(min(359_999, max(0, seconds))) : 0
         return value < 3_600 ? String(format: "%d:%02d", value / 60, value % 60) :
             String(format: "%d:%02d:%02d", value / 3_600, value / 60 % 60, value % 60)
+    }
+}
+
+private struct ArchiveEqualizer: View {
+    let transport: ToolDriveTransport
+    @Environment(\.dismiss) private var dismiss
+    @State private var settings = PlaybackEQSettings.flat
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Equalizer").font(.title.bold())
+                Spacer()
+                Button("Done") { dismiss() }
+            }
+            HStack {
+                ForEach(PlaybackEQPreset.allCases) { preset in
+                    Button(preset.rawValue) { settings = preset.settings(magik: settings.magik) }
+                }
+            }
+            band("Bass", value: $settings.bass)
+            band("Mid", value: $settings.mid)
+            band("Treble", value: $settings.treble)
+            Toggle("Magik", isOn: $settings.magik)
+        }
+        .padding(28)
+        #if os(macOS)
+        .frame(minWidth: 460)
+        #endif
+        .onAppear {
+            let (bass, mid, treble, magik) = transport.equalizerValues
+            settings = PlaybackEQSettings(bass: bass, mid: mid, treble: treble, magik: magik)
+        }
+        .onChange(of: settings) { _, value in
+            transport.setEqualizer(bass: value.bass, mid: value.mid, treble: value.treble, magik: value.magik)
+        }
+    }
+
+    private func band(_ label: String, value: Binding<Double>) -> some View {
+        #if os(tvOS)
+        return HStack {
+            Text(label)
+            Button { value.wrappedValue -= 1 } label: { Image(systemName: "minus") }
+                .accessibilityLabel("Decrease " + label).disabled(value.wrappedValue <= -10)
+            Button { value.wrappedValue += 1 } label: { Image(systemName: "plus") }
+                .accessibilityLabel("Increase " + label).disabled(value.wrappedValue >= 10)
+            Text(String(format: "%+.0f dB", value.wrappedValue)).monospacedDigit()
+        }
+        #else
+        return Slider(value: value, in: -10...10, step: 1) { Text(label) }
+        #endif
     }
 }
 

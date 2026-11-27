@@ -191,13 +191,16 @@ struct DownloadsBrowser: View {
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 15) {
                     heading.fixedSize()
+                    Spacer()
                     search.frame(width: 205)
                 }
                 VStack(spacing: 10) {
-                    heading.multilineTextAlignment(.center)
+                    heading.frame(maxWidth: .infinity, alignment: .leading)
                     search.frame(maxWidth: 205)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
                 }
             }
+            .frame(maxWidth: .infinity)
             .padding(.horizontal, 28).padding(.vertical, 20)
             if !downloads.status.isEmpty {
                 HStack {
@@ -210,6 +213,7 @@ struct DownloadsBrowser: View {
                     description: Text("Use Download in the Music, Movies, or TV Shows item menu. Tool Drive recordings are in its Library."))
                     .frame(maxWidth: 440)
                     .padding(.horizontal, 20)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 10) {
@@ -240,11 +244,10 @@ struct DownloadsBrowser: View {
                         }
                     }.padding(.horizontal, 28).padding(.top, 12)
                 }
+                .frame(maxWidth: 720)
             }
         }
-        .frame(maxWidth: 720)
-        .frame(maxWidth: .infinity, maxHeight: .infinity,
-               alignment: downloads.items.isEmpty ? .center : .top)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .sheet(item: $video) { item in
             if let file = item.files.first {
                 OfflineVideoSheet(title: item.title, url: downloads.url(file, in: item))

@@ -18,6 +18,10 @@ public final class ToolDriveTransport: ObservableObject {
     @Published public private(set) var canNext = false
     @Published public private(set) var elapsed = 0.0
     @Published public private(set) var duration = 0.0
+    @Published public private(set) var trackTitles: [String] = []
+    @Published public private(set) var trackIndex: Int?
+    var equalizer = PlaybackEQSettings.flat
+    var levels: [Double] = []
     fileprivate weak var controller: AppDelegate?
 
     public init() {}
@@ -26,7 +30,7 @@ public final class ToolDriveTransport: ObservableObject {
         let visible = state["visible"] as? Bool == true
         let status = state["status"] as? String
         let tracks = state["tracks"] as? [[String: Any]] ?? []
-        let ready = visible && !tracks.isEmpty && status != "loading" && status != "resolving" && status != "error"
+        let ready = visible && !tracks.isEmpty && status != "loading" && status != "resolving"
         let newTitle = visible ? state["title"] as? String : nil
         let newContext = state["context"] as? String ?? ""
         let newMessage = state["message"] as? String ?? ""
@@ -43,6 +47,10 @@ public final class ToolDriveTransport: ObservableObject {
         if canNext != next { canNext = next }
         if elapsed != newElapsed { elapsed = newElapsed }
         if duration != newDuration { duration = newDuration }
+        let titles = tracks.map { $0["title"] as? String ?? "Track" }
+        if trackTitles != titles { trackTitles = titles }
+        let index = state["trackIndex"] as? Int
+        if trackIndex != index { trackIndex = index }
     }
 
     public func toggle() { controller?.handlePlayer(["action": "toggle"]) }
@@ -50,13 +58,17 @@ public final class ToolDriveTransport: ObservableObject {
     public func next() { controller?.handlePlayer(["action": "next"]) }
     public func seek(_ seconds: Double) { controller?.handlePlayer(["action": "seek", "seconds": seconds]) }
     public func stop() { controller?.handlePlayer(["action": "close"]) }
-    public func showEqualizer() { open("mac-player-eq") }
-    public func showVisualizer() { open("mac-player-visualizer") }
-    public func showTracklist() { open("mac-player-tracklist") }
-
-    private func open(_ id: String) {
-        controller?.web?.evaluateJavaScript("document.getElementById('\(id)')?.click()", completionHandler: nil)
+    public func selectTrack(_ index: Int) { controller?.handlePlayer(["action": "playTrack", "index": index]) }
+    public var equalizerValues: (Double, Double, Double, Bool) {
+        (equalizer.bass, equalizer.mid, equalizer.treble, equalizer.magik)
     }
+    public func setEqualizer(bass: Double, mid: Double, treble: Double, magik: Bool) {
+        equalizer = PlaybackEQSettings(bass: bass, mid: mid, treble: treble, magik: magik)
+        controller?.setPlaybackEqualizer(equalizer)
+    }
+    public func setVisualizerActive(_ active: Bool) { controller?.setPlaybackVisualizer(active) }
+    public func visualizerLevels() -> [Double] { levels }
+
 }
 
 public struct ToolDriveArchiveView: NSViewRepresentable {

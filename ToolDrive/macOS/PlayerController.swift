@@ -32,6 +32,8 @@ final class PlayerController {
     private var userWantsPlayback = false
     private var retryCount = 0
     private var retryWork: DispatchWorkItem?
+    private var startupWork: DispatchWorkItem?
+    private var plexPlayback = false
     private var healthySince: Date?
     private var itemStatusObservation: NSKeyValueObservation?
     private var timeControlObservation: NSKeyValueObservation?
@@ -67,6 +69,7 @@ final class PlayerController {
         visualizerTimer?.invalidate()
         media.cancelAll()
         retryWork?.cancel()
+        startupWork?.cancel()
         itemStatusObservation?.invalidate()
         timeControlObservation?.invalidate()
         if let observer = timeObserver { player.removeTimeObserver(observer) }
@@ -237,6 +240,7 @@ final class PlayerController {
             self.tracks = []
             self.completedTracks = 0
             self.index = 0
+            self.plexPlayback = false
             self.showID = showID
             self.sourceID = sourceID
             self.date = date
@@ -318,7 +322,7 @@ final class PlayerController {
             do {
                 let tracks = try PlexParser.validatedPlaybackTracks(supplied)
                 self.loadPreparedTracks(tracks, collection: collection,
-                                        startTrack: startTrack, autoplay: autoplay, resume: resume)
+                                        startTrack: startTrack, autoplay: autoplay, resume: resume, plex: true)
             } catch {
                 self.fail("The Plex recording could not be opened.")
             }
@@ -468,7 +472,7 @@ final class PlayerController {
     }
 
     private func loadPreparedTracks(_ preparedTracks: [LiveTrack], collection: String,
-                                    startTrack: Int, autoplay: Bool, resume: DesktopResumePosition? = nil) {
+                                    startTrack: Int, autoplay: Bool, resume: DesktopResumePosition? = nil, plex: Bool = false) {
         media.cancelTrackResolution()
         cancelRetry()
         player.pause()
@@ -480,6 +484,7 @@ final class PlayerController {
         date = ""
         venue = ""
         versionLabel = ""
+        plexPlayback = plex
         collectionLabel = collection
         retryCount = 0
         message = ""
@@ -518,6 +523,14 @@ final class PlayerController {
         observeActiveItem(item)
         status = autoplay ? "buffering" : "ready"
         userWantsPlayback = autoplay
+        if plexPlayback && autoplay {
+            let timeout = DispatchWorkItem { [weak self, weak item] in
+                guard let self, self.activeItem === item, self.player.timeControlStatus != .playing else { return }
+                self.handlePlaybackFailure(nil)
+            }
+            startupWork = timeout
+            DispatchQueue.main.asyncAfter(deadline: .now() + 4, execute: timeout)
+        }
         lastNowPlayingSecond = -1
         emitState()
         updateNowPlaying()
@@ -569,6 +582,7 @@ final class PlayerController {
         if player.currentItem == nil, activeItem != nil { return }
         switch player.timeControlStatus {
         case .playing:
+            cancelRetry()
             status = "playing"
             message = ""
             if healthySince == nil { healthySince = Date() }
@@ -652,7 +666,12 @@ final class PlayerController {
         notificationObservers = []
     }
 
-    private func cancelRetry() { retryWork?.cancel(); retryWork = nil }
+    private func cancelRetry() {
+        retryWork?.cancel()
+        retryWork = nil
+        startupWork?.cancel()
+        startupWork = nil
+    }
 
     private func emitTracks() {
         var event: [String: Any] = ["kind": "tracks", "tracks": tracks.map(\.summary)]

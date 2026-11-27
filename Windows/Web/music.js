@@ -825,7 +825,13 @@
   }
   window.toolDriveTransport = state => {
     archiveTransportState = state || {};
-    if (archiveTransportActive) renderArchiveTransport();
+    if (archiveTransportActive) {
+      renderArchiveTransport();
+      if (nowPlaying.open) {
+        if (archiveTransportState.visible) renderArchiveNowPlaying();
+        else nowPlaying.close();
+      }
+    }
   };
   window.showToolDriveTransport = active => {
     archiveTransportActive = active;
@@ -885,6 +891,70 @@
     if (document.activeElement !== get('seek')) get('seek').value = state.elapsed || 0;
     get('elapsed').textContent = time(state.elapsed);
   }
+  const archiveEQInputs = [...document.querySelectorAll('[data-archive-eq]')];
+  let archiveQueueKey = '';
+  let archiveRevision;
+  function setArchiveTools(active) {
+    for (const id of ['archive-eq-toggle', 'archive-visualizer-toggle', 'archive-stop']) get(id).hidden = !active;
+    for (const id of ['signal-path-button', 'lyrics-button']) get(id).hidden = active;
+    get('jump-now-queue').textContent = active ? 'Tracklist' : 'Queue';
+    get('now-queue-heading').textContent = active ? 'Tracklist' : 'Up Next';
+    if (!active) {
+      get('archive-eq').hidden = true;
+      get('archive-eq-toggle').setAttribute('aria-expanded', 'false');
+    }
+  }
+  function renderArchiveNowPlaying() {
+    const state = archiveTransportState;
+    get('now-title').textContent = state.title || 'Loading recording…';
+    get('now-artist').textContent = state.context || '';
+    get('now-album').textContent = '';
+    renderNowTransport(state);
+    get('now-play').disabled = !state.canToggle;
+    if (state.revision !== archiveRevision) {
+      archiveRevision = state.revision;
+      get('archive-eq-preset').value = 'flat';
+      for (const input of archiveEQInputs) {
+        if (input.type === 'checkbox') input.checked = false;
+        else input.value = 0;
+      }
+    }
+    const tracks = state.tracks || [];
+    const key = JSON.stringify(tracks);
+    const queue = get('now-queue-list');
+    if (key !== archiveQueueKey) {
+      archiveQueueKey = key;
+      queue.replaceChildren(...tracks.map((track, index) => {
+        const row = node('li', '', 'now-queue-row');
+        const entry = button(track.title, () => archiveTransportCommand({action:'playTrack', index}), 'now-queue-play');
+        row.append(entry);
+        return row;
+      }));
+    }
+    for (const [index, row] of [...queue.children].entries()) {
+      const entry = row.firstElementChild;
+      if (index === state.trackIndex) entry.setAttribute('aria-current', 'true');
+      else entry.removeAttribute('aria-current');
+    }
+  }
+  function renderNowTransport(state) {
+    const message = get('now-status');
+    message.textContent = state.message || '';
+    message.hidden = !state.message;
+    const seek = get('now-seek');
+    seek.max = Math.max(1, state.duration || 0);
+    seek.disabled = !state.duration;
+    if (document.activeElement !== seek) seek.value = state.elapsed || 0;
+    get('now-elapsed').textContent = time(state.elapsed);
+    get('now-duration').textContent = time(state.duration);
+    get('now-duration').setAttribute('aria-label', 'Track duration');
+    const active = state.status === 'playing';
+    get('now-play').textContent = active ? '⏸' : '▶';
+    get('now-play').setAttribute('aria-label', active ? 'Pause' : 'Play');
+    get('now-prev').disabled = !state.canPrevious;
+    get('now-next').disabled = !state.canNext;
+    if (Number.isFinite(state.volume) && document.activeElement !== get('now-volume')) get('now-volume').value = state.volume;
+  }
   function renderNowPlaying(state) {
     const track = nowQueue[state.trackIndex] || {};
     const path = playingCover(state);
@@ -901,22 +971,8 @@
     get('now-title').textContent = track.title || state.title || playing.title;
     get('now-artist').textContent = track.artist || playing.artist || '';
     get('now-album').textContent = track.album || (playing.kind === 'album' ? playing.title : '');
-    const message = get('now-status');
-    message.textContent = state.message || '';
-    message.hidden = !state.message;
-    const seek = get('now-seek');
-    seek.max = Math.max(1, state.duration || 0);
-    seek.disabled = !state.duration;
-    if (document.activeElement !== seek) seek.value = state.elapsed || 0;
-    get('now-elapsed').textContent = time(state.elapsed);
-    get('now-duration').textContent = time(state.duration);
-    get('now-duration').setAttribute('aria-label', 'Track duration');
-    const active = state.status === 'playing';
-    get('now-play').textContent = active ? '⏸' : '▶';
-    get('now-play').setAttribute('aria-label', active ? 'Pause' : 'Play');
-    get('now-prev').disabled = !state.canPrevious;
-    get('now-next').disabled = !state.canNext;
-    if (Number.isFinite(state.volume)) get('now-volume').value = state.volume;
+    get('now-play').disabled = false;
+    renderNowTransport(state);
     const queue = get('now-queue-list');
     if (renderedQueue !== nowQueue) {
       const rows = document.createDocumentFragment();
@@ -1127,26 +1183,64 @@
     else dismissNowPlaying();
   });
   nowPlaying.addEventListener('close', () => {
+    if (get('archive-visualizer-toggle').getAttribute('aria-pressed') === 'true') setArchiveVisualizer(false);
+    if (archiveTransportActive) setArchiveTools(false);
     if (nowPlaying.open) return;
     clearTimeout(nowPlayingCloseTimer);
     nowPlayingAnimation?.cancel();
     nowPlayingAnimation = null;
     closingNowPlaying = false;
   });
-  const archivePlayerOptions = get('tool-drive-player-options');
-  for (const button of archivePlayerOptions.querySelectorAll('[data-tool-drive-command]')) {
-    button.onclick = () => {
-      archivePlayerOptions.close();
-      archiveTransportCommand({action:button.dataset.toolDriveCommand});
-    };
-  }
-  get('playing').onclick = () => {
-    if (archiveTransportActive) {
-      if (archiveTransportState.visible) archivePlayerOptions.showModal();
-      return;
+  function setArchiveVisualizer(active) {
+    get('archive-visualizer-toggle').setAttribute('aria-pressed', String(active));
+    archiveTransportCommand({action:'visualizer', enabled:active});
+    get('now-art').replaceChildren(active ? node('span', '', 'archive-spectrum') : node('span', '♫'));
+    if (active) {
+      const spectrum = get('now-art').firstElementChild;
+      spectrum.setAttribute('aria-label', 'Audio Visualizer');
+      for (let index = 0; index < 3; index++) spectrum.append(node('i'));
     }
-    if (!playing || nowPlaying.open) return;
-    renderNowPlaying(playbackState);
+  }
+  window.toolDriveVisualizer = levels => {
+    get('now-art').querySelectorAll('.archive-spectrum i').forEach((bar, index) => {
+      bar.style.height = Math.max(4, Math.min(100, (levels[index] || 0) * 100)) + '%';
+    });
+  };
+  get('archive-visualizer-toggle').onclick = () => setArchiveVisualizer(get('archive-visualizer-toggle').getAttribute('aria-pressed') !== 'true');
+  get('archive-eq-toggle').onclick = () => {
+    const panel = get('archive-eq');
+    panel.hidden = !panel.hidden;
+    get('archive-eq-toggle').setAttribute('aria-expanded', String(!panel.hidden));
+  };
+  get('archive-stop').onclick = () => archiveTransportCommand({action:'close'});
+  function updateArchiveEQ() {
+    const values = Object.fromEntries(archiveEQInputs.map(control => [
+      control.dataset.archiveEq, control.type === 'checkbox' ? control.checked : Number(control.value)
+    ]));
+    get('archive-eq-preset').value = Object.keys(eqPresets).find(preset =>
+      eqPresets[preset].every((gain, index) => values[bands[index]] === gain)) || 'custom';
+    archiveTransportCommand({action:'eq', values});
+  }
+  for (const input of archiveEQInputs) input.oninput = updateArchiveEQ;
+  get('archive-eq-preset').onchange = event => {
+    const preset = eqPresets[event.target.value];
+    if (!preset) return;
+    preset.forEach((gain, index) => { archiveEQInputs[index].value = gain; });
+    if (event.target.value === 'flat') archiveEQInputs[3].checked = false;
+    updateArchiveEQ();
+  };
+  get('playing').onclick = () => {
+    if (nowPlaying.open || (archiveTransportActive ? !archiveTransportState.visible : !playing)) return;
+    setArchiveTools(archiveTransportActive);
+    if (archiveTransportActive) {
+      nowCover = null;
+      renderedQueue = null;
+      archiveQueueKey = '';
+      nowPlaying.style.removeProperty('--glass-artwork');
+      get('now-art').disabled = true;
+      get('now-art').replaceChildren(node('span', '♫'));
+      renderArchiveNowPlaying();
+    } else renderNowPlaying(playbackState);
     showNowQueue(false);
     closingNowPlaying = false;
     nowPlaying.showModal();
@@ -1155,11 +1249,11 @@
   };
   get('close-now-playing').onclick = dismissNowPlaying;
   get('jump-now-queue').onclick = () => showNowQueue(!nowPlaying.classList.contains('queue-open'));
-  get('now-prev').onclick = () => player.action({action:'previous'});
-  get('now-play').onclick = () => player.action({action:'toggle'});
-  get('now-next').onclick = () => player.action({action:'next'});
-  get('now-seek').oninput = event => player.action({action:'seek', seconds:event.target.value});
-  get('now-volume').oninput = event => player.action({action:'volume', value:event.target.value});
+  get('now-prev').onclick = () => footerCommand({action:'previous'});
+  get('now-play').onclick = () => footerCommand({action:'toggle'});
+  get('now-next').onclick = () => footerCommand({action:'next'});
+  get('now-seek').oninput = event => footerCommand({action:'seek', seconds:event.target.value});
+  get('now-volume').oninput = event => footerCommand({action:'volume', value:event.target.value});
   get('connect').onclick = () => host({action:'connect'});
   get('refresh-plex').onclick = () => host({action:'servers'});
   const openSettings = () => {

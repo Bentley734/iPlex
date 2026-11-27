@@ -186,16 +186,6 @@
     <input id="seek" aria-label="Playback position" type="range" min="0" max="1" value="0" disabled>
     <time id="elapsed">0:00</time>
   </footer>
-  <dialog id="tool-drive-player-options" class="playback-sheet" aria-labelledby="tool-drive-player-heading">
-    <header>
-      <h2 id="tool-drive-player-heading">Tool Drive Playback</h2>
-      <form method="dialog"><button>Done</button></form>
-    </header>
-    <button type="button" data-tool-drive-command="tracklist">Tracklist</button>
-    <button type="button" data-tool-drive-command="eq">Equalizer</button>
-    <button type="button" data-tool-drive-command="visualizer">Visualizer</button>
-    <button type="button" data-tool-drive-command="close">Stop Playback</button>
-  </dialog>
   <dialog id="now-playing" aria-labelledby="now-playing-heading">
     <header class="now-playing-header">
       <button id="close-now-playing" type="button">‹ Library</button>
@@ -214,6 +204,22 @@
             <div class="now-playing-tools">
               <button id="signal-path-button" type="button" aria-haspopup="dialog">Signal Path</button>
               <button id="lyrics-button" type="button" aria-haspopup="dialog">Lyrics</button>
+              <button id="archive-eq-toggle" type="button" aria-expanded="false" aria-controls="archive-eq" hidden>Equalizer</button>
+              <button id="archive-visualizer-toggle" type="button" aria-pressed="false" hidden>Visualizer</button>
+              <button id="archive-stop" type="button" hidden>Stop Playback</button>
+            </div>
+            <div id="archive-eq" hidden>
+              <label>Preset <select id="archive-eq-preset">
+                <option value="custom">Custom</option>
+                <option value="flat">Flat</option>
+                <option value="bassBoost">Bass Boost</option>
+                <option value="vocal">Vocal</option>
+                <option value="bright">Bright</option>
+              </select></label>
+              <label>Bass <input data-archive-eq="bass" type="range" min="-10" max="10" step="1" value="0"></label>
+              <label>Mid <input data-archive-eq="mid" type="range" min="-10" max="10" step="1" value="0"></label>
+              <label>Treble <input data-archive-eq="treble" type="range" min="-10" max="10" step="1" value="0"></label>
+              <label>Magik <input data-archive-eq="magik" type="checkbox"></label>
             </div>
             <input id="now-seek" type="range" min="0" max="1" step="0.1" value="0" aria-label="Playback position">
             <div class="now-playing-times"><time id="now-elapsed">0:00</time><time id="now-duration">0:00</time></div>

@@ -31,6 +31,7 @@ namespace ToolDriveOffline
         private Icon selectedIcon;
 
         internal Action<object> TransportChanged;
+        internal Action<object> VisualizerChanged;
 
         internal ArchiveWindow(Catalog initialCatalog, string warning)
         {
@@ -207,6 +208,9 @@ namespace ToolDriveOffline
                         break;
                     case "iplexTransport":
                         if (TransportChanged != null) TransportChanged(body);
+                        break;
+                    case "iplexVisualizer":
+                        if (VisualizerChanged != null) VisualizerChanged(body);
                         break;
                     case "updates":
                         if (body as string == "app") UpdateState("app", "Check for updates in iPlex Settings.", "Check now", false, false);

@@ -38,20 +38,28 @@
     window.macPlayerState = state => {
       updateArchivePlayer?.(state);
       if (!state) return;
-      const {visible, status, title, context, message, elapsed, duration, canPrevious, canNext} = state;
+      const {visible, status, title, context, message, elapsed, duration, canPrevious, canNext, tracks, trackIndex, volume, revision} = state;
       window.toolWindows.send('iplexTransport', {
-        visible, status, title, context, message, elapsed, duration, canPrevious, canNext,
+        visible, status, title, context, message, elapsed, duration, canPrevious, canNext, tracks, trackIndex, volume, revision,
         canToggle: Array.isArray(state.tracks) && state.tracks.length > 0 &&
-          !['loading', 'resolving', 'error'].includes(status)
+          !['loading', 'resolving'].includes(status)
       });
+    };
+    const archiveLevels = window.macVisualizerLevels;
+    window.macVisualizerLevels = levels => {
+      archiveLevels?.(levels);
+      window.toolWindows.send('iplexVisualizer', levels);
     };
     window.iplexArchiveTransport = request => {
       switch (request.action) {
-        case 'toggle': case 'previous': case 'next': case 'seek': case 'close':
+        case 'toggle': case 'previous': case 'next': case 'seek': case 'playTrack': case 'volume': case 'close':
           window.windowsPlayback?.action(request);
           break;
-        case 'eq': case 'visualizer': case 'tracklist':
-          document.getElementById('mac-player-' + request.action)?.click();
+        case 'eq':
+          window.windowsPlayback?.eq(request.values);
+          break;
+        case 'visualizer':
+          window.windowsPlayback?.visualize({action:request.enabled ? 'listen' : 'idle', host:true});
           break;
       }
     };

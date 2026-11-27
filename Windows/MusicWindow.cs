@@ -295,6 +295,7 @@ namespace MusicRoom
                 var catalog = ToolDriveOffline.CatalogCache.Load(out warning);
                 toolDrive = new ToolDriveOffline.ArchiveWindow(catalog, warning);
                 toolDrive.TransportChanged = state => Emit("toolDriveTransport", state);
+                toolDrive.VisualizerChanged = levels => Emit("toolDriveVisualizer", levels);
                 Controls.Add(toolDrive);
             }
             object appearance;

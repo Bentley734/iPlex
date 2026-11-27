@@ -62,7 +62,7 @@ private struct MusicLibraryScreen: View {
                 .disabled(showPlayer || showMiniPlayer)
                 #endif
             if showPlayer {
-                NowPlayingView(library: library) { showPlayer = false }
+                NowPlayingView(library: library, archive: library.toolDriveSelected ? archiveTransport : nil) { showPlayer = false }
                     .modifier(NowPlayingPopTransition())
             }
             if showMiniPlayer {
@@ -162,7 +162,10 @@ private struct MusicLibraryScreen: View {
                 }
                 if library.toolDriveSelected, let title = archiveTransport.title {
                     playbackBar(title: title, detail: archiveTransport.context, isArchive: true,
-                                open: archiveTransport.showNowPlaying) {
+                                open: {
+                                    archiveTransport.setPlaybackVolume(library.playbackVolume)
+                                    showPlayer = true
+                                }) {
                         Image(systemName: "waveform").foregroundStyle(accent)
                     }
                 } else if !library.toolDriveSelected, let album = library.playingAlbum {
