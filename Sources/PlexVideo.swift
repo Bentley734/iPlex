@@ -25,6 +25,10 @@ struct PlexVideoItem: Identifiable, Equatable, Codable {
     let subtitle: String
     let summary: String
     let thumb: String?
+    var duration: Double? = nil
+    var viewOffset: Double? = nil
+    var played: Bool? = nil
+    var seriesTitle: String? = nil
 }
 
 struct PlexVideoSnapshot: Codable {
@@ -132,6 +136,9 @@ struct PlexVideoBrowser: View {
     let retryConnection: () -> Void
     let pauseMusic: () -> Void
     let sectionName: String
+    let searchResult: PlexVideoItem?
+    let searchRequest: UUID?
+    let onCredit: ((PlexVideoCredit) -> Void)?
 
     @MusicAppearance private var theme
     @State private var snapshot: PlexVideoSnapshot?
@@ -159,7 +166,8 @@ struct PlexVideoBrowser: View {
 
     init(kind: PlexVideoKind, server: String, service: PlexService, serverReady: Bool,
          connectionError: String?, retryConnection: @escaping () -> Void, pauseMusic: @escaping () -> Void,
-         sectionName: String? = nil) {
+         sectionName: String? = nil, searchResult: PlexVideoItem? = nil,
+         searchRequest: UUID? = nil, onCredit: ((PlexVideoCredit) -> Void)? = nil) {
         self.kind = kind
         self.server = server
         self.service = service
@@ -168,6 +176,9 @@ struct PlexVideoBrowser: View {
         self.retryConnection = retryConnection
         self.pauseMusic = pauseMusic
         self.sectionName = sectionName ?? kind.title
+        self.searchResult = searchResult
+        self.searchRequest = searchRequest
+        self.onCredit = onCredit
         let saved = PlexVideoSnapshot.restore(kind: kind, server: server)
         _snapshot = State(initialValue: saved)
         _libraries = State(initialValue: saved.map { [$0.library] } ?? [])
@@ -234,6 +245,12 @@ struct PlexVideoBrowser: View {
             refreshWatchState()
             if ready { await load(offset: 0, generation: current) }
         }
+        .task(id: [String(ready), searchRequest?.uuidString ?? ""]) {
+            guard ready, let searchResult else { return }
+            closeDetails()
+            if searchResult.type == "episode" { episodeDetail = searchResult }
+            else { detail = searchResult }
+        }
         .onChange(of: selection) { _, value in
             if !value.isEmpty { UserDefaults.standard.set(value, forKey: preference) }
             trail = []
@@ -270,7 +287,7 @@ struct PlexVideoBrowser: View {
             }
         }, episodes: {
             if item.type == "show" { showNavigation }
-        })
+        }, onCredit: onCredit)
         .id(item.id)
     }
 
@@ -325,6 +342,8 @@ struct PlexVideoBrowser: View {
 
     private var showNavigation: some View {
         VStack(alignment: .leading, spacing: 14) {
+            let rows = items.filter { $0.type == (episodes ? "episode" : "season") }
+            let nextEpisode = episodes ? rows.first(where: { !episodeWatched($0) })?.id : nil
             if episodes {
                 Button("All Seasons", systemImage: "chevron.backward") { trail.removeLast() }
                     .buttonStyle(.bordered)
@@ -333,7 +352,7 @@ struct PlexVideoBrowser: View {
                 Text("Seasons").font(.title2.bold()).accessibilityAddTraits(.isHeader)
             }
             LazyVStack(alignment: .leading, spacing: 10) {
-                ForEach(items.filter { $0.type == (episodes ? "episode" : "season") }) { item in
+                ForEach(rows) { item in
                     Button {
                         if episodes { episodeDetail = item }
                         else { trail.append(item) }
@@ -342,12 +361,26 @@ struct PlexVideoBrowser: View {
                             poster(item).frame(width: 100, height: 62)
                             VStack(alignment: .leading, spacing: 4) {
                                 labels(item)
-                                if episodes, let position = resumePosition(for: item) {
-                                    Text("Resume at " + videoTime(position)).font(.caption).foregroundStyle(.secondary)
+                                if episodes {
+                                    if episodeWatched(item) {
+                                        Label("Watched", systemImage: "checkmark").font(.caption).foregroundStyle(.secondary)
+                                    } else {
+                                        if item.id == nextEpisode {
+                                            Text("Next Unwatched").font(.caption.bold()).foregroundStyle(theme.accent)
+                                        }
+                                        if let position = resumePosition(for: item) {
+                                            Text("Resume at " + videoTime(position)).font(.caption).foregroundStyle(.secondary)
+                                            if let duration = item.duration, duration > 0 {
+                                                ProgressView(value: min(1, position / duration))
+                                                    .frame(maxWidth: 180)
+                                                    .accessibilityLabel("Episode progress")
+                                            }
+                                        }
+                                    }
                                 }
                             }
                             Spacer()
-                            Image(systemName: episodes && watchedItems.contains(item.id)
+                            Image(systemName: episodes && episodeWatched(item)
                                   ? "checkmark.circle.fill" : "chevron.forward")
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -506,9 +539,14 @@ struct PlexVideoBrowser: View {
 
     @ViewBuilder
     private func watchActions(_ item: PlexVideoItem) -> some View {
-        if watchedItems.contains(item.id) {
+        if episodeWatched(item) {
             Button("Mark Unwatched", systemImage: "eye.slash") {
-                VideoWatchStore.shared.clear(server: server, library: selection, id: item.id)
+                if item.played == true {
+                    VideoWatchStore.shared.update(server: server, library: selection, item: item, seconds: 0,
+                                                  watched: false, explicitlyUnwatched: true)
+                } else {
+                    VideoWatchStore.shared.clear(server: server, library: selection, id: item.id)
+                }
                 refreshWatchState()
             }
         } else {
@@ -525,9 +563,19 @@ struct PlexVideoBrowser: View {
         }
     }
 
+    private func episodeWatched(_ item: PlexVideoItem) -> Bool {
+        if watchedItems.contains(item.id) { return true }
+        guard item.played == true else { return false }
+        let saved = VideoWatchStore.shared.record(server: server, library: selection, id: item.id)
+        return saved?.explicitlyUnwatched != true && saved?.canResume != true
+    }
+
     private func resumePosition(for item: PlexVideoItem) -> Double? {
-        let record = VideoWatchStore.shared.record(server: server, library: selection, id: item.id)
-        return record?.canResume == true ? record?.seconds : nil
+        if episodeWatched(item) { return nil }
+        if let local = VideoWatchStore.shared.record(server: server, library: selection, id: item.id) {
+            return local.canResume ? local.seconds : nil
+        }
+        return item.viewOffset.flatMap { $0 >= 5 ? $0 : nil }
     }
 
     private func refreshWatchState() {
@@ -1051,7 +1099,11 @@ private struct PlexVideoPlayback: View {
         if !hasPrepared {
             hasPrepared = true
             let record = VideoWatchStore.shared.record(server: server, library: section, id: item.id)
-            lastSaved = record?.canResume == true ? record?.seconds ?? 0 : 0
+            if let record {
+                lastSaved = record.canResume ? record.seconds : 0
+            } else {
+                lastSaved = item.played == true ? 0 : item.viewOffset ?? 0
+            }
             resumeAt = CMTime(seconds: lastSaved, preferredTimescale: 1_000)
         }
         player.pause()

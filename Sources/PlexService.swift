@@ -2112,12 +2112,12 @@ extension PlexParser {
         }
         let directors = tags("Director", limit: 8).compactMap { credit -> PlexVideoCredit? in
             guard let name = string(credit["tag"], maximum: 150) else { return nil }
-            return PlexVideoCredit(name: name, role: "Director", photo: creditPhoto(credit["thumb"] as? String))
+            return PlexVideoCredit(name: name, role: "Director", photo: creditPhoto(credit["thumb"] as? String), id: numericIdentifier(credit["id"]))
         }
         let cast = tags("Role", limit: 24).compactMap { credit -> PlexVideoCredit? in
             guard let name = string(credit["tag"], maximum: 150) else { return nil }
             return PlexVideoCredit(name: name, role: string(credit["role"], maximum: 180) ?? "",
-                                   photo: creditPhoto(credit["thumb"] as? String))
+                                   photo: creditPhoto(credit["thumb"] as? String), id: numericIdentifier(credit["id"]))
         }
         let formats = tags("Media", limit: 8).compactMap { media -> String? in
             let resolution = string(media["videoResolution"], maximum: 12) ?? ""
@@ -2188,7 +2188,11 @@ extension PlexParser {
         let subtitle = expected == "episode" ? index.map { "Episode \($0)" } ?? "" : year
         return PlexVideoItem(id: id, type: expected, title: title, subtitle: subtitle,
                              summary: string(row["summary"], maximum: 4_000) ?? "",
-                             thumb: musicArtworkPath(row["thumb"] as? String))
+                             thumb: musicArtworkPath(row["thumb"] as? String),
+                             duration: integer(row["duration"]).flatMap { $0 > 0 ? Double($0) / 1000 : nil },
+                             viewOffset: integer(row["viewOffset"]).flatMap { $0 > 0 ? Double($0) / 1000 : nil },
+                             played: integer(row["viewCount"]).map { $0 > 0 },
+                             seriesTitle: expected == "episode" ? string(row["grandparentTitle"], maximum: 300) : nil)
     }
 
     static func episodePage(_ data: Data, section: String, showID: String) throws -> PlexEpisodePage {
@@ -2273,18 +2277,22 @@ extension PlexService {
     }
 
     func videoPage(server: String, kind: PlexVideoKind, section: String, parent: PlexVideoItem?,
-                   query: String, offset: Int, size: Int = 60) async throws -> PlexVideoPage {
+                   query: String, offset: Int, size: Int = 60, searchEpisodes: Bool = false,
+                   credit: PlexVideoCredit? = nil) async throws -> PlexVideoPage {
         try await serverOperation(server: server) { record, base, operation in
             let path = parent.map { "/library/metadata/\($0.id)/children" } ?? "/library/sections/\(section)/all"
             var filters: [URLQueryItem] = []
             if parent == nil {
-                filters.append(.init(name: "type", value: kind.plexType))
+                filters.append(.init(name: "type", value: searchEpisodes ? "4" : kind.plexType))
+                if let credit, let id = credit.id {
+                    filters.append(.init(name: credit.role == "Director" ? "director" : "actor", value: id))
+                }
                 if !query.isEmpty { filters.append(.init(name: "title", value: String(query.prefix(120)))) }
             }
             var request = try self.serverRequest(base: base, path: path, query: filters, token: record.token)
             request.setValue(String(offset), forHTTPHeaderField: "X-Plex-Container-Start")
             request.setValue(String(size), forHTTPHeaderField: "X-Plex-Container-Size")
-            let expected = parent.map { $0.type == "show" ? "season" : "episode" } ?? kind.rawValue
+            let expected = parent.map { $0.type == "show" ? "season" : "episode" } ?? (searchEpisodes ? "episode" : kind.rawValue)
             return try PlexParser.videoPage(operation.fetch(request, limit: 8 * 1024 * 1024),
                                             section: section, expected: expected, parent: parent?.id,
                                             offset: offset, size: size)

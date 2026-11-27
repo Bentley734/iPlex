@@ -4,6 +4,7 @@ struct PlexVideoCredit {
     let name: String
     let role: String
     let photo: String?
+    var id: String? = nil
 }
 
 struct PlexVideoDetails {
@@ -33,12 +34,13 @@ struct VideoDetailsPage<Actions: View, Episodes: View>: View {
     @ViewBuilder let episodes: () -> Episodes
 
     @MusicAppearance private var theme
-    @ObservedObject private var wallpaper = GlassWallpaper.shared
     @ObservedObject private var downloads = MediaDownloads.shared
+    @ObservedObject private var wallpaper = GlassWallpaper.shared
     @State private var requestedDownload = false
     @State private var details: PlexVideoDetails?
     @State private var loadError = false
     @State private var retry = 0
+    var onCredit: ((PlexVideoCredit) -> Void)?
 
     private var isEpisode: Bool { item.type == "episode" }
 
@@ -190,7 +192,7 @@ struct VideoDetailsPage<Actions: View, Episodes: View>: View {
                 download()
             }
             .buttonStyle(.bordered)
-            .disabled(!ready || downloads.busy)
+            .disabled(!ready)
         }
         Menu(isEpisode ? "Episode Actions" : item.type == "show" ? "Show Actions" : "Movie Actions", systemImage: "ellipsis.circle", content: actions)
             .disabled(!ready)
@@ -210,20 +212,29 @@ struct VideoDetailsPage<Actions: View, Episodes: View>: View {
         ScrollView(.horizontal) {
             HStack(alignment: .top, spacing: 12) {
                 ForEach(Array(credits.enumerated()), id: \.offset) { _, credit in
-                    VStack(alignment: .leading, spacing: 6) {
-                        creditPortrait(credit)
-                            .frame(width: 64, height: 64)
-                            .clipShape(.rect(cornerRadius: 12))
-                            .accessibilityHidden(true)
-                        Text(credit.name).font(.callout.weight(.semibold)).lineLimit(2)
-                        if !credit.role.isEmpty {
-                            Text(credit.role).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                        }
+                    if credit.id != nil, let onCredit {
+                        Button { onCredit(credit) } label: { creditCard(credit) }
+                            .buttonStyle(.plain)
+                    } else {
+                        creditCard(credit)
                     }
-                    .frame(width: 112, alignment: .leading)
                 }
             }
         }
+    }
+
+    private func creditCard(_ credit: PlexVideoCredit) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            creditPortrait(credit)
+                .frame(width: 64, height: 64)
+                .clipShape(.rect(cornerRadius: 12))
+                .accessibilityHidden(true)
+            Text(credit.name).font(.callout.weight(.semibold)).lineLimit(2)
+            if !credit.role.isEmpty {
+                Text(credit.role).font(.caption).foregroundStyle(.secondary).lineLimit(2)
+            }
+        }
+        .frame(width: 112, alignment: .leading)
     }
 
     @ViewBuilder private func creditPortrait(_ credit: PlexVideoCredit) -> some View {

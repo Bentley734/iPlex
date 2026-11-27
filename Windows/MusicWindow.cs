@@ -22,6 +22,7 @@ namespace MusicRoom
         Icon dockIcon;
         ToolDriveOffline.ArchiveWindow toolDrive;
         Rectangle? toolDriveBounds;
+        long pendingToolDriveRecording;
         int toolDriveEntry, presentedToolDriveEntry = -1;
         object toolDriveMotion;
         bool preparingToolDrive;
@@ -228,6 +229,15 @@ namespace MusicRoom
                     if (toolDrive != null && !toolDrive.IsDisposed) toolDrive.TransportAction(
                         WindowsMediaService.Map(request["command"]));
                 }
+                else if (action == "openToolDriveRecording")
+                {
+                    pendingToolDriveRecording = WindowsMediaService.Num(request, "recording");
+                    if (toolDrive != null && toolDrive.IsPageReady && pendingToolDriveRecording > 0)
+                    {
+                        toolDrive.OpenRecording(pendingToolDriveRecording);
+                        pendingToolDriveRecording = 0;
+                    }
+                }
                 else if (action == "offlineVideo") OpenOfflineVideo(WindowsMediaService.Str(request, "media"),
                     WindowsMediaService.Str(request, "title"));
                 else if (action == "videoDisplay")
@@ -264,9 +274,26 @@ namespace MusicRoom
             if (uri == null || nativeVideo != null) return;
             try
             {
+                bool finished = false;
                 nativeVideo = new NativeVideoWindow(uri, title.Length <= 200 ? title : title.Substring(0, 200),
-                    0, false, false, false, (result, seconds) => {
-                        if (result != "progress") nativeVideo = null;
+                    media.OfflinePosition(id), false, false, false, (result, seconds) => {
+                        if (result == "ended")
+                        {
+                            finished = true;
+                            media.RememberOfflinePosition(id, 0, true);
+                        }
+                        else if (result == "progress")
+                        {
+                            finished = false;
+                            media.RememberOfflinePosition(id, seconds, false);
+                        }
+                        else
+                        {
+                            if (!finished && result != "failed" && seconds >= 5)
+                                media.RememberOfflinePosition(id, seconds, false);
+                            nativeVideo = null;
+                            media.RefreshOffline();
+                        }
                         if (result == "failed") Emit("offlineError", "This download could not be opened.");
                     });
                 nativeVideo.Show(this);
@@ -353,6 +380,11 @@ namespace MusicRoom
             toolDrive.Bounds = toolDriveBounds.Value;
             toolDrive.BringToFront();
             toolDrive.Show();
+            if (pendingToolDriveRecording > 0)
+            {
+                toolDrive.OpenRecording(pendingToolDriveRecording);
+                pendingToolDriveRecording = 0;
+            }
             Emit("toolDrivePageReady", true);
         }
 

@@ -1,4 +1,5 @@
 import Combine
+import Foundation
 
 @MainActor
 public final class ToolDriveTransport: ObservableObject {
@@ -7,6 +8,17 @@ public final class ToolDriveTransport: ObservableObject {
     private var playbackChanges: AnyCancellable?
 
     public init() {}
+
+    @Published var requestedRecording: Int?
+
+    public func searchRecordings(_ term: String) -> [(id: Int, venue: String, date: String)] {
+        Array(catalog.shows.lazy.filter { show in
+            ([show.date, show.venue, show.location] + show.songs)
+                .joined(separator: " ").localizedCaseInsensitiveContains(term)
+        }.prefix(12).map { ($0.id, $0.venue, $0.date) })
+    }
+
+    public func openRecording(_ id: Int) { requestedRecording = id }
 
     public func prepareCatalog() async { await catalog.load() }
 
@@ -17,7 +29,7 @@ public final class ToolDriveTransport: ObservableObject {
 
     public var context: String {
         guard let player else { return "" }
-        return player.errorMessage ?? (player.context.isEmpty ? player.collection : player.context)
+        return message.isEmpty ? (player.context.isEmpty ? player.collection : player.context) : message
     }
 
     func attach(_ player: AudioPlayer) {
@@ -33,7 +45,14 @@ public final class ToolDriveTransport: ObservableObject {
         objectWillChange.send()
     }
 
-    public var message: String { player?.errorMessage ?? "" }
+    public var message: String {
+        if let error = player?.errorMessage { return error }
+        switch player?.phase {
+        case .resolving: return "Connecting to recording…"
+        case .buffering: return "Buffering…"
+        default: return ""
+        }
+    }
     public var canToggle: Bool { player?.canToggle == true }
     public var playing: Bool { player?.isPlaying == true }
     public var elapsed: Double { player?.elapsed ?? 0 }

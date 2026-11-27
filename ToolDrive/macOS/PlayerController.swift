@@ -523,18 +523,22 @@ final class PlayerController {
         observeActiveItem(item)
         status = autoplay ? "buffering" : "ready"
         userWantsPlayback = autoplay
-        if plexPlayback && autoplay {
-            let timeout = DispatchWorkItem { [weak self, weak item] in
-                guard let self, self.activeItem === item, self.player.timeControlStatus != .playing else { return }
-                self.handlePlaybackFailure(nil)
-            }
-            startupWork = timeout
-            DispatchQueue.main.asyncAfter(deadline: .now() + 4, execute: timeout)
-        }
+        schedulePlexWatchdog()
         lastNowPlayingSecond = -1
         emitState()
         updateNowPlaying()
         updateRemoteAvailability()
+    }
+
+    private func schedulePlexWatchdog() {
+        guard plexPlayback, userWantsPlayback, startupWork == nil, let item = activeItem else { return }
+        let timeout = DispatchWorkItem { [weak self, weak item] in
+            guard let self, let item, self.activeItem === item else { return }
+            self.startupWork = nil
+            if self.player.timeControlStatus != .playing { self.handlePlaybackFailure(nil) }
+        }
+        startupWork = timeout
+        DispatchQueue.main.asyncAfter(deadline: .now() + 4, execute: timeout)
     }
 
     private func observeActiveItem(_ item: AVPlayerItem) {
@@ -588,6 +592,7 @@ final class PlayerController {
             if healthySince == nil { healthySince = Date() }
         case .waitingToPlayAtSpecifiedRate:
             status = "buffering"
+            schedulePlexWatchdog()
         case .paused:
             if status != "failed" && status != "finished" {
                 status = player.currentItem == nil ? "idle" : preparingAudioMix && userWantsPlayback ? "buffering" : "paused"

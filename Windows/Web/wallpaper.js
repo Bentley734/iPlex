@@ -17,11 +17,66 @@
   const gradientMotion = get('motion');
   const gradientSpeed = get('speed');
   const gradientDurations = {slow:48, normal:30, fast:16};
+  const dimming = get('dimming');
+  const palette = get('palette');
+  const paletteName = get('name');
+  const paletteKey = 'musicroom-glass-gradient-palettes';
+  const builtIn = [
+    ['Ocean', ['#253e7d', '#167f87', '#732e72']],
+    ['Sunset', ['#55264f', '#a74447', '#e18043']],
+    ['Evergreen', ['#173743', '#287657', '#7c8f49']],
+    ['Midnight', ['#101739', '#364488', '#5e3f7a']]
+  ];
+  let savedPalettes = [];
+  try {
+    const entries = JSON.parse(localStorage.getItem(paletteKey));
+    if (Array.isArray(entries)) savedPalettes = entries.filter(entry =>
+      Array.isArray(entry) && typeof entry[0] === 'string' && Array.isArray(entry[1]) &&
+      entry[1].length === 3 && entry[1].every(color => /^#[a-f0-9]{6}$/i.test(color)));
+  } catch {}
+
+  function renderPalettes(value = '') {
+    palette.replaceChildren(new Option('Custom Colors', ''));
+    builtIn.forEach(([name], index) => palette.add(new Option(name, 'preset-' + index)));
+    savedPalettes.forEach(([name], index) => palette.add(new Option(name, 'saved-' + index)));
+    palette.value = value;
+    get('remove').hidden = !value.startsWith('saved-');
+  }
+
+  function storePalettes(value) {
+    try { localStorage.setItem(paletteKey, JSON.stringify(savedPalettes)); } catch {}
+    renderPalettes(value);
+  }
+
+  palette.addEventListener('change', () => {
+    const [category, index] = palette.value.split('-');
+    const entry = (category === 'saved' ? savedPalettes : builtIn)[index];
+    if (entry) {
+      entry[1].forEach((color, index) => { gradientColors[index].value = color; });
+      saveGradient();
+    }
+    get('remove').hidden = category !== 'saved';
+  });
+  get('save').addEventListener('click', () => {
+    const name = paletteName.value.trim();
+    if (!name) return;
+    savedPalettes = savedPalettes.filter(([existing]) => existing.toLowerCase() !== name.toLowerCase());
+    savedPalettes.push([name, gradientColors.map(input => input.value)]);
+    storePalettes('saved-' + (savedPalettes.length - 1));
+    paletteName.value = '';
+  });
+  get('remove').addEventListener('click', () => {
+    if (!palette.value.startsWith('saved-')) return;
+    savedPalettes.splice(Number(palette.value.slice(6)), 1);
+    storePalettes('');
+  });
+  renderPalettes();
   try {
     const saved = JSON.parse(localStorage.getItem(gradientKey));
     gradientColors.forEach((input, index) => {
       if (/^#[a-f0-9]{6}$/i.test(saved?.colors?.[index])) input.value = saved.colors[index];
     });
+    if (Number.isFinite(saved?.dimming)) dimming.value = saved.dimming;
     if ([...gradientMotion.options].some(option => option.value === saved?.motion)) gradientMotion.value = saved.motion;
     if ([...gradientSpeed.options].some(option => option.value === saved?.speed)) gradientSpeed.value = saved.speed;
   } catch {}
@@ -33,19 +88,25 @@
     root.toggleAttribute('data-animated-gradient', active);
     root.dataset.gradientMotion = gradientMotion.value;
     gradientColors.forEach((input, index) => root.style.setProperty('--gradient-color-' + (index+1), input.value));
+    root.style.setProperty('--gradient-dimming', String(Number(dimming.value)));
+    get('dimming-value').value = Math.round(Number(dimming.value) * 100) + '%';
     root.style.setProperty('--gradient-duration', gradientDurations[gradientSpeed.value] + 's');
   }
 
   function saveGradient() {
     try {
       localStorage.setItem(gradientKey, JSON.stringify({
-        colors:gradientColors.map(input => input.value), motion:gradientMotion.value, speed:gradientSpeed.value
+        colors:gradientColors.map(input => input.value), motion:gradientMotion.value, speed:gradientSpeed.value, dimming:Number(dimming.value)
       }));
     } catch {}
     renderGradient();
   }
 
-  gradientColors.forEach(input => input.addEventListener('input', saveGradient));
+  gradientColors.forEach(input => input.addEventListener('input', () => {
+    renderPalettes();
+    saveGradient();
+  }));
+  dimming.addEventListener('input', saveGradient);
   gradientMotion.addEventListener('change', saveGradient);
   gradientSpeed.addEventListener('change', saveGradient);
 

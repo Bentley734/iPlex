@@ -44,6 +44,7 @@
       <nav aria-label="Offline Library"><button id="downloads" aria-pressed="false">Downloads</button></nav>
     </div>
     <div class="sidebar-controls">
+      <button id="global-search" type="button">Search iPlex</button>
       <button id="settings" type="button">Settings</button>
     </div>
   </aside>
@@ -60,6 +61,8 @@
       </header>
       <div class="content">
         <p id="downloads-status" role="status"></p>
+        <progress id="downloads-progress" max="1" aria-label="Download progress" hidden></progress>
+        <div id="downloads-queue"></div>
         <button id="downloads-cancel" type="button" hidden>Cancel Download</button>
         <p id="downloads-empty">Use Download in the item’s menu. Tool Drive recordings are in its Library.</p>
         <div id="downloads-items"></div>
@@ -162,6 +165,15 @@
       </article>
     </section>
   </main>
+  <dialog id="global-search-dialog" class="playback-sheet" aria-labelledby="global-search-heading">
+    <header>
+      <h2 id="global-search-heading">Search iPlex</h2>
+      <button id="global-search-close" type="button">Done</button>
+    </header>
+    <input id="global-search-input" type="search" aria-label="Search your libraries" placeholder="Search your libraries">
+    <p id="global-search-status" role="status"></p>
+    <div id="global-search-results"></div>
+  </dialog>
   <dialog id="remove-download" aria-labelledby="remove-download-title">
     <h2 id="remove-download-title">Remove Download?</h2>
     <p id="remove-download-name"></p>
@@ -417,6 +429,17 @@
       <fieldset id="glass-gradient-settings" hidden>
         <legend>Customize Gradient</legend>
         <div id="glass-gradient-preview" aria-hidden="true"></div>
+        <label>Gradient Palettes
+          <select id="glass-gradient-palette"></select>
+        </label>
+        <div>
+          <input id="glass-gradient-name" type="text" placeholder="Palette name" aria-label="Palette name">
+          <button id="glass-gradient-save" type="button">Save Palette</button>
+          <button id="glass-gradient-remove" type="button" hidden>Remove Palette</button>
+        </div>
+        <label>Dimming <input id="glass-gradient-dimming" type="range" min="0" max="0.8" step="0.01" value="0.38">
+          <output id="glass-gradient-dimming-value" for="glass-gradient-dimming">38%</output>
+        </label>
         <div class="gradient-colors">
           <label>Color 1 <input id="glass-gradient-first" type="color" value="#253e7d"></label>
           <label>Color 2 <input id="glass-gradient-second" type="color" value="#167f87"></label>

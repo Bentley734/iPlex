@@ -27,6 +27,8 @@ private struct MusicLibraryScreen: View {
     @AppStorage(LiquidGlassTint.preferenceKey) private var glassTint = LiquidGlassTint.themeDefault
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @State private var showSettings = false
+    @State private var showGlobalSearch = false
+    @State private var searchSelection: (() -> Void)?
     @AppStorage(LibraryLayout.preferenceKey) private var libraryLayout = LibraryLayout.grid
     @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
@@ -77,6 +79,16 @@ private struct MusicLibraryScreen: View {
         #if os(iOS)
         .statusBarHidden(showMiniPlayer)
         #endif
+        .sheet(isPresented: $showGlobalSearch, onDismiss: {
+            library.selectedCredit = nil
+            let selection = searchSelection
+            searchSelection = nil
+            selection?()
+        }) {
+            GlobalLibrarySearch(library: library, archive: archiveTransport, credit: library.selectedCredit,
+                                select: { searchSelection = $0 },
+                                openVideo: { library.openVideoSearchResult($0, item: $1) })
+        }
         .sheet(isPresented: $showSettings) { MusicSettings(library: library) }
         .sheet(item: $library.playlistEdit) { edit in PlexPlaylistEditor(library: library, edit: edit) }
         .sheet(isPresented: $showAppIcons) { MusicAppIconPicker() }
@@ -101,6 +113,9 @@ private struct MusicLibraryScreen: View {
                 SectionHeaderBrand(section: library.activeSection,
                                    theme: theme, width: columnWidth, height: 56)
                 Spacer()
+                Button { showGlobalSearch = true } label: { Image(systemName: "magnifyingglass") }
+                    .accessibilityLabel("Search iPlex")
+                    .glassHover()
                 Button { showAppIcons = true } label: { Image(systemName: "app.dashed") }
                     .accessibilityLabel("App Icon")
                     .glassHover()
@@ -145,7 +160,10 @@ private struct MusicLibraryScreen: View {
                     PlexVideoBrowser(kind: videoSection, server: library.serverID, service: library.service,
                                      serverReady: library.videoServerReady, connectionError: library.busy ? nil : library.message,
                                      retryConnection: library.retryLibrary, pauseMusic: library.player.pause,
-                                     sectionName: library.sectionName(HeaderBrandSection(video: videoSection)))
+                                     sectionName: library.sectionName(HeaderBrandSection(video: videoSection)),
+                                 searchResult: library.selectedVideoSearchResult,
+                                 searchRequest: library.videoSearchRequest,
+                                 onCredit: { library.selectedCredit = $0; showGlobalSearch = true })
                         .id(library.serverID + videoSection.rawValue)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .musicGlass(theme, radius: 22)

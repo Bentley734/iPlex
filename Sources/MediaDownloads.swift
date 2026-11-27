@@ -22,7 +22,17 @@ struct OfflineMedia: Codable, Identifiable {
     let added: Date
 }
 
-private final class MediaDownloadSession: NSObject, URLSessionTaskDelegate {
+private final class MediaDownloadSession: NSObject, URLSessionDownloadDelegate {
+    var progress: (@Sendable (Double) -> Void)?
+
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {}
+
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64,
+                    totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        guard totalBytesExpectedToWrite > 0 else { return }
+        progress?(min(1, Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)))
+    }
+
     func urlSession(_ session: URLSession, task: URLSessionTask, willPerformHTTPRedirection response: HTTPURLResponse,
                     newRequest request: URLRequest, completionHandler: @escaping (URLRequest?) -> Void) {
         // Plex playback URLs contain credentials. Never forward them to a redirect target.
@@ -35,7 +45,19 @@ final class MediaDownloads: ObservableObject {
     static let shared = MediaDownloads()
     @Published private(set) var items = [OfflineMedia]()
     @Published private(set) var status = ""
-    @Published private(set) var busy = false
+    struct Job: Identifiable {
+        let id = UUID()
+        let title: String
+        let detail: String
+        let kind: OfflineMedia.Kind
+        let resolve: @MainActor () async throws -> [Source]
+        var error: String?
+    }
+
+    @Published private(set) var active: Job?
+    @Published private(set) var pending: [Job] = []
+    @Published private(set) var failed: [Job] = []
+    @Published private(set) var progress: Double?
     private let directory: URL
     private var transfer: Task<Void, Never>?
     private let session: URLSession
@@ -81,19 +103,38 @@ final class MediaDownloads: ObservableObject {
 
     func start(title: String, detail: String, kind: OfflineMedia.Kind,
                resolve: @escaping @MainActor () async throws -> [Source]) {
-        guard transfer == nil else { return }
-        busy = true
+        pending.append(Job(title: title, detail: detail, kind: kind, resolve: resolve))
+        startNext()
+    }
+
+    func retry(_ job: Job) {
+        failed.removeAll { $0.id == job.id }
+        start(title: job.title, detail: job.detail, kind: job.kind, resolve: job.resolve)
+    }
+
+    func dismissJob(_ job: Job) {
+        pending.removeAll { $0.id == job.id }
+        failed.removeAll { $0.id == job.id }
+    }
+
+    private func startNext() {
+        guard transfer == nil, !pending.isEmpty else { return }
+        let job = pending.removeFirst()
+        let (id, title) = (job.id, job.title)
+        active = job
+        progress = nil
         status = "Preparing \(title)…"
-        let id = UUID()
         let staging = directory.appending(path: ".\(id.uuidString).partial", directoryHint: .isDirectory)
         transfer = Task {
             defer {
                 try? FileManager.default.removeItem(at: staging)
-                busy = false
+                active = nil
+                progress = nil
                 transfer = nil
+                startNext()
             }
             do {
-                let sources = try await resolve()
+                let sources = try await job.resolve()
                 guard !sources.isEmpty else { throw UpdateError("No downloadable media was found.") }
                 try Task.checkCancellation()
                 try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
@@ -104,7 +145,17 @@ final class MediaDownloads: ObservableObject {
                     let suffix = try Self.fileSuffix(source)
                     let name = "\(index + 1).\(suffix)"
                     let endpoint = try Self.downloadRequest(source.url)
-                    let (temporary, response) = try await session.download(for: endpoint)
+                    let observer = MediaDownloadSession()
+                    observer.progress = { [weak self] fraction in
+                        let value = (Double(index) + fraction) / Double(sources.count)
+                        Task { @MainActor [weak self] in
+                            guard let self, self.active?.id == id else { return }
+                            if self.progress == nil || value - (self.progress ?? 0) >= 0.01 || value == 1 {
+                                self.progress = value
+                            }
+                        }
+                    }
+                    let (temporary, response) = try await session.download(for: endpoint, delegate: observer)
                     defer { try? FileManager.default.removeItem(at: temporary) }
                     try Task.checkCancellation()
                     guard let response = response as? HTTPURLResponse, response.statusCode == 200,
@@ -115,13 +166,21 @@ final class MediaDownloads: ObservableObject {
                     try FileManager.default.moveItem(at: temporary, to: staging.appending(path: name))
                     files.append(.init(name: name, title: source.title, duration: source.duration))
                 }
-                let item = OfflineMedia(id: id, kind: kind, title: title, detail: detail, files: files, added: .now)
+                let item = OfflineMedia(id: id, kind: job.kind, title: title, detail: job.detail, files: files, added: .now)
                 try JSONEncoder().encode(item).write(to: staging.appending(path: "media.json"), options: .atomic)
                 try FileManager.default.moveItem(at: staging, to: folder(id))
                 items.insert(item, at: 0)
                 status = "Saved \(title)."
             } catch {
-                status = Task.isCancelled ? "Download canceled." : "Could not download \(title). Check your Plex connection and available storage."
+                if Task.isCancelled {
+                    status = "Download canceled."
+                } else {
+                    var entry = job
+                    entry.error = (error as? UpdateError)?.localizedDescription
+                        ?? "Check your Plex connection and available storage."
+                    failed.append(entry)
+                    status = "Could not download \(title)."
+                }
             }
         }
     }
@@ -130,9 +189,21 @@ final class MediaDownloads: ObservableObject {
         do {
             try FileManager.default.removeItem(at: folder(item.id))
             items.removeAll { $0.id == item.id }
+            UserDefaults.standard.removeObject(forKey: Self.positionKey(item.id))
         } catch {
             status = "Could not remove \(item.title)."
         }
+    }
+
+    private static func positionKey(_ id: UUID) -> String { "OfflineVideoPosition." + id.uuidString }
+
+    func position(for item: OfflineMedia) -> Double {
+        UserDefaults.standard.double(forKey: Self.positionKey(item.id))
+    }
+
+    func rememberPosition(_ seconds: Double, finished: Bool, for item: OfflineMedia) {
+        guard seconds.isFinite else { return }
+        UserDefaults.standard.set(finished || seconds < 5 ? 0 : seconds, forKey: Self.positionKey(item.id))
     }
 
     private func folder(_ id: UUID) -> URL { directory.appending(path: id.uuidString, directoryHint: .isDirectory) }
@@ -202,11 +273,40 @@ struct DownloadsBrowser: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 28).padding(.vertical, 20)
-            if !downloads.status.isEmpty {
-                HStack {
-                    Text(downloads.status).foregroundStyle(.secondary)
-                    if downloads.busy { ProgressView(); Button("Cancel", action: downloads.cancel) }
-                }.padding(.horizontal, 28)
+            if !downloads.status.isEmpty || !downloads.pending.isEmpty || !downloads.failed.isEmpty {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        if !downloads.status.isEmpty { Text(downloads.status).foregroundStyle(.secondary) }
+                        if downloads.active != nil {
+                            HStack {
+                                if let progress = downloads.progress { ProgressView(value: progress) }
+                                else { ProgressView() }
+                                Button("Cancel", action: downloads.cancel)
+                            }
+                        }
+                        ForEach(downloads.pending) { job in
+                            HStack {
+                                Text(job.title)
+                                Spacer()
+                                Text("Queued").foregroundStyle(.secondary)
+                                Button("Cancel") { downloads.dismissJob(job) }
+                            }
+                        }
+                        ForEach(downloads.failed) { job in
+                            HStack {
+                                VStack(alignment: .leading) {
+                                    Text(job.title)
+                                    if let error = job.error { Text(error).font(.caption).foregroundStyle(.secondary) }
+                                }
+                                Spacer()
+                                Button("Retry") { downloads.retry(job) }
+                                Button("Dismiss") { downloads.dismissJob(job) }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 28)
+                }
+                .frame(maxHeight: min(180, CGFloat(54 + 42 * (downloads.pending.count + downloads.failed.count))))
             }
             if downloads.items.isEmpty {
                 ContentUnavailableView("No Downloads", systemImage: "arrow.down.circle",
@@ -234,7 +334,11 @@ struct DownloadsBrowser: View {
                                             if !item.detail.isEmpty { Text(item.detail).foregroundStyle(.secondary) }
                                         }
                                         Spacer()
-                                        Image(systemName: "play.circle")
+                                        if kind != .music, downloads.position(for: item) >= 5 {
+                                            Label("Resume", systemImage: "play.circle")
+                                        } else {
+                                            Image(systemName: "play.circle")
+                                        }
                                     }.padding(8).contentShape(Rectangle())
                                 }
                                 .contextMenu {
@@ -248,9 +352,17 @@ struct DownloadsBrowser: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onChange(of: library.selectedDownload?.id, initial: true) { _, _ in
+            guard let item = library.selectedDownload else { return }
+            library.selectedDownload = nil
+            if item.kind == .music { library.playDownload(item) }
+            else { library.player.pause(); video = item }
+        }
         .sheet(item: $video) { item in
             if let file = item.files.first {
-                OfflineVideoSheet(title: item.title, url: downloads.url(file, in: item))
+                OfflineVideoSheet(title: item.title, url: downloads.url(file, in: item),
+                                  startAt: downloads.position(for: item),
+                                  progress: { downloads.rememberPosition($0, finished: $1, for: item) })
             }
         }
         .confirmationDialog("Remove Download?", isPresented: Binding(
@@ -272,6 +384,8 @@ struct DownloadsBrowser: View {
 private struct OfflineVideoSheet: View {
     let title: String
     let url: URL
+    let startAt: Double
+    let progress: (Double, Bool) -> Void
     @Environment(\.dismiss) private var dismiss
     @AppStorage(VideoSubtitleMode.preferenceKey) private var subtitles = VideoSubtitleMode.off
     @State private var failure = false
@@ -293,7 +407,7 @@ private struct OfflineVideoSheet: View {
             }.padding()
             if failure { ContentUnavailableView("Unable to Play Download", systemImage: "exclamationmark.triangle") }
             else {
-                NativeVideoPlayer(url: url, startAt: 0, subtitleMode: subtitles, progress: { _, _ in },
+                NativeVideoPlayer(url: url, startAt: startAt, subtitleMode: subtitles, progress: progress,
                                   fallback: nil, onFailure: { failure = true })
                 #if os(macOS)
                 .environment(\.macVideoPresentation, presentation)

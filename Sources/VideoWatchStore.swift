@@ -10,6 +10,7 @@ struct VideoWatchRecord: Codable {
     let seconds: Double
     let watched: Bool
     let updatedAt: Double
+    var explicitlyUnwatched: Bool? = nil
 
     var canResume: Bool { seconds >= 5 && !watched }
 }
@@ -82,15 +83,16 @@ final class VideoWatchStore {
         #endif
     }
 
-    func update(server: String, library: String, item: PlexVideoItem, seconds: Double, watched: Bool) {
+    func update(server: String, library: String, item: PlexVideoItem, seconds: Double, watched: Bool,
+                explicitlyUnwatched: Bool = false) {
         guard item.type == "movie" || item.type == "episode",
-              seconds.isFinite, seconds <= 30 * 24 * 60 * 60, watched || seconds >= 5 else { return }
-        if !watched && record(server: server, library: library, id: item.id)?.watched == true { return }
+              seconds.isFinite, seconds <= 30 * 24 * 60 * 60, watched || explicitlyUnwatched || seconds >= 5 else { return }
+        if !watched && !explicitlyUnwatched && record(server: server, library: library, id: item.id)?.watched == true { return }
         let snapshot = PlexVideoItem(id: item.id, type: item.type, title: String(item.title.prefix(200)),
                                      subtitle: String(item.subtitle.prefix(120)), summary: "", thumb: item.thumb)
         let value = VideoWatchRecord(server: server, library: library, item: snapshot,
                                      seconds: watched ? 0 : seconds, watched: watched,
-                                     updatedAt: Date.now.timeIntervalSince1970)
+                                     updatedAt: Date.now.timeIntervalSince1970, explicitlyUnwatched: explicitlyUnwatched ? true : nil)
         #if os(tvOS)
         let old = records().filter { $0.server != server || $0.library != library || $0.item.id != item.id }
         save([value] + old)
@@ -98,7 +100,7 @@ final class VideoWatchStore {
         guard let payload = try? encoder.encode(value) else { return }
         withStatement("INSERT OR REPLACE INTO watch_state VALUES (?, ?, ?, ?, ?, ?)", [server, library, item.id]) { statement in
             sqlite3_bind_double(statement, 4, value.updatedAt)
-            sqlite3_bind_int(statement, 5, watched ? 1 : 0)
+            sqlite3_bind_int(statement, 5, watched ? 1 : explicitlyUnwatched ? -1 : 0)
             _ = payload.withUnsafeBytes { sqlite3_bind_blob(statement, 6, $0.baseAddress, Int32($0.count), Self.transient) }
             sqlite3_step(statement)
         }

@@ -22,7 +22,7 @@ public struct ToolDriveArchiveView: View {
     @StateObject private var plex = MobilePlex()
 
     public var body: some View {
-        CatalogView()
+        CatalogView(openRecording: Binding(get: { transport.requestedRecording }, set: { transport.requestedRecording = $0 }))
             .environmentObject(archive)
             .environmentObject(audio)
             .environmentObject(library)

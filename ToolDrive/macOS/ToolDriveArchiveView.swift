@@ -28,6 +28,31 @@ public final class ToolDriveTransport: ObservableObject {
 
     public init() {}
 
+    private var pendingRecording: Int?
+
+    public func searchRecordings(_ term: String) -> [(id: Int, venue: String, date: String)] {
+        guard let controller else { return [] }
+        let shows = controller.activeCatalog["shows"] as? [[String: Any]] ?? []
+        return Array(shows.lazy.compactMap { show -> (Int, String, String)? in
+            guard let id = controller.integer(show["id"]), let date = show["date"] as? String else { return nil }
+            let venue = show["venue"] as? String ?? "Tool Drive recording"
+            let searchable = [date, venue] + ["city", "state", "country"].compactMap { show[$0] as? String }
+                + (show["songs"] as? [String] ?? [])
+            return searchable.joined(separator: " ").localizedCaseInsensitiveContains(term) ? (id, venue, date) : nil
+        }.prefix(12))
+    }
+
+    public func openRecording(_ id: Int) {
+        pendingRecording = id
+        displayPendingRecording()
+    }
+
+    private func displayPendingRecording() {
+        guard catalogReady, let id = pendingRecording, let web = controller?.web else { return }
+        pendingRecording = nil
+        web.evaluateJavaScript("window.iplexOpenRecording?.(\(id))")
+    }
+
     func update(_ state: [String: Any]) {
         let visible = state["visible"] as? Bool == true
         let status = state["status"] as? String
@@ -35,7 +60,13 @@ public final class ToolDriveTransport: ObservableObject {
         let ready = visible && !tracks.isEmpty && status != "loading" && status != "resolving"
         let newTitle = visible ? state["title"] as? String : nil
         let newContext = state["context"] as? String ?? ""
-        let newMessage = state["message"] as? String ?? ""
+        let suppliedMessage = state["message"] as? String ?? ""
+        let fallback: String = switch status {
+        case "loading", "resolving": "Connecting to recording…"
+        case "buffering": "Buffering…"
+        default: ""
+        }
+        let newMessage = suppliedMessage.isEmpty ? fallback : suppliedMessage
         let newElapsed = state["elapsed"] as? Double ?? 0
         let newDuration = ready ? state["duration"] as? Double ?? 0 : 0
         let previous = ready && state["canPrevious"] as? Bool == true
@@ -58,6 +89,7 @@ public final class ToolDriveTransport: ObservableObject {
     func updateCatalog(ready: Bool, failed: Bool = false) {
         if catalogReady != ready { catalogReady = ready }
         if catalogFailed != failed { catalogFailed = failed }
+        displayPendingRecording()
     }
 
     public func reloadCatalog() { controller?.loadCatalogPage() }

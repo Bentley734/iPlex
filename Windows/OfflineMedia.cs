@@ -27,7 +27,21 @@ namespace MusicRoom
             public double? durationSeconds { get; set; }
         }
 
+        sealed class OfflineRequest
+        {
+            public string id { get; set; }
+            public string title { get; set; }
+            public string error { get; set; }
+            internal string Action;
+            internal string ServerID;
+            internal string Section;
+            internal Dictionary<string, object> Body;
+        }
+
         CancellationTokenSource offlineJob;
+        readonly List<OfflineRequest> offlinePending = new List<OfflineRequest>();
+        readonly List<OfflineRequest> offlineFailures = new List<OfflineRequest>();
+        double? offlineProgress;
         string offlineMessage = "";
         string OfflineRoot { get { return Path.Combine(root, "Offline Media"); } }
 
@@ -59,9 +73,12 @@ namespace MusicRoom
         void PublishOffline()
         {
             Send("offlineState", new { items = OfflineItems().OrderBy(row => row.title).Select(row => new {
-                row.id, row.title, row.detail, row.kind, tracks = row.files.Count
-            }).ToArray(), busy = offlineJob != null, message = offlineMessage });
+                row.id, row.title, row.detail, row.kind, tracks = row.files.Count,
+                resume = row.kind != "music" ? OfflinePosition(row.id) : 0
+            }).ToArray(), busy = offlineJob != null, message = offlineMessage, progress = offlineProgress, pending = offlinePending.ToArray(), failed = offlineFailures.ToArray() });
         }
+
+        internal void RefreshOffline() { PublishOffline(); }
 
         internal Uri OfflineVideo(string id)
         {
@@ -69,10 +86,56 @@ namespace MusicRoom
             return item == null ? null : new Uri(Path.Combine(OfflineRoot, item.id, item.files[0].name));
         }
 
+        internal double OfflinePosition(string id)
+        {
+            Guid parsed;
+            if (!Guid.TryParseExact(id, "N", out parsed)) return 0;
+            try
+            {
+                string file = Path.Combine(OfflineRoot, id, "position.txt");
+                if (!File.Exists(file)) return 0;
+                double value;
+                if (Double.TryParse(File.ReadAllText(file), System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out value) && value >= 5 && value < 2592000) return value;
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            return 0;
+        }
+
+        internal void RememberOfflinePosition(string id, double seconds, bool finished)
+        {
+            Guid parsed;
+            if (!Guid.TryParseExact(id, "N", out parsed) || Double.IsNaN(seconds) || Double.IsInfinity(seconds)) return;
+            try
+            {
+                File.WriteAllText(Path.Combine(OfflineRoot, id, "position.txt"),
+                    (finished ? 0 : seconds).ToString(System.Globalization.CultureInfo.InvariantCulture));
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+            if (finished) PublishOffline();
+        }
+
         async Task HandleOffline(string action, Dictionary<string, object> body)
         {
             if (action == "offlineList") { PublishOffline(); return; }
             if (action == "offlineCancel") { if (offlineJob != null) offlineJob.Cancel(); return; }
+            if (action == "offlineRetry" || action == "offlineDismiss")
+            {
+                string jobID = Str(body, "job");
+                OfflineRequest failed = offlineFailures.FirstOrDefault(row => row.id == jobID);
+                if (failed != null) offlineFailures.Remove(failed);
+                if (action == "offlineRetry" && failed != null)
+                {
+                    failed.error = null;
+                    offlinePending.Add(failed);
+                }
+                if (action == "offlineDismiss") offlinePending.RemoveAll(row => row.id == jobID);
+                PublishOffline();
+                await StartNextOffline();
+                return;
+            }
             if (action == "offlinePlay" || action == "offlineRemove")
             {
                 OfflineItem item = OfflineItems().FirstOrDefault(row => row.id == Str(body, "media"));
@@ -98,18 +161,39 @@ namespace MusicRoom
                 }
                 return;
             }
-            if (offlineJob != null) return;
-            string id = Guid.NewGuid().ToString("N");
+            offlinePending.Add(new OfflineRequest { id = Guid.NewGuid().ToString("N"),
+                title = String.Concat(Str(body, "title").Take(400)), Action = action, ServerID = selectedServer,
+                Section = selectedSection, Body = new Dictionary<string, object>(body) });
+            PublishOffline();
+            await StartNextOffline();
+        }
+
+        async Task StartNextOffline()
+        {
+            while (offlineJob == null && offlinePending.Count > 0 && !shutdown.IsCancellationRequested)
+            {
+                OfflineRequest request = offlinePending[0];
+                offlinePending.RemoveAt(0);
+                await TransferOffline(request);
+            }
+        }
+
+        async Task TransferOffline(OfflineRequest queued)
+        {
+            string action = queued.Action;
+            Dictionary<string, object> body = queued.Body;
+            string id = queued.id;
             string stage = Path.Combine(OfflineRoot, "." + id + ".partial");
             using (var job = CancellationTokenSource.CreateLinkedTokenSource(shutdown.Token))
             {
                 offlineJob = job;
-                offlineMessage = "Preparing download…";
+                offlineProgress = null;
+                offlineMessage = "Preparing " + queued.title + "…";
                 PublishOffline();
                 try
                 {
                     Server server;
-                    if (!servers.TryGetValue(selectedServer, out server)) throw Problem("The Plex server is unavailable.");
+                    if (!servers.TryGetValue(queued.ServerID, out server)) throw Problem("The Plex server is unavailable.");
                     string key = Str(body, "item");
                     if (!ItemID.IsMatch(key)) throw Problem("Invalid download selection.");
                     var item = new OfflineItem { id = id, title = Str(body, "title"), detail = Str(body, "detail"), files = new List<OfflineFile>() };
@@ -119,9 +203,9 @@ namespace MusicRoom
                     if (action == "offlineDownloadMusic")
                     {
                         string kind = Str(body, "kind");
-                        if (selectedSection.Length == 0 || (kind != "album" && kind != "track" && kind != "playlist"))
+                        if (queued.Section.Length == 0 || (kind != "album" && kind != "track" && kind != "playlist"))
                             throw Problem("Invalid music download.");
-                        sources = await LoadAlbumTracks(server, selectedSection, key, kind, job.Token);
+                        sources = await LoadAlbumTracks(server, queued.Section, key, kind, job.Token);
                         item.kind = "music";
                     }
                     else
@@ -172,14 +256,22 @@ namespace MusicRoom
                                 string mime = reply.Content.Headers.ContentType == null ? "" : reply.Content.Headers.ContentType.MediaType;
                                 if (reply.StatusCode != System.Net.HttpStatusCode.OK || mime == "text/html" || mime == "application/json")
                                     throw Problem("Plex did not return a complete media file.");
+                                long? totalBytes = reply.Content.Headers.ContentLength;
                                 using (var source = await reply.Content.ReadAsStreamAsync())
                                 using (var destination = new FileStream(Path.Combine(stage, name), FileMode.CreateNew, FileAccess.Write,
                                     FileShare.None, 65536, true))
                                 {
                                     var buffer = new byte[65536];
                                     int length;
+                                    var clock = System.Diagnostics.Stopwatch.StartNew();
                                     while ((length = await source.ReadAsync(buffer, 0, buffer.Length, job.Token)) > 0)
+                                    {
                                         await destination.WriteAsync(buffer, 0, length, job.Token);
+                                        if (!totalBytes.HasValue || totalBytes.Value <= 0 || clock.ElapsedMilliseconds < 300) continue;
+                                        offlineProgress = (number - 1 + Math.Min(1, (double)destination.Length / totalBytes.Value)) / sources.Count;
+                                        PublishOffline();
+                                        clock.Restart();
+                                    }
                                     if (destination.Length == 0) throw Problem("The downloaded media file was empty.");
                                 }
                             }
@@ -192,8 +284,13 @@ namespace MusicRoom
                     offlineMessage = "Saved " + item.title + ".";
                 }
                 catch (OperationCanceledException) { offlineMessage = "Download canceled."; }
-                catch (Exception) { offlineMessage = "Could not complete the download. Check your Plex connection and available storage."; }
-                finally { Clean(stage); offlineJob = null; PublishOffline(); }
+                catch (Exception)
+                {
+                    queued.error = "Check your Plex connection and available storage.";
+                    offlineFailures.Add(queued);
+                    offlineMessage = "Could not download " + queued.title + ".";
+                }
+                finally { Clean(stage); offlineJob = null; offlineProgress = null; PublishOffline(); }
             }
         }
     }

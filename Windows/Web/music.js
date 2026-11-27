@@ -449,6 +449,12 @@
     pendingEnqueue = {id, item, startIndex};
     host({action:'enqueue', id, album:item.id});
   }
+  window.openGlobalMusicResult = item => {
+    window.plexVideoExit();
+    selectSection(item.kind === 'track' ? 'tracks' : 'albums');
+    if (item.kind === 'track') playLibraryRow(item);
+    else open(item);
+  };
   function loadInlineAlbum(target) {
     const id = ++albumPreviewSequence;
     albumPreviews.set(id, target);

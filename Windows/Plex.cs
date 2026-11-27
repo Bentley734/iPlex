@@ -1048,10 +1048,11 @@ namespace MusicRoom
         {
             string action = Str(body, "action");
             long id = Num(body, "id");
+            if (action == "globalSearch") { await GlobalSearch(body, id); return; }
             if (action == "cacheCovers") { await CacheLibraryArtwork(body); return; }
             if (action == "stopCoverCache") { StopCoverCache(true); return; }
             if (action == "offlineList" || action == "offlineCancel" || action == "offlinePlay" ||
-                action == "offlineRemove" || action == "offlineDownloadMusic" || action == "offlineDownloadVideo")
+                action == "offlineRemove" || action == "offlineRetry" || action == "offlineDismiss" || action == "offlineDownloadMusic" || action == "offlineDownloadVideo")
             { await HandleOffline(action, body); return; }
             if (action == "beginTrack" || action == "seekTrack")
             {

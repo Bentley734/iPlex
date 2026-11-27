@@ -49,6 +49,22 @@ final class LibraryModel: ObservableObject {
     @Published private(set) var toolDriveSelected = false
     @Published private(set) var downloadsSelected = false
     @Published private var sectionNames = [String: String]()
+    @Published var selectedDownload: OfflineMedia?
+    @Published var selectedVideoSearchResult: PlexVideoItem?
+    @Published var videoSearchRequest = UUID()
+    @Published var selectedCredit: PlexVideoCredit?
+
+    func openVideoSearchResult(_ kind: PlexVideoKind, item: PlexVideoItem) {
+        selectVideoSection(kind)
+        selectedVideoSearchResult = item
+        videoSearchRequest = UUID()
+    }
+
+    func searchMusic(_ kind: MusicKind, query: String) async throws -> [MusicEntry] {
+        let page = try await request { service.musicEntries(kind: kind, query: query, offset: 0, limit: 15, completion: $0) }
+        return page.items
+    }
+
     @Published var query = ""
     @Published var playlistEdit: PlexPlaylistEdit?
     @Published private(set) var savingPlaylistTrack = false
@@ -384,6 +400,8 @@ final class LibraryModel: ObservableObject {
     }
 
     func selectVideoSection(_ section: PlexVideoKind?) {
+        selectedVideoSearchResult = nil
+        if section != videoSection { selectedCredit = nil }
         if let section, !visibleVideoKinds.contains(section) || serverID.isEmpty { return }
         toolDriveSelected = false
         downloadsSelected = false
@@ -392,6 +410,7 @@ final class LibraryModel: ObservableObject {
     }
 
     func selectToolDrive() {
+        selectedVideoSearchResult = nil
         lastVideoSection = nil
         downloadsSelected = false
         toolDriveSelected = true
@@ -399,6 +418,7 @@ final class LibraryModel: ObservableObject {
     }
 
     func selectDownloads() {
+        selectedVideoSearchResult = nil
         lastVideoSection = nil
         toolDriveSelected = false
         downloadsSelected = true
@@ -414,10 +434,17 @@ final class LibraryModel: ObservableObject {
     }
 
     func downloadMusic(_ entry: MusicEntry, track: LiveTrack?) {
+        let server = serverID
+        let section = libraryID
         MediaDownloads.shared.start(title: track?.title ?? entry.title, detail: track?.artist ?? entry.artist, kind: .music) {
             let selected: [LiveTrack]
             if let track { selected = [track] }
             else {
+                guard self.serverID == server, self.libraryID == section,
+                      self.service.status.selectedServerID == server,
+                      self.service.status.selectedLibraryID == section else {
+                    throw UpdateError("Select the original Plex music library before retrying.")
+                }
                 selected = try await self.request { self.service.musicTracks(entry: entry, inBackground: true, completion: $0) }
             }
             return selected.map { .init(url: $0.url, title: $0.title, duration: $0.duration, format: $0.format.container) }

@@ -19,6 +19,12 @@ struct CatalogView: View {
     @State private var sidebarVisible = true
     @State private var sheet: CatalogSheet?
 
+    @Binding var openRecording: Int?
+
+    init(openRecording: Binding<Int?> = .constant(nil)) {
+        _openRecording = openRecording
+    }
+
     private enum CatalogSheet: String, Identifiable {
         case filters, library, plex, about, home, updates, stats, albums, songs
         var id: Self { self }
@@ -27,6 +33,13 @@ struct CatalogView: View {
     var body: some View {
         GeometryReader { geometry in
             archive(width: geometry.size.width)
+        }
+        .onChange(of: openRecording, initial: true) { _, id in
+            guard let id else { return }
+            selectedID = id
+            selectedAnniversary = true
+            phonePath = [id]
+            openRecording = nil
         }
         .sheet(isPresented: Binding(
             get: { sheet == nil && audio.isExpanded },
@@ -68,7 +81,7 @@ struct CatalogView: View {
             guard !started else { return }
             started = true
             savedOnly = store.home.start == .saved
-            if store.home.start == .library { sheet = .library }
+            if store.home.start == .library && phonePath.isEmpty && openRecording == nil { sheet = .library }
         }
     }
 

@@ -320,8 +320,9 @@ namespace MusicRoom
                 {
                     double seconds;
                     bool watched = Object.Equals(Get(request, "watched"), true);
+                    bool explicitlyUnwatched = !watched && Object.Equals(Get(request, "explicitlyUnwatched"), true);
                     if (!Double.TryParse(Str(request, "seconds"), NumberStyles.Float, CultureInfo.InvariantCulture, out seconds)
-                        || Double.IsNaN(seconds) || Double.IsInfinity(seconds) || seconds > 2592000 || (!watched && seconds < 5)) return;
+                        || Double.IsNaN(seconds) || Double.IsInfinity(seconds) || seconds > 2592000 || (!watched && !explicitlyUnwatched && seconds < 5)) return;
                     var artwork = Str(request, "artwork");
                     var title = Str(request, "title");
                     var subtitle = Str(request, "subtitle");
@@ -329,9 +330,9 @@ namespace MusicRoom
                         key, type = expected, title = title.Substring(0, Math.Min(200, title.Length)),
                         subtitle = subtitle.Substring(0, Math.Min(120, subtitle.Length)),
                         artwork = artwork.Length < 180 && ArtPath.IsMatch(artwork) ? artwork : "",
-                        watched, seconds = watched ? 0 : seconds
+                        watched, seconds = watched || explicitlyUnwatched ? 0 : seconds
                     });
-                    videoWatch.Save(server.Id, library, key, watched, payload);
+                    videoWatch.Save(server.Id, library, key, watched, payload, explicitlyUnwatched);
                     if (id == 0) return;
                 }
                 SendVideoWatchState(server, library, id);
@@ -383,7 +384,8 @@ namespace MusicRoom
                         .GroupBy(row => Str(row, "ratingKey")).Select(group => group.First()).ToArray();
                     var items = rows.Select(row => new {
                         key = Str(row, "ratingKey"), type = expected, title = Str(row, "title"),
-                        summary = Str(row, "summary"), subtitle = expected == "episode" && Num(row, "index") > 0 ?
+                        summary = Str(row, "summary"), duration = Num(row, "duration") / 1000.0,
+                        seconds = Num(row, "viewOffset") / 1000.0, watched = Num(row, "viewCount") > 0, subtitle = expected == "episode" && Num(row, "index") > 0 ?
                             "Episode " + Str(row, "index") : Str(row, "year"),
                         thumb = ArtworkPath(row, "thumb"), artwork = RegisterVideoArt(server.Id, library, ArtworkPath(row, "thumb"), savePreview)
                     }).ToArray();
@@ -491,9 +493,9 @@ namespace MusicRoom
                 var art = Str(row, "art");
                 var duration = Num(row, "duration");
                 var credits = Rows(Get(row, "Director")).Take(8).Select(person => new {
-                    name = Str(person, "tag"), role = "Director", photo = CreditPhoto(server.Id, library, person)
+                    name = Str(person, "tag"), role = "Director", photo = CreditPhoto(server.Id, library, person), id = Str(person, "id")
                 }).Concat(Rows(Get(row, "Role")).Take(24).Select(person => new {
-                    name = Str(person, "tag"), role = Str(person, "role"), photo = CreditPhoto(server.Id, library, person)
+                    name = Str(person, "tag"), role = Str(person, "role"), photo = CreditPhoto(server.Id, library, person), id = Str(person, "id")
                 })).Where(person => person.name.Length > 0).ToArray();
                 var formats = Rows(Get(row, "Media")).Take(8).Select(media => {
                     string resolution = MediaLabel(Str(media, "videoResolution"));

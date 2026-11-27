@@ -1,6 +1,11 @@
 (() => {
   'use strict';
   const get = id => document.getElementById(id);
+  const node = (tag, text) => {
+    const element = document.createElement(tag);
+    if (text !== undefined) element.textContent = text;
+    return element;
+  };
   const host = body => window.chrome.webview.postMessage(body);
   const browser = get('video-browser');
   const tiles = get('video-items');
@@ -104,7 +109,7 @@
   const moviePage = get('movie-details');
   const listingHeader = browser.querySelector('.library-page-header');
   const listingContent = browser.querySelector('.content');
-  let selectedDetail, movieOpener, videoDetailSequence = 0, requestedMovieDownload = false, downloadBusy = false;
+  let selectedDetail, movieOpener, videoDetailSequence = 0, requestedMovieDownload = false;
 
   let showBeforeEpisode, tvListing, currentDetailMetadata;
   let watchRecords = new Map(), watchSequence = 0, activeItem, activeScope, lastReport = 0;
@@ -194,16 +199,32 @@
       ':' + String(total % 60).padStart(2, '0');
   }
 
+  function watchFor(item) {
+    return watchRecords.get(item?.key) || item || {};
+  }
+
   function renderWatch() {
     watchShelf.hidden = Boolean(parent.length || search.value.trim());
+    let foundNext = false;
     for (const tile of tiles.children) {
-      const watched = Boolean(watchRecords.get(tile.dataset.item)?.watched);
+      const watch = watchFor(tile.videoItem);
+      const watched = Boolean(watch.watched);
       tile.classList.toggle('watched-video', watched);
       const badge = tile.querySelector('.watched-badge');
       if (badge) badge.hidden = !watched;
+      const nextBadge = tile.querySelector('.next-episode');
+      if (nextBadge) {
+        nextBadge.hidden = watched || foundNext;
+        if (!watched) foundNext = true;
+      }
+      const progress = tile.querySelector('.episode-progress');
+      if (progress) {
+        progress.hidden = watched || !(watch.seconds >= 5) || !(tile.videoItem.duration > 0);
+        progress.value = Math.min(1, (watch.seconds || 0) / (tile.videoItem.duration || 1));
+      }
     }
     updateMovieActions();
-    watchToggle.textContent = watchRecords.get(activeItem?.key)?.watched ? 'Mark Unwatched' : 'Mark Watched';
+    watchToggle.textContent = watchFor(activeItem).watched ? 'Mark Unwatched' : 'Mark Watched';
     const recent = [...watchRecords.values()].filter(row => !row.watched && row.seconds >= 5).slice(0,24);
     watchShelf.hidden ||= recent.length === 0;
     watchItems.replaceChildren(...recent.map(row => {
@@ -244,13 +265,23 @@
     if (refresh) renderWatch();
   }
 
+  function markUnwatched(item, scope) {
+    const {key, type, title, subtitle, thumb} = item;
+    if (item.watched) {
+      watchRecords.set(key, {...item, watched:false, seconds:0});
+      host({action:'videoWatchUpdate', id:++watchSequence, ...scope, item:key, type, title,
+        subtitle, artwork:thumb, explicitlyUnwatched:true, seconds:0});
+    } else {
+      watchRecords.delete(key);
+      host({action:'videoWatchClear', id:++watchSequence, ...scope, item:key, type});
+    }
+    renderWatch();
+  }
+
   watchToggle.onclick = () => {
     if (!activeItem || !activeScope) return;
-    if (watchRecords.get(activeItem.key)?.watched) {
-      watchRecords.delete(activeItem.key);
-      host({action:'videoWatchClear', id:++watchSequence, ...activeScope, item:activeItem.key, type:activeItem.type});
-      renderWatch();
-    } else saveWatch(0, true, true);
+    if (watchFor(activeItem).watched) markUnwatched(activeItem, activeScope);
+    else saveWatch(0, true, true);
   };
 
   function videoServer(value = state) { return value?.videoServer || value?.serverId || ''; }
@@ -394,6 +425,97 @@
     configure();
   }
 
+  const globalDialog = get('global-search-dialog');
+  const globalInput = get('global-search-input');
+  const globalResults = get('global-search-results');
+  const globalStatus = get('global-search-status');
+  let globalSequence = 0, searchTimer, selectedCredit;
+
+  function launchGlobalSearch(credit) {
+    selectedCredit = credit;
+    get('global-search-heading').textContent = credit?.name || 'Search iPlex';
+    globalInput.value = '';
+    globalInput.hidden = Boolean(credit);
+    if (!globalDialog.open) globalDialog.showModal();
+    if (!credit) globalInput.focus();
+    searchGlobally();
+  }
+
+  function searchGlobally() {
+    clearTimeout(searchTimer);
+    const id = ++globalSequence;
+    const query = globalInput.value.trim(), credit = selectedCredit;
+    globalResults.replaceChildren();
+    if (!query && !credit) {
+      globalStatus.textContent = 'Enter a title, artist, venue, or date.';
+      host({action:'globalSearch', id, query:''});
+      return;
+    }
+    globalStatus.textContent = 'Searching…';
+    searchTimer = setTimeout(() => {
+      const location = type => {
+        const choices = (state?.videoLibraries || []).filter(row => row.type === type);
+        const saved = localStorage.getItem(preference(type));
+        return choices.find(row => row.id === saved)?.id || choices[0]?.id;
+      };
+      host({action:'globalSearch', id, query, person:credit?.id, credit:credit?.role,
+            movies:location('movie'), shows:location('show')});
+    }, credit ? 0 : 275);
+  }
+
+  function openGlobalResult(group, row) {
+    globalDialog.close();
+    if (group === 'album' || group === 'track') window.openGlobalMusicResult?.(row);
+    else if (group === 'downloads') {
+      rememberSection('downloads');
+      openDownloads(true);
+      playDownload(row);
+    } else if (group === 'toolDrive') {
+      rememberSection('toolDrive');
+      openArchive(true);
+      host({action:'openToolDriveRecording', recording:row.id});
+    } else {
+      const section = group === 'movie' ? 'movie' : 'show';
+      rememberSection(section);
+      openSection(section);
+      openDetails(row, get('global-search'));
+    }
+  }
+
+  get('global-search').onclick = () => launchGlobalSearch();
+  get('global-search-close').onclick = () => globalDialog.close();
+  globalInput.oninput = searchGlobally;
+  globalDialog.addEventListener('close', () => {
+    clearTimeout(searchTimer);
+    ++globalSequence;
+    host({action:'globalSearch', id:globalSequence, query:''});
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key.toLowerCase() === 'f' && event.shiftKey && (event.ctrlKey || event.metaKey) &&
+        !document.querySelector('dialog[open]')) {
+      event.preventDefault();
+      launchGlobalSearch();
+    }
+  });
+  window.plexGlobalSearch = reply => {
+    if (!globalDialog.open || reply.id !== globalSequence) return;
+    const labels = {movie:titles.movie, show:titles.show, episode:'Episodes', album:'Albums',
+                    track:'Tracks', toolDrive:titles.toolDrive, downloads:titles.downloads};
+    const groups = reply.groups || [];
+    globalStatus.textContent = reply.failed ? 'Some results could not be loaded.' : (groups.length ? '' : 'No matches.');
+    globalResults.replaceChildren(...groups.map(group => {
+      const section = node('section');
+      section.append(node('h3', labels[group.kind]));
+      for (const row of group.rows) {
+        const button = node('button');
+        button.append(node('strong', row.title), node('small', row.subtitle || ''));
+        button.onclick = () => openGlobalResult(group.kind, row);
+        section.append(button);
+      }
+      return section;
+    }));
+  };
+
   function reportArchiveBounds() {
     const visible = archiveOpen && !document.querySelector('dialog[open]');
     const {left, top, width, height} = toolDrivePanel.getBoundingClientRect();
@@ -409,7 +531,7 @@
     const channels = value('custom-tint-rgb');
     const tint = root.dataset.glassTint === 'none' ? '' : channels ? `rgb(${channels})` : value('accent');
     const gradient = root.hasAttribute('data-animated-gradient') ? {
-      motion:root.dataset.gradientMotion, duration:value('gradient-duration'),
+      motion:root.dataset.gradientMotion, duration:value('gradient-duration'), dimming:value('gradient-dimming'),
       colors:[1,2,3].map(index => value('gradient-color-' + index))
     } : null;
     return {title:titles.toolDrive, text:value('text'), accent:value('accent'), gradient,
@@ -478,17 +600,40 @@
   get('downloads-search').oninput = renderDownloads;
   window.offlineState = reply => {
     downloadedItems = reply.items || [];
-    downloadBusy = Boolean(reply.busy);
-    get('movie-download').disabled = downloadBusy;
     if (requestedMovieDownload) showMovieText(get('movie-download-status'), reply.message || '');
     get('downloads-status').textContent = reply.message || '';
     get('downloads-cancel').hidden = !reply.busy;
+    const progress = get('downloads-progress');
+    progress.hidden = !reply.busy;
+    if (Number.isFinite(reply.progress)) progress.value = reply.progress;
+    else progress.removeAttribute('value');
+    const queue = get('downloads-queue');
+    queue.replaceChildren();
+    for (const job of [...(reply.pending || []), ...(reply.failed || [])]) {
+      const line = node('div');
+      line.append(node('span', job.title + ' · ' + (job.error || 'Queued')));
+      if (job.error) {
+        const retry = node('button', 'Retry');
+        retry.onclick = () => host({action:'offlineRetry', job:job.id});
+        line.append(retry);
+      }
+      const dismiss = node('button', job.error ? 'Dismiss' : 'Cancel');
+      dismiss.onclick = () => host({action:'offlineDismiss', job:job.id});
+      line.append(dismiss);
+      queue.append(line);
+    }
     renderDownloads();
   };
   window.offlineError = message => {
     if (requestedMovieDownload) showMovieText(get('movie-download-status'), message);
     get('downloads-status').textContent = message;
   };
+  function playDownload(row) {
+    const player = window.windowsPlayback;
+    if (row.kind === 'music') player.prepareAudio();
+    else player.action({action:'pause'});
+    host({action:row.kind === 'music' ? 'offlinePlay' : 'offlineVideo', media:row.id, title:row.title});
+  }
   function renderDownloads() {
     const query = get('downloads-search').value.trim().toLocaleLowerCase();
     const items = downloadedItems.filter(row => [row.title,row.detail].join(' ').toLocaleLowerCase().includes(query));
@@ -504,13 +649,8 @@
       for (const row of rows) {
         const item = document.createElement('article');
         const play = document.createElement('button');
-        play.textContent = row.title + (row.detail ? ' · ' + row.detail : '');
-        play.onclick = () => {
-          const player = window.windowsPlayback;
-          if (type === 'music') player.prepareAudio();
-          else player.action({action:'pause'});
-          host({action:type === 'music' ? 'offlinePlay' : 'offlineVideo', media:row.id, title:row.title});
-        };
+        play.textContent = row.title + (row.resume >= 5 ? ' · Resume' : '') + (row.detail ? ' · ' + row.detail : '');
+        play.onclick = () => playDownload(row);
         const remove = document.createElement('button');
         remove.textContent = 'Remove';
         remove.setAttribute('aria-label', 'Remove ' + row.title);
@@ -601,6 +741,7 @@
     renderItems(reply.items, true);
     if (rendered.size === previousCount || next <= listOffset) next = null;
     if (pageSize === 'all' && next !== null) { browse(next); return; }
+    renderWatch();
     status.textContent = rendered.size ? '' : 'No matches.';
     loadMore.hidden = next === null;
   };
@@ -613,6 +754,7 @@
       tile.type = 'button';
       tile.className = 'video-tile';
       tile.dataset.item = row.key;
+      tile.videoItem = row;
       tile.disabled = !interactive;
       const poster = document.createElement('span');
       poster.className = 'video-poster';
@@ -641,6 +783,15 @@
       badge.textContent = 'Watched';
       badge.hidden = !watchRecords.get(row.key)?.watched;
       labels.append(badge);
+      if (row.type === 'episode') {
+        const nextEpisode = node('small', 'Next Unwatched');
+        nextEpisode.className = 'next-episode';
+        const progress = node('progress');
+        progress.className = 'episode-progress';
+        progress.max = 1;
+        progress.setAttribute('aria-label', 'Episode progress');
+        labels.append(nextEpisode, progress);
+      }
       tile.append(poster, labels);
       tile.onclick = () => {
         if (['movie','show','episode'].includes(row.type)) openDetails(row, tile);
@@ -687,7 +838,7 @@
 
   function updateMovieActions() {
     if (!selectedDetail || selectedDetail.type === 'show') return;
-    const watch = watchRecords.get(selectedDetail.key);
+    const watch = watchFor(selectedDetail);
     const resume = watch && !watch.watched && watch.seconds >= 5;
     get('movie-play').textContent = resume ? 'Resume' : (selectedDetail.type === 'episode' ? 'Play Episode' : 'Play Movie');
     get('movie-watch').textContent = watch?.watched ? 'Mark Unwatched' : 'Mark Watched';
@@ -793,7 +944,7 @@
   get('movie-play').onclick = () => { if (selectedDetail && selectedDetail.type !== 'show') open(selectedDetail); };
   get('movie-match').onclick = () => { if (selectedDetail) openMatch(selectedDetail); };
   get('movie-download').onclick = () => {
-    if (!selectedDetail || selectedDetail.type === 'show' || downloadBusy) return;
+    if (!selectedDetail || selectedDetail.type === 'show') return;
     requestedMovieDownload = true;
     host({action:'offlineDownloadVideo', item:selectedDetail.key, library,
       kind:selectedDetail.type, title:selectedDetail.title, detail:selectedDetail.subtitle, version:-1});
@@ -801,9 +952,9 @@
   get('movie-watch').onclick = () => {
     if (!selectedDetail || selectedDetail.type === 'show') return;
     const {key, type, title, subtitle, thumb} = selectedDetail;
-    if (watchRecords.get(key)?.watched) {
-      watchRecords.delete(key);
-      host({action:'videoWatchClear', id:++watchSequence, ...watchContext(), item:key, type});
+    if (watchFor(selectedDetail).watched) {
+      markUnwatched(selectedDetail, watchContext());
+      return;
     } else {
       watchRecords.set(key, {...selectedDetail, watched:true, seconds:0});
       host({action:'videoWatchUpdate', id:++watchSequence, ...watchContext(), item:key,
@@ -851,7 +1002,11 @@
       const name = document.createElement('strong'), role = document.createElement('small');
       name.textContent = credit.name;
       role.textContent = credit.role;
-      li.append(name, role);
+      if (/^[0-9]+$/.test(credit.id)) {
+        const button = node('button', credit.name);
+        button.onclick = () => launchGlobalSearch(credit);
+        li.append(button, role);
+      } else li.append(name, role);
       return li;
     }));
     formats.hidden = !details.formats?.length;
@@ -875,7 +1030,8 @@
     activeScope = watchContext();
     selectedVersion = -1;
     versionField.hidden = true;
-    lastSaved = watchRecords.get(item.key)?.seconds || 0;
+    const watch = watchFor(item);
+    lastSaved = watch.watched ? 0 : watch.seconds || 0;
     renderWatch();
     get('video-playing-title').textContent = item.title;
     get('video-playing-summary').textContent = item.summary || '';

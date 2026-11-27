@@ -851,3 +851,17 @@ body {
 #glass-gradient-settings label { display:inline-flex; align-items:center; gap:6px; margin-top:8px; }
 .gradient-colors { display:flex; flex-wrap:wrap; gap:12px; }
 #glass-gradient-preview { width:100%; height:74px; border-radius:8px; }
+
+
+#global-search-dialog { width:min(650px, 94vw); }
+#global-search-dialog header { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+#global-search-input { box-sizing:border-box; width:100%; }
+#global-search-results { max-height:58vh; overflow:auto; }
+#global-search-results section { display:grid; gap:5px; margin-bottom:16px; }
+#global-search-results button { text-align:left; }
+#global-search-results small { display:block; opacity:.75; }
+#downloads-progress, .episode-progress { width:100%; }
+#downloads-queue { max-height:175px; overflow:auto; }
+#downloads-queue > div { display:flex; align-items:center; gap:8px; margin:5px 0; }
+#downloads-queue span { flex:1; }
+.next-episode { color:var(--accent); }

@@ -73,12 +73,12 @@ namespace MusicRoom
             finally { sqlite3_finalize(statement); }
         }
 
-        internal void Save(string server, string library, string item, bool watched, string payload)
+        internal void Save(string server, string library, string item, bool watched, string payload, bool explicitlyUnwatched = false)
         {
             Statement("INSERT OR REPLACE INTO watch_state SELECT ?, ?, ?, strftime('%s','now'), ?, ? " +
                 "WHERE ? = '1' OR NOT EXISTS (SELECT 1 FROM watch_state WHERE server_id = ? AND library_id = ? AND item_id = ? AND watched = 1)",
                 statement => sqlite3_step(statement),
-                server, library, item, watched ? "1" : "0", payload, watched ? "1" : "0", server, library, item);
+                server, library, item, watched ? "1" : explicitlyUnwatched ? "-1" : "0", payload, watched || explicitlyUnwatched ? "1" : "0", server, library, item);
         }
 
         internal void Clear(string server, string library, string item)

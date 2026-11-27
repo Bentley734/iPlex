@@ -32,6 +32,7 @@
 		302A4395B55B8B0627800F4D /* VideoLAN-SOURCE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 72754B9270BC4C0CFEE4A941 /* VideoLAN-SOURCE.txt */; };
 		30FB9912CFC98B40FC532C8F /* MacVideoPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF714F069BFA8BAE334EE31F /* MacVideoPresentation.swift */; };
 		35BFE8815C14CE85F8CBC1AF /* CatalogFilters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57C1069E561396E8408C4EFA /* CatalogFilters.swift */; };
+		36875384EA443F8BF7BB95FD /* GlobalLibrarySearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7664D59D65ABDB49AA33D6 /* GlobalLibrarySearch.swift */; };
 		37DBDBEFBCA7FA9300B97620 /* MusicSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81F02BA2B14ABC3859F379BD /* MusicSettings.swift */; };
 		38F439CF3FC372B6BB106E1E /* ToolDrive in Resources */ = {isa = PBXBuildFile; fileRef = 21DCA187065CE4E18A11F6DC /* ToolDrive */; };
 		3AF66C4880414EBC37880124 /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E789032BCF3A6169CFC2233 /* NowPlayingView.swift */; };
@@ -110,6 +111,7 @@
 		B14DB919AF1E5EA88CF12FE5 /* AudioAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED8702E61EE0F31C7677EC30 /* AudioAnalysis.swift */; };
 		B2C253CB334766259D06E91A /* NativeVideoPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41756213822D289CE6E5D98A /* NativeVideoPlayer.swift */; };
 		B3454E96260F2C14C2E75C3E /* VideoLAN-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 20DA8624C5A602D1F228302A /* VideoLAN-LICENSE.txt */; };
+		B3F489AFB07B38BC7DBE8CFB /* GlobalLibrarySearch.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA7664D59D65ABDB49AA33D6 /* GlobalLibrarySearch.swift */; };
 		B472B74042F99986CB2B1526 /* TVAppearanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3A858D1BC0BAD7FE7E5A78C /* TVAppearanceView.swift */; };
 		B622BC84DAD72E7A756E7DFA /* Updates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C9BAB797374ADD5B2683083 /* Updates.swift */; };
 		B7E443953550133C851BC0A2 /* MobileMusicRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97A49FCD6AC086C13007CEB /* MobileMusicRoomApp.swift */; };
@@ -244,6 +246,7 @@
 		A2D8D6D54E6232361B6D546B /* PlexView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlexView.swift; sourceTree = "<group>"; };
 		A5FD29343DF8F67713D13B64 /* iOS.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = iOS.xcassets; sourceTree = "<group>"; };
 		A7C3DEA02512BD0C8E406A0F /* MusicGenreList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicGenreList.swift; sourceTree = "<group>"; };
+		AA7664D59D65ABDB49AA33D6 /* GlobalLibrarySearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalLibrarySearch.swift; sourceTree = "<group>"; };
 		AE3A4685EF46B49FB6B22D90 /* MacMiniPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMiniPlayer.swift; sourceTree = "<group>"; };
 		B231419E2817C1F973377DD4 /* VideoDetailsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoDetailsPage.swift; sourceTree = "<group>"; };
 		B2DA695E5F978CFBEDD54C3D /* ClickWheelPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClickWheelPlayer.swift; sourceTree = "<group>"; };
@@ -463,6 +466,7 @@
 				ED8702E61EE0F31C7677EC30 /* AudioAnalysis.swift */,
 				B2DA695E5F978CFBEDD54C3D /* ClickWheelPlayer.swift */,
 				83BDC61173C885223594A01D /* GlassWallpaper.swift */,
+				AA7664D59D65ABDB49AA33D6 /* GlobalLibrarySearch.swift */,
 				1E11ED386C44B1F0E5CB11FA /* InterfaceMotion.swift */,
 				C69FD3E93908A0408008D345 /* LibraryModel.swift */,
 				ED9C2A0F694BD3960FADA938 /* MacAppUpdates.swift */,
@@ -654,6 +658,7 @@
 				2F7B05532D59401224593621 /* AudioAnalysis.swift in Sources */,
 				AD0027C3EA6B7D84AD57F90D /* ClickWheelPlayer.swift in Sources */,
 				857073C928677ED881AC8112 /* GlassWallpaper.swift in Sources */,
+				36875384EA443F8BF7BB95FD /* GlobalLibrarySearch.swift in Sources */,
 				977E177DAED424AE445D3F86 /* InterfaceMotion.swift in Sources */,
 				66D831237EA3E508723100E1 /* LibraryModel.swift in Sources */,
 				4852498FF890C183BB536F7A /* MacAppUpdates.swift in Sources */,
@@ -758,6 +763,7 @@
 				B14DB919AF1E5EA88CF12FE5 /* AudioAnalysis.swift in Sources */,
 				29CF984811D8CCAD74A6AB1F /* ClickWheelPlayer.swift in Sources */,
 				9986C5B0BC30A08F62C49E57 /* GlassWallpaper.swift in Sources */,
+				B3F489AFB07B38BC7DBE8CFB /* GlobalLibrarySearch.swift in Sources */,
 				B959B6B9F749535AC78A8563 /* InterfaceMotion.swift in Sources */,
 				C0F0713CDBB0212EBBDFA09D /* LibraryModel.swift in Sources */,
 				4F8F42D2AB91DCC695B06BD6 /* MacAppUpdates.swift in Sources */,
@@ -883,7 +889,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 54;
+				CURRENT_PROJECT_VERSION = 55;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -898,7 +904,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
-				MARKETING_VERSION = 0.1.53;
+				MARKETING_VERSION = 0.1.54;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -988,7 +994,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 54;
+				CURRENT_PROJECT_VERSION = 55;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -1009,7 +1015,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
-				MARKETING_VERSION = 0.1.53;
+				MARKETING_VERSION = 0.1.54;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

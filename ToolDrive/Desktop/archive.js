@@ -4,6 +4,11 @@
   const tools = oldHeader.querySelector('.topbar-tools');
   const search = document.querySelector('.search-wrap');
   search.querySelector('input').placeholder = 'Search shows';
+  window.iplexOpenRecording = id => {
+    if (!Number.isSafeInteger(id)) return;
+    document.querySelector('dialog[open]')?.close();
+    window.openArchivePerformance?.(id);
+  };
   const header = document.createElement('header');
   header.className = 'iplex-archive-header';
   const title = document.createElement('h1');
@@ -65,6 +70,7 @@
     if (gradient) {
       root.dataset.gradientMotion = gradient.motion;
       root.style.setProperty('--gradient-duration', gradient.duration);
+      root.style.setProperty('--gradient-dimming', gradient.dimming ?? '0.38');
       gradient.colors.forEach((color, index) => root.style.setProperty('--gradient-color-' + (index+1), color));
     }
   };
@@ -83,7 +89,9 @@
       if (!state) return;
       const {visible, status, title, context, message, elapsed, duration, canPrevious, canNext, tracks, trackIndex, volume, revision} = state;
       window.toolWindows.send('iplexTransport', {
-        visible, status, title, context, message, elapsed, duration, canPrevious, canNext, tracks, trackIndex, volume, revision,
+        visible, status, title, context, message:message || ({
+          loading:'Connecting to recording…', resolving:'Connecting to recording…', buffering:'Buffering…'
+        })[status] || '', elapsed, duration, canPrevious, canNext, tracks, trackIndex, volume, revision,
         canToggle: Array.isArray(state.tracks) && state.tracks.length > 0 &&
           !['loading', 'resolving'].includes(status)
       });

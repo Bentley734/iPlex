@@ -296,6 +296,11 @@ namespace ToolDriveOffline
             Script("window.applyIPlexArchiveAppearance?.(" + json + ")");
         }
 
+        internal void OpenRecording(long id)
+        {
+            Script("window.iplexOpenRecording?.(" + id.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")");
+        }
+
         private async void Script(string script)
         {
             if (closing || !ready) return;

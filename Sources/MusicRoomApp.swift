@@ -71,6 +71,8 @@ private struct MusicWindow: View {
     @GestureState private var sidebarDrag: CGFloat = 0
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @State private var showSettings = false
+    @State private var showGlobalSearch = false
+    @State private var searchSelection: (() -> Void)?
     @State private var showNowPlaying = false
     @State private var showVolume = false
     @StateObject private var archiveTransport = ToolDriveTransport()
@@ -94,6 +96,16 @@ private struct MusicWindow: View {
         .background(theme.backdrop(using: palette))
         .toolbarBackground(theme.surface(using: palette), for: .windowToolbar)
         .toolbarBackground(.visible, for: .windowToolbar)
+        .sheet(isPresented: $showGlobalSearch, onDismiss: {
+            model.selectedCredit = nil
+            let selection = searchSelection
+            searchSelection = nil
+            selection?()
+        }) {
+            GlobalLibrarySearch(library: model, archive: archiveTransport, credit: model.selectedCredit,
+                                select: { searchSelection = $0 },
+                                openVideo: { model.openVideoSearchResult($0, item: $1) })
+        }
         .sheet(isPresented: $showSettings, onDismiss: archiveTransport.refreshPlex) { MusicSettings(library: model) }
         .sheet(item: $model.playlistEdit) { edit in PlexPlaylistEditor(library: model, edit: edit) }
         .foregroundStyle(theme.text)
@@ -206,6 +218,13 @@ private struct MusicWindow: View {
             .frame(maxHeight: .infinity)
 
             VStack(alignment: .leading, spacing: 10) {
+                Button { showGlobalSearch = true } label: {
+                    Label("Search iPlex", systemImage: "magnifyingglass")
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(Rectangle())
+                }
+                .keyboardShortcut("f", modifiers: [.command, .shift])
+                .glassHover()
                 settingsButton
             }
             .padding(.horizontal, padding)
@@ -299,7 +318,10 @@ private struct MusicWindow: View {
                 PlexVideoBrowser(kind: videoSection, server: model.serverID, service: model.service,
                                  serverReady: model.videoServerReady, connectionError: model.busy ? nil : model.message,
                                  retryConnection: model.retryLibrary, pauseMusic: model.player.pause,
-                                 sectionName: model.sectionName(HeaderBrandSection(video: videoSection)))
+                                 sectionName: model.sectionName(HeaderBrandSection(video: videoSection)),
+                                 searchResult: model.selectedVideoSearchResult,
+                                 searchRequest: model.videoSearchRequest,
+                                 onCredit: { model.selectedCredit = $0; showGlobalSearch = true })
                     .id(model.serverID + videoSection.rawValue)
             } else if model.libraryID.isEmpty {
                 if !model.libraries.isEmpty { musicBrowseHeader }
@@ -548,7 +570,7 @@ private struct MusicWindow: View {
                         Image(systemName: "waveform").frame(width: 46, height: 46)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(title).font(.headline).lineLimit(1)
-                            Text(archiveTransport.context).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+                            Text(archiveTransport.message.isEmpty ? archiveTransport.context : archiveTransport.message).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                             if !archiveTransport.message.isEmpty {
                                 Text(archiveTransport.message).font(.caption2).foregroundStyle(copper).lineLimit(1)
                             }

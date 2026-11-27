@@ -3860,7 +3860,7 @@ window.windowsPlayback = (() => {
     switch(p.action) {
       case 'toggle':
         if (wantsPlay) pause();
-        else if (state === 'error') select(index, true, audio.currentTime || 0);
+        else if (state === 'error') select(index, true, audio.currentTime || resumeAt || 0);
         else play();
         break;
       case 'pause': pause(); break;
@@ -3898,7 +3898,17 @@ window.windowsPlayback = (() => {
     publish();
   });
   audio.addEventListener('pause',() => { if (current() && audio.paused && !audio.ended && !wantsPlay) {state='paused'; publish();} });
-  audio.addEventListener('waiting',() => { if (current() && wantsPlay) {state='loading'; publish();} });
+  audio.addEventListener('waiting', () => {
+    if (!current() || !wantsPlay) return;
+    state = 'buffering';
+    publish();
+    if (origin === 'plex') {
+      clearTimeout(startupTimer);
+      startupTimer = setTimeout(() => {
+        if (current() && state === 'buffering') retryOrFail();
+      }, 4000);
+    }
+  });
   audio.addEventListener('ended', () => {
     if (!current()) return;
     if (completedTracks === index) completedTracks++;

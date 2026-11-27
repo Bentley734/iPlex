@@ -23,7 +23,7 @@ public struct ToolDriveArchiveView: View {
     @StateObject private var plex = MobilePlex()
 
     public var body: some View {
-            TVCatalogView()
+            TVCatalogView(openRecording: Binding(get: { transport.requestedRecording }, set: { transport.requestedRecording = $0 }))
                 .environmentObject(archive)
                 .environmentObject(player)
                 .environmentObject(library)
@@ -69,6 +69,12 @@ private struct TVCatalogView: View {
     @State private var savedOnly = false
     @State private var filters = CatalogFilters()
     @State private var started = false
+    @Binding var openRecording: Int?
+
+    init(openRecording: Binding<Int?> = .constant(nil)) {
+        _openRecording = openRecording
+    }
+
     @State private var path: [TVRoute] = []
     @State private var showingFilters = false
     @State private var noAnniversaryShow = false
@@ -264,12 +270,17 @@ private struct TVCatalogView: View {
                 Text("No past shows with on-drive recordings match today’s date.")
             }
         }
+        .onChange(of: openRecording, initial: true) { _, id in
+            guard let id else { return }
+            path = [.show(id)]
+            openRecording = nil
+        }
         .fullScreenCover(isPresented: $player.isExpanded) { TVPlayerView() }
         .onAppear {
             guard !started else { return }
             started = true
             savedOnly = archive.home.start == .saved
-            if archive.home.start == .library { path = [.library] }
+            if archive.home.start == .library && path.isEmpty && openRecording == nil { path = [.library] }
         }
     }
 

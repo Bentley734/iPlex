@@ -291,18 +291,23 @@ final class AudioPlayer: ObservableObject {
         configureProcessing(startAt: startAt)
         observeActiveItem(item)
         if autoplay { resume() } else { updateNowPlaying() }
-        if autoplay, case .plex? = recordingSource {
-            startupRetry = Task { [weak self, weak item] in
-                do { try await Task.sleep(for: .seconds(4)) } catch { return }
-                guard let self, let item, self.activeItem === item, self.wantsPlayback, !self.isPlaying else { return }
-                if self.startupRetries >= 2 {
-                    self.fail("Plex audio didn’t start. Press Play to retry.")
-                } else {
-                    self.startupRetries += 1
-                    self.openTrack(requested, autoplay: true, startAt: startAt)
-                    self.errorMessage = "Retrying Plex audio…"
-                }
+        if autoplay { schedulePlexRetry(for: item, startAt: startAt) }
+    }
+
+    private func schedulePlexRetry(for item: AVPlayerItem, startAt: Double = 0, interrupted: Bool = false) {
+        guard case .plex? = recordingSource, wantsPlayback, startupRetry == nil else { return }
+        startupRetry = Task { [weak self, weak item] in
+            do { try await Task.sleep(for: .seconds(4)) } catch { return }
+            guard let self, let item, self.activeItem === item else { return }
+            self.startupRetry = nil
+            guard self.wantsPlayback, interrupted || self.transport.timeControlStatus != .playing || item.status == .failed else { return }
+            guard self.startupRetries < 2 else {
+                self.fail("Plex audio is unavailable. Press Play to retry this track.")
+                return
             }
+            self.startupRetries += 1
+            self.openTrack(self.index, autoplay: true, startAt: max(startAt, self.elapsed))
+            if self.phase != .playing { self.errorMessage = "Retrying Plex audio…" }
         }
     }
 
@@ -314,7 +319,11 @@ final class AudioPlayer: ObservableObject {
             Task { @MainActor in
                 guard let self, self.transport.currentItem === item else { return }
                 if item.status == .failed {
-                    if self.startupRetry == nil { self.fail("This track couldn’t be played. Retry it or choose another track.") }
+                    if case .plex? = self.recordingSource, self.wantsPlayback {
+                        self.schedulePlexRetry(for: item)
+                    } else {
+                        self.fail("This track couldn’t be played. Retry it or choose another track.")
+                    }
                 }
                 else if item.status == .readyToPlay { self.updateTime(); self.updatePlaybackStatus() }
             }
@@ -345,15 +354,22 @@ final class AudioPlayer: ObservableObject {
         itemObservers.append(center.addObserver(forName: .AVPlayerItemFailedToPlayToEndTime, object: item, queue: .main) { [weak self, weak item] _ in
             Task { @MainActor in
                 guard let self, let item, self.transport.currentItem === item else { return }
-                self.fail("Playback stopped before the end of this track.")
+                if case .plex? = self.recordingSource, self.wantsPlayback {
+                    self.errorMessage = "Retrying Plex audio…"
+                    self.schedulePlexRetry(for: item, interrupted: true)
+                } else {
+                    self.fail("Playback stopped before the end of this track.")
+                }
             }
         })
     }
 
     func toggle() {
         if isPlaying { pause() }
-        else if phase == .failed, let retryLive { retryLive() }
-        else if phase == .failed { selectTrack(index) }
+        else if phase == .failed {
+            if tracks.indices.contains(index) { selectTrack(index, startAt: elapsed) }
+            else { retryLive?() }
+        }
         else if phase == .finished { completedTracks = 0; selectTrack(0) }
         else { resume() }
     }
@@ -619,6 +635,8 @@ final class AudioPlayer: ObservableObject {
             startupRetry?.cancel()
             startupRetry = nil
             if startupRetries > 0 { errorMessage = nil }
+        } else if next == .buffering, let item = activeItem {
+            schedulePlexRetry(for: item)
         }
         if phase != next { phase = next }
         updateNowPlaying()
