@@ -601,8 +601,14 @@ body {
 :root[data-tool-drive-open] :is(#welcome, #browser) { display:none !important; }
 :root[data-downloads-open] :is(#welcome, #browser) { display:none !important; }
 #tool-drive-panel { width:100%; height:100%; }
-#downloads-panel { height:100%; display:flex; flex-direction:column; }
-#downloads-panel .content { overflow:auto; }
+#downloads-panel { height:100%; max-width:720px; margin-inline:auto; display:flex; flex-direction:column; }
+#downloads-panel:has(#downloads-empty:not([hidden])) { justify-content:safe center; }
+#downloads-panel header { justify-content:center; }
+#downloads-panel .content { min-height:0; overflow:auto; }
+#downloads-status, #downloads-empty { text-align:center; }
+#downloads-status:empty { display:none; }
+#downloads-cancel { display:block; margin-inline:auto; }
+#downloads-empty { max-width:410px; margin-inline:auto; }
 #downloads-items article { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:8px 0; }
 #video-browser { height:100%; display:flex; flex-direction:column; }
 #video-browser .content { overflow:auto; }

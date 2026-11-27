@@ -187,19 +187,18 @@ struct DownloadsBrowser: View {
     @State private var query = ""
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            #if os(macOS)
-            LibraryBrowseHeader {
-                Text(library.sectionName(.downloads)).font(.largeTitle.bold())
-            } controls: {
-                LibraryBrowseControls(placeholder: "Search downloads", query: $query, searchDisabled: false) { EmptyView() }
+        VStack(spacing: 12) {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 15) {
+                    heading.fixedSize()
+                    search.frame(width: 205)
+                }
+                VStack(spacing: 10) {
+                    heading.multilineTextAlignment(.center)
+                    search.frame(maxWidth: 205)
+                }
             }
-            #else
-            VStack(alignment: .leading) {
-                Text(library.sectionName(.downloads)).font(.largeTitle.bold())
-                LibraryBrowseControls(placeholder: "Search downloads", query: $query, searchDisabled: false) { EmptyView() }
-            }.padding()
-            #endif
+            .padding(.horizontal, 28).padding(.vertical, 20)
             if !downloads.status.isEmpty {
                 HStack {
                     Text(downloads.status).foregroundStyle(.secondary)
@@ -209,6 +208,8 @@ struct DownloadsBrowser: View {
             if downloads.items.isEmpty {
                 ContentUnavailableView("No Downloads", systemImage: "arrow.down.circle",
                     description: Text("Use Download in the Music, Movies, or TV Shows item menu. Tool Drive recordings are in its Library."))
+                    .frame(maxWidth: 440)
+                    .padding(.horizontal, 20)
             } else {
                 ScrollView {
                     LazyVStack(alignment: .leading, spacing: 10) {
@@ -241,6 +242,9 @@ struct DownloadsBrowser: View {
                 }
             }
         }
+        .frame(maxWidth: 720)
+        .frame(maxWidth: .infinity, maxHeight: .infinity,
+               alignment: downloads.items.isEmpty ? .center : .top)
         .sheet(item: $video) { item in
             if let file = item.files.first {
                 OfflineVideoSheet(title: item.title, url: downloads.url(file, in: item))
@@ -251,6 +255,14 @@ struct DownloadsBrowser: View {
         ), presenting: removal) { item in
             Button("Remove \(item.title)", role: .destructive) { downloads.remove(item); removal = nil }
         }
+    }
+
+    private var heading: some View {
+        Text(library.sectionName(.downloads)).font(.largeTitle.bold())
+    }
+
+    private var search: some View {
+        LibraryBrowseControls(placeholder: "Search downloads", query: $query, searchDisabled: false) { EmptyView() }
     }
 }
 
