@@ -353,7 +353,7 @@ private struct MusicWindow: View {
                 let scale = libraryArtworkSize.scale
                 let artwork = GridItem.Size.adaptive(minimum: (145 * scale).rounded(),
                                                      maximum: (190 * scale).rounded())
-                LazyVGrid(columns: [GridItem(trackList ? .flexible() : artwork, spacing: 21)],
+                LazyVGrid(columns: [GridItem(trackList ? .flexible() : artwork, spacing: 21, alignment: .top)],
                           alignment: .leading, spacing: trackList ? 8 : 24) {
                     ForEach(model.entries) { entry in
                         Button { searchTask?.cancel(); model.open(entry) } label: {
@@ -364,7 +364,8 @@ private struct MusicWindow: View {
                                     .aspectRatio(1, contentMode: .fit)
                                     .frame(width: trackList ? 46 : nil, height: trackList ? 46 : nil)
                                 VStack(alignment: .leading, spacing: 3) {
-                                    Text(entry.title).font(.headline).lineLimit(1)
+                                    Text(entry.title).font(.headline).lineLimit(trackList ? 1 : 2)
+                                        .multilineTextAlignment(.leading)
                                     if !entry.artist.isEmpty {
                                         Text(entry.artist).font(.callout).foregroundStyle(.secondary).lineLimit(1)
                                     }

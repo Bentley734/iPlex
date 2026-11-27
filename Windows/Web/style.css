@@ -87,6 +87,7 @@ header { padding:25px 29px 20px; display:flex; align-items:center; gap:12px; }
 .grid.track-list { grid-template-columns:1fr; gap:4px; }
 .track-list .tile { grid-template-columns:46px minmax(0,1fr); align-items:center; gap:12px; }
 .tile strong, .tile small, .playing strong, .playing small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+#grid[data-layout="grid"]:not(.track-list) > .library-tile > .tile { align-content:start; }
 small { color:var(--muted); }
 .cover { position:relative; display:grid; place-items:center; border-radius:9px; aspect-ratio:1; overflow:hidden; background:radial-gradient(circle,#4a3540,#25232b 80%); }
 .cover img { position:absolute; width:100%; height:100%; object-fit:cover; }
@@ -599,6 +600,11 @@ body {
 .video-tile { display:grid; gap:8px; text-align:left; align-content:start; border:0; background:transparent; min-width:0; }
 .video-tile strong,.video-tile small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .video-tile small { color:var(--muted); margin-top:3px; }
+#grid[data-layout="grid"]:not(.track-list) > .library-tile > .tile strong,
+.video-grid:not(.video-episodes) .video-tile strong {
+  display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; white-space:normal;
+  overflow-wrap:anywhere;
+}
 .video-poster { position:relative; display:grid; place-items:center; aspect-ratio:2/3; overflow:hidden;
   border-radius:10px; background:var(--surface-end); color:var(--muted); }
 .video-poster img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; }

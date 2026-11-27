@@ -187,7 +187,7 @@ struct PlexVideoBrowser: View {
                             }
                         }
                     } else {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: posterWidth), spacing: 18)], spacing: 22) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: posterWidth), spacing: 18, alignment: .top)], spacing: 22) {
                             ForEach(items) { item in
                                 Button {
                                     if item.type == "movie" { presentation = item }
@@ -202,6 +202,7 @@ struct PlexVideoBrowser: View {
                                             }
                                         }
                                     }
+                                    .fixedSize(horizontal: false, vertical: true)
                                 }
                                 .glassHover(lift: true)
                                 .disabled(!ready)
@@ -381,7 +382,7 @@ struct PlexVideoBrowser: View {
 
     private func labels(_ item: PlexVideoItem) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(item.title).font(.headline).lineLimit(2)
+            Text(item.title).font(.headline).lineLimit(2).multilineTextAlignment(.leading)
             if !item.subtitle.isEmpty {
                 Text(item.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }

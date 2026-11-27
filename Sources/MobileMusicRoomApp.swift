@@ -273,7 +273,7 @@ private struct MusicLibraryScreen: View {
                         LibraryAlternateLayout(library: library, layout: libraryLayout)
                     } else {
                         let trackList = library.kind == .tracks && library.selectedGroup == nil
-                        LazyVGrid(columns: [GridItem(trackList ? .flexible() : artworkColumns, spacing: 20)],
+                        LazyVGrid(columns: [GridItem(trackList ? .flexible() : artworkColumns, spacing: 20, alignment: .top)],
                                   spacing: trackList ? 8 : 20) {
                             ForEach(library.entries) { entry in
                                 Button { search?.cancel(); library.open(entry) } label: {
@@ -284,7 +284,8 @@ private struct MusicLibraryScreen: View {
                                             .aspectRatio(1, contentMode: .fit)
                                             .frame(width: trackList ? 46 : nil, height: trackList ? 46 : nil)
                                         VStack(alignment: .leading, spacing: 3) {
-                                            Text(entry.title).font(.headline).lineLimit(1)
+                                            Text(entry.title).font(.headline).lineLimit(trackList ? 1 : 2)
+                                                .multilineTextAlignment(.leading)
                                             if !entry.artist.isEmpty {
                                                 Text(entry.artist).font(.caption).foregroundStyle(.secondary).lineLimit(1)
                                             }
