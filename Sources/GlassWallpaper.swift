@@ -6,7 +6,7 @@ import PhotosUI
 #endif
 
 enum GlassBackground: String, CaseIterable, Identifiable {
-    case themeDefault, prismTide = "prism-tide", emberFold = "ember-fold", violetOrbit = "violet-orbit", custom
+    case themeDefault, prismTide = "prism-tide", emberFold = "ember-fold", violetOrbit = "violet-orbit", custom, gradient
 
     var id: Self { self }
     var label: String {
@@ -16,9 +16,10 @@ enum GlassBackground: String, CaseIterable, Identifiable {
         case .emberFold: "Ember Fold"
         case .violetOrbit: "Violet Orbit"
         case .custom: "Custom Image"
+        case .gradient: "Animated Gradient"
         }
     }
-    var isPreset: Bool { self != .themeDefault && self != .custom }
+    var isPreset: Bool { self == .prismTide || self == .emberFold || self == .violetOrbit }
 }
 
 @MainActor
@@ -252,6 +253,7 @@ struct GlassWallpaperSettings: View {
                 }
             }
             .disabled(wallpaper.working)
+            if wallpaper.background == .gradient { AnimatedGradientSettings() }
             if let image = wallpaper.image {
                 GlassWallpaperImage(image: image)
                     .scaledToFill().frame(width: 132, height: 74)

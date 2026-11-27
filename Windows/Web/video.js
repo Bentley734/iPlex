@@ -106,6 +106,7 @@
   const listingContent = browser.querySelector('.content');
   let selectedDetail, movieOpener, videoDetailSequence = 0, requestedMovieDownload = false, downloadBusy = false;
 
+  let showBeforeEpisode, tvListing, currentDetailMetadata;
   let watchRecords = new Map(), watchSequence = 0, activeItem, activeScope, lastReport = 0;
   let lastSaved = 0, awaitingSeek = false, nativeActive = false;
   let selectedVersion = -1, activeVersion = null, nextEpisode = null, nextTimer = null;
@@ -220,7 +221,7 @@
       const resume = document.createElement('small');
       resume.textContent = 'Resume at ' + watchTime(row.seconds);
       tile.append(title, resume);
-      tile.onclick = () => open(row);
+      tile.onclick = () => row.type === 'episode' ? openDetails(row, tile) : open(row);
       return tile;
     }));
   }
@@ -407,7 +408,11 @@
     const value = name => appearance.getPropertyValue('--' + name).trim();
     const channels = value('custom-tint-rgb');
     const tint = root.dataset.glassTint === 'none' ? '' : channels ? `rgb(${channels})` : value('accent');
-    return {title:titles.toolDrive, text:value('text'), accent:value('accent'),
+    const gradient = root.hasAttribute('data-animated-gradient') ? {
+      motion:root.dataset.gradientMotion, duration:value('gradient-duration'),
+      colors:[1,2,3].map(index => value('gradient-color-' + index))
+    } : null;
+    return {title:titles.toolDrive, text:value('text'), accent:value('accent'), gradient,
             density:value('glass-density'), tint,
             background:value('panel'), hover:root.hasAttribute('data-glass-hover')};
   }
@@ -438,7 +443,7 @@
   new MutationObserver(() => { if (archiveOpen) reportArchiveBounds(); })
     .observe(document.body, {subtree:true, attributes:true, attributeFilter:['open']});
   new MutationObserver(() => { if (archiveOpen) reportArchiveBounds(); })
-    .observe(document.documentElement, {attributes:true, attributeFilter:['style', 'data-glass-hover', 'data-glass-tint', 'data-artwork-colors']});
+    .observe(document.documentElement, {attributes:true, attributeFilter:['style', 'data-glass-hover', 'data-glass-tint', 'data-artwork-colors', 'data-animated-gradient', 'data-gradient-motion']});
   function resumeArchive() {
     if (preferredKind === 'toolDrive') openArchive(true);
     if (preferredKind === 'downloads') openDownloads(true);
@@ -612,7 +617,7 @@
       const poster = document.createElement('span');
       poster.className = 'video-poster';
       const typeIcon = document.createElement('span');
-      typeIcon.textContent = row.type === 'episode' ? '▶' : '▣';
+      typeIcon.textContent = '▣';
       typeIcon.setAttribute('aria-hidden', 'true');
       poster.append(typeIcon);
       if (/^\/art\/[a-f0-9]{32}$/.test(row.artwork)) {
@@ -638,8 +643,7 @@
       labels.append(badge);
       tile.append(poster, labels);
       tile.onclick = () => {
-        if (row.type === 'movie' || row.type === 'show') openDetails(row, tile);
-        else if (row.type === 'episode') open(row);
+        if (['movie','show','episode'].includes(row.type)) openDetails(row, tile);
         else { parent.push(row); browse(); }
       };
       if (interactive && row.type === kind) {
@@ -682,79 +686,120 @@
   }
 
   function updateMovieActions() {
-    if (selectedDetail?.type !== 'movie') return;
+    if (!selectedDetail || selectedDetail.type === 'show') return;
     const watch = watchRecords.get(selectedDetail.key);
     const resume = watch && !watch.watched && watch.seconds >= 5;
-    get('movie-play').textContent = resume ? 'Resume' : 'Play Movie';
+    get('movie-play').textContent = resume ? 'Resume' : (selectedDetail.type === 'episode' ? 'Play Episode' : 'Play Movie');
     get('movie-watch').textContent = watch?.watched ? 'Mark Unwatched' : 'Mark Watched';
     showMovieText(get('movie-resume'), resume ? 'Continue at ' + watchTime(watch.seconds) : '');
   }
 
   function openDetails(item, opener) {
-    selectedDetail = item;
-    requestedMovieDownload = false;
-    showMovieText(get('movie-download-status'), '');
-    movieOpener = opener;
-    const show = item.type === 'show';
-    const showBrowse = get('show-browse');
-    listingHeader.hidden = true;
-    listingContent.hidden = !show;
-    showBrowse.hidden = !show;
-    for (const id of ['movie-play','movie-download','movie-watch','movie-resume']) get(id).hidden = show;
-    if (show) {
-      showBrowse.append(listingContent);
+    if (item.type === 'episode' && selectedDetail?.type === 'show') {
+      showBeforeEpisode = {item:selectedDetail, opener:movieOpener, metadata:currentDetailMetadata, scroll:moviePage.scrollTop};
+    }
+    if (item.type === 'show') {
+      tvListing = {nodes:[...tiles.childNodes], keys:[...rendered], next, offset:listOffset,
+        message:status.textContent, scroll:listingContent.scrollTop, busy};
+      get('show-browse').append(listingContent);
       parent = [item];
     }
+    presentDetails(item, opener);
+    requestVideoDetails();
+    if (item.type === 'show') browse();
+  }
+
+  function presentDetails(item, opener, metadata) {
+    selectedDetail = item;
+    currentDetailMetadata = metadata;
+    requestedMovieDownload = false;
+    showMovieText(get('movie-download-status'), '');
+    showMovieText(get('movie-detail-status'), '');
+    get('movie-detail-retry').hidden = true;
+    movieOpener = opener;
+    const show = item.type === 'show';
+    listingHeader.hidden = true;
+    listingContent.hidden = get('show-browse').hidden = !show;
+    for (const id of ['movie-play','movie-download','movie-watch','movie-resume']) get(id).hidden = show;
+    get('movie-match').hidden = item.type === 'episode';
     moviePage.hidden = false;
+    moviePage.dataset.kind = item.type;
     moviePage.scrollTop = 0;
-    get('movie-back').textContent = '‹ Back to ' + titles[item.type];
+    const backTo = item.type === 'episode' ? parent.at(-1)?.title || titles.show : titles[item.type];
+    get('movie-back').textContent = '‹ Back to ' + backTo;
     get('movie-detail-title').textContent = item.title;
-    setMovieArt(get('movie-poster'), item.artwork);
     updateMovieActions();
-    renderVideoDetails({});
+    renderVideoDetails(metadata || {});
     window.interfaceMotion.show(moviePage, ['videoDetails', library, item.key]);
     get('movie-detail-title').focus({preventScroll:true});
-    requestVideoDetails();
-    if (show) browse();
   }
 
   function closeDetails() {
     if (!selectedDetail) return;
-    if (selectedDetail.type === 'show') {
+    if (tvListing) {
       browser.insertBefore(listingContent, moviePage);
       parent = [];
     }
-    selectedDetail = null;
+    tvListing = showBeforeEpisode = null;
+    selectedDetail = currentDetailMetadata = null;
     ++videoDetailSequence;
     moviePage.hidden = true;
     listingHeader.hidden = listingContent.hidden = false;
   }
 
   get('movie-back').onclick = () => {
-    const wasShow = selectedDetail?.type === 'show';
-    closeDetails();
-    if (wasShow) browse();
-    else window.interfaceMotion.show(browser, ['video', kind, library, parent.at(-1)?.key]);
-    if (movieOpener?.isConnected) movieOpener.focus({preventScroll:true});
-    else search.focus({preventScroll:true});
+    const opener = movieOpener;
+    if (showBeforeEpisode) {
+      const {item, opener:showOpener, metadata, scroll} = showBeforeEpisode;
+      showBeforeEpisode = null;
+      ++videoDetailSequence;
+      presentDetails(item, showOpener, metadata);
+      if (!metadata) requestVideoDetails();
+      moviePage.scrollTop = scroll;
+    } else {
+      const listing = tvListing;
+      closeDetails();
+      if (listing?.nodes.length && !listing.busy) {
+        ++pending;
+        busy = false;
+        tiles.replaceChildren(...listing.nodes);
+        rendered.clear();
+        for (const key of listing.keys) rendered.add(key);
+        listOffset = listing.offset;
+        next = listing.next;
+        status.textContent = listing.message;
+        retry.hidden = true;
+        loadMore.hidden = next === null;
+        get('video-title').textContent = titles[kind];
+        get('video-back').hidden = true;
+        get('video-summary').hidden = true;
+        search.hidden = !library;
+        tiles.classList.remove('video-episodes');
+        listingContent.scrollTop = listing.scroll;
+        renderWatch();
+      } else if (listing) browse();
+      window.interfaceMotion.show(browser, ['video', kind, library, parent.at(-1)?.key]);
+    }
+    if (opener?.isConnected) opener.focus({preventScroll:true});
+    else if (!selectedDetail) search.focus({preventScroll:true});
   };
   get('show-all-seasons').onclick = () => { if (parent.at(-1)?.type === 'season') { parent.pop(); browse(); } };
   moviePage.addEventListener('keydown', event => {
     if (event.key === 'Escape') {
       event.preventDefault();
-      get(parent.at(-1)?.type === 'season' ? 'show-all-seasons' : 'movie-back').click();
+      get(selectedDetail?.type === 'show' && parent.at(-1)?.type === 'season' ? 'show-all-seasons' : 'movie-back').click();
     }
   });
-  get('movie-play').onclick = () => { if (selectedDetail?.type === 'movie') open(selectedDetail); };
+  get('movie-play').onclick = () => { if (selectedDetail && selectedDetail.type !== 'show') open(selectedDetail); };
   get('movie-match').onclick = () => { if (selectedDetail) openMatch(selectedDetail); };
   get('movie-download').onclick = () => {
-    if (selectedDetail?.type !== 'movie' || downloadBusy) return;
+    if (!selectedDetail || selectedDetail.type === 'show' || downloadBusy) return;
     requestedMovieDownload = true;
     host({action:'offlineDownloadVideo', item:selectedDetail.key, library,
-      kind:'movie', title:selectedDetail.title, detail:selectedDetail.subtitle, version:-1});
+      kind:selectedDetail.type, title:selectedDetail.title, detail:selectedDetail.subtitle, version:-1});
   };
   get('movie-watch').onclick = () => {
-    if (selectedDetail?.type !== 'movie') return;
+    if (!selectedDetail || selectedDetail.type === 'show') return;
     const {key, type, title, subtitle, thumb} = selectedDetail;
     if (watchRecords.get(key)?.watched) {
       watchRecords.delete(key);
@@ -771,13 +816,14 @@
     if (!selectedDetail) return;
     showMovieText(get('movie-detail-status'), '');
     get('movie-detail-retry').hidden = true;
-    host({action:'videoDetails', id:++videoDetailSequence, item:selectedDetail.key, ...watchContext()});
+    host({action:'videoDetails', id:++videoDetailSequence, item:selectedDetail.key, type:selectedDetail.type, ...watchContext()});
   }
 
   function renderVideoDetails(details) {
-    get('movie-facts').textContent = [details.year || selectedDetail.subtitle, details.minutes ? details.minutes + ' min' : '',
+    get('movie-facts').textContent = [selectedDetail.type === 'episode' ? selectedDetail.subtitle : details.year || selectedDetail.subtitle, details.minutes ? details.minutes + ' min' : '',
       details.classification].filter(Boolean).join('  ·  ');
     setMovieArt(get('movie-backdrop'), details.backdrop);
+    setMovieArt(get('movie-poster'), details.thumbnail || selectedDetail.artwork);
     showMovieText(get('movie-genres'), (details.genres || []).join(' · '));
     const synopsis = get('movie-synopsis');
     const summary = details.summary || selectedDetail.summary || '';
@@ -821,7 +867,7 @@
     if (!selectedDetail || reply.id !== videoDetailSequence || reply.key !== selectedDetail.key) return;
     showMovieText(get('movie-detail-status'), reply.error || '');
     get('movie-detail-retry').hidden = !reply.error;
-    if (!reply.error) renderVideoDetails(reply);
+    if (!reply.error) { currentDetailMetadata = reply; renderVideoDetails(reply); }
   };
 
   function open(item) {

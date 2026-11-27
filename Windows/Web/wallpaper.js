@@ -11,6 +11,44 @@
   const maximumBytes = 25 * 1024 * 1024;
   const presets = new Set(['prism-tide', 'ember-fold', 'violet-orbit']);
   const choiceKey = 'musicroom-glass-background';
+  const gradientKey = 'musicroom-glass-gradient';
+  const get = id => document.getElementById('glass-gradient-' + id);
+  const gradientColors = ['first','second','third'].map(get);
+  const gradientMotion = get('motion');
+  const gradientSpeed = get('speed');
+  const gradientDurations = {slow:48, normal:30, fast:16};
+  try {
+    const saved = JSON.parse(localStorage.getItem(gradientKey));
+    gradientColors.forEach((input, index) => {
+      if (/^#[a-f0-9]{6}$/i.test(saved?.colors?.[index])) input.value = saved.colors[index];
+    });
+    if ([...gradientMotion.options].some(option => option.value === saved?.motion)) gradientMotion.value = saved.motion;
+    if ([...gradientSpeed.options].some(option => option.value === saved?.speed)) gradientSpeed.value = saved.speed;
+  } catch {}
+
+  function renderGradient() {
+    const active = selected === 'gradient';
+    get('settings').hidden = !active;
+    get('speed-label').hidden = gradientMotion.value === 'still';
+    root.toggleAttribute('data-animated-gradient', active);
+    root.dataset.gradientMotion = gradientMotion.value;
+    gradientColors.forEach((input, index) => root.style.setProperty('--gradient-color-' + (index+1), input.value));
+    root.style.setProperty('--gradient-duration', gradientDurations[gradientSpeed.value] + 's');
+  }
+
+  function saveGradient() {
+    try {
+      localStorage.setItem(gradientKey, JSON.stringify({
+        colors:gradientColors.map(input => input.value), motion:gradientMotion.value, speed:gradientSpeed.value
+      }));
+    } catch {}
+    renderGradient();
+  }
+
+  gradientColors.forEach(input => input.addEventListener('input', saveGradient));
+  gradientMotion.addEventListener('change', saveGradient);
+  gradientSpeed.addEventListener('change', saveGradient);
+
   let selected = 'custom';
   try { selected = localStorage.getItem(choiceKey) || 'custom'; } catch {}
   let objectURL = '';
@@ -43,7 +81,8 @@
     const preset = presets.has(selected);
     const source = preset ? 'GlassBackgrounds/' + selected + '.jpg' : selected === 'custom' ? objectURL : '';
     choice.querySelector('[value="custom"]').hidden = !objectURL;
-    choice.value = source ? selected : 'themeDefault';
+    choice.value = source || selected === 'gradient' ? selected : 'themeDefault';
+    renderGradient();
     root.toggleAttribute('data-custom-wallpaper', Boolean(source));
     root.toggleAttribute('data-preset-wallpaper', preset);
     preview.hidden = !source;

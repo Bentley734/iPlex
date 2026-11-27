@@ -835,3 +835,19 @@ body {
 
 #show-browse .content { padding:0; overflow:visible; }
 #show-all-seasons { margin-bottom:12px; }
+
+#movie-details[data-kind="episode"] .movie-hero { min-height:270px; }
+#movie-details[data-kind="episode"] #movie-poster:not([hidden]) {
+  flex:0 0 min(36%,232px); width:min(36%,232px); aspect-ratio:16 / 9;
+}
+@media (max-width:650px) {
+  #movie-details[data-kind="episode"] .movie-feature { flex-direction:column; align-items:start; }
+  #movie-details[data-kind="episode"] #movie-poster:not([hidden]) {
+    display:block; flex:auto; width:min(100%,300px);
+  }
+}
+
+#glass-gradient-settings { border:1px solid var(--glass-border); padding:12px; border-radius:12px; }
+#glass-gradient-settings label { display:inline-flex; align-items:center; gap:6px; margin-top:8px; }
+.gradient-colors { display:flex; flex-wrap:wrap; gap:12px; }
+#glass-gradient-preview { width:100%; height:74px; border-radius:8px; }

@@ -149,6 +149,8 @@ struct PlexVideoBrowser: View {
     @State private var generation = UUID()
     @State private var presentation: PlexVideoItem?
     @State private var detail: PlexVideoItem?
+    @State private var episodeDetail: PlexVideoItem?
+    @State private var showListing: (items: [PlexVideoItem], next: Int?)?
     @State private var matching: PlexVideoItem?
     @AppStorage(LibraryPageSize.preferenceKey) private var pageSize = LibraryPageSize.standard
     @AppStorage(LibraryArtworkSize.videoPosterPreferenceKey) private var posterSize = LibraryArtworkSize.medium
@@ -183,33 +185,33 @@ struct PlexVideoBrowser: View {
     var body: some View {
         ZStack {
             listing
-                .opacity(detail == nil ? 1 : 0)
-                .allowsHitTesting(detail == nil)
-                .accessibilityHidden(detail != nil)
-                .disabled(detail != nil)
+                .opacity(detail == nil && episodeDetail == nil ? 1 : 0)
+                .allowsHitTesting(detail == nil && episodeDetail == nil)
+                .accessibilityHidden(detail != nil || episodeDetail != nil)
+                .disabled(detail != nil || episodeDetail != nil)
             if let detail {
-                VideoDetailsPage(item: detail, server: server, section: selection, service: service,
-                                 ready: ready, resume: detail.type == "movie" ? resumePosition(for: detail) : nil,
-                                 sectionName: sectionName, back: closeDetails,
-                                 play: { presentation = detail }, download: {
-                    MediaDownloads.shared.downloadVideo(service: service, server: server, section: selection, item: detail)
-                }, actions: {
-                    if detail.type == "movie" { watchActions(detail) }
-                    Button("Fix Match", systemImage: "magnifyingglass") { matching = detail }
-                        .disabled(!ready)
-                }, episodes: {
-                    if detail.type == "show" { showNavigation }
-                })
-                .id(detail.id)
-                #if os(tvOS)
-                .onExitCommand {
-                    if episodes { trail.removeLast() }
-                    else { closeDetails() }
+                detailsPage(detail, backTitle: sectionName, back: closeDetails)
+                    .opacity(episodeDetail == nil ? 1 : 0)
+                    .allowsHitTesting(episodeDetail == nil)
+                    .accessibilityHidden(episodeDetail != nil)
+                    .disabled(episodeDetail != nil)
+                    #if os(tvOS)
+                    .onExitCommand {
+                        if episodes { trail.removeLast() }
+                        else { closeDetails() }
+                    }
+                    #endif
+            }
+            if let episodeDetail {
+                detailsPage(episodeDetail, backTitle: parent?.title ?? sectionName) {
+                    self.episodeDetail = nil
                 }
+                #if os(tvOS)
+                .onExitCommand { self.episodeDetail = nil }
                 #endif
             }
         }
-        .pageTransition(on: detail?.id)
+        .pageTransition(on: episodeDetail?.id ?? detail?.id)
         .clipped()
         .task(id: [String(serverReady), String(discoveryRetry)]) {
             if serverReady { await discover() }
@@ -218,6 +220,15 @@ struct PlexVideoBrowser: View {
         .task(id: requestKey) {
             let current = UUID()
             generation = current
+            if parent == nil, let saved = showListing {
+                showListing = nil
+                items = saved.items
+                next = saved.next
+                busy = false
+                message = nil
+                refreshWatchState()
+                return
+            }
             items = showingRoot && snapshot?.library.id == selection ? snapshot?.items ?? [] : []
             next = nil
             refreshWatchState()
@@ -227,12 +238,15 @@ struct PlexVideoBrowser: View {
             if !value.isEmpty { UserDefaults.standard.set(value, forKey: preference) }
             trail = []
             detail = nil
+            episodeDetail = nil
+            showListing = nil
             items = showingRoot && snapshot?.library.id == value ? snapshot?.items ?? [] : []
             refreshWatchState()
         }
         .sheet(item: $matching) { item in
             PlexVideoMatchEditor(item: item, server: server, section: selection, service: service) {
                 if detail?.id == item.id { closeDetails() }
+                showListing = nil
                 retry += 1
             }
         }
@@ -241,6 +255,23 @@ struct PlexVideoBrowser: View {
         #else
         .fullScreenCover(item: $presentation, onDismiss: refreshWatchState, content: videoSession)
         #endif
+    }
+
+    private func detailsPage(_ item: PlexVideoItem, backTitle: String, back: @escaping () -> Void) -> some View {
+        VideoDetailsPage(item: item, server: server, section: selection, service: service,
+                         ready: ready, resume: item.type == "show" ? nil : resumePosition(for: item),
+                         sectionName: backTitle, back: back,
+                         play: { presentation = item }, download: {
+            MediaDownloads.shared.downloadVideo(service: service, server: server, section: selection, item: item)
+        }, actions: {
+            if item.type != "show" { watchActions(item) }
+            if item.type != "episode" {
+                Button("Fix Match", systemImage: "magnifyingglass") { matching = item }.disabled(!ready)
+            }
+        }, episodes: {
+            if item.type == "show" { showNavigation }
+        })
+        .id(item.id)
     }
 
     private var listing: some View {
@@ -287,6 +318,7 @@ struct PlexVideoBrowser: View {
     }
 
     private func closeDetails() {
+        episodeDetail = nil
         detail = nil
         trail = []
     }
@@ -303,7 +335,7 @@ struct PlexVideoBrowser: View {
             LazyVStack(alignment: .leading, spacing: 10) {
                 ForEach(items.filter { $0.type == (episodes ? "episode" : "season") }) { item in
                     Button {
-                        if episodes { presentation = item }
+                        if episodes { episodeDetail = item }
                         else { trail.append(item) }
                     } label: {
                         HStack(spacing: 15) {
@@ -315,9 +347,8 @@ struct PlexVideoBrowser: View {
                                 }
                             }
                             Spacer()
-                            Image(systemName: episodes
-                                  ? (watchedItems.contains(item.id) ? "checkmark.circle.fill" : "play.circle")
-                                  : "chevron.forward")
+                            Image(systemName: episodes && watchedItems.contains(item.id)
+                                  ? "checkmark.circle.fill" : "chevron.forward")
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -371,7 +402,10 @@ struct PlexVideoBrowser: View {
             ForEach(items) { item in
                 Button {
                     detail = item
-                    if item.type == "show" { trail = [item] }
+                    if item.type == "show" {
+                        if !busy && message == nil { showListing = (items, next) }
+                        trail = [item]
+                    }
                 } label: {
                     VStack(alignment: .leading, spacing: 8) {
                         poster(item).frame(width: layout.posterWidth, height: layout.posterHeight)
@@ -452,7 +486,10 @@ struct PlexVideoBrowser: View {
             ScrollView(.horizontal) {
                 LazyHStack(alignment: .top, spacing: 16) {
                     ForEach(recent, id: \.item.id) { record in
-                        Button { presentation = record.item } label: {
+                        Button {
+                            if record.item.type == "episode" { episodeDetail = record.item }
+                            else { presentation = record.item }
+                        } label: {
                             VStack(alignment: .leading, spacing: 5) {
                                 poster(record.item).frame(width: 150, height: 86)
                                 labels(record.item)

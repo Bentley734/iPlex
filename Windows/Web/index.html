@@ -13,6 +13,7 @@
   <script defer src="interface-motion.js"></script>
   <script defer src="video.js"></script>
   <script defer src="music.js"></script>
+  <link rel="stylesheet" href="gradient-background.css">
   <script defer src="wallpaper.js"></script>
 </head>
 <body>
@@ -410,8 +411,29 @@
         <option value="prism-tide">Prism Tide</option>
         <option value="ember-fold">Ember Fold</option>
         <option value="violet-orbit">Violet Orbit</option>
+        <option value="gradient">Animated Gradient</option>
         <option value="custom" hidden>Custom Image</option>
       </select>
+      <fieldset id="glass-gradient-settings" hidden>
+        <legend>Customize Gradient</legend>
+        <div id="glass-gradient-preview" aria-hidden="true"></div>
+        <div class="gradient-colors">
+          <label>Color 1 <input id="glass-gradient-first" type="color" value="#253e7d"></label>
+          <label>Color 2 <input id="glass-gradient-second" type="color" value="#167f87"></label>
+          <label>Color 3 <input id="glass-gradient-third" type="color" value="#732e72"></label>
+        </div>
+        <label>Gradient Motion
+          <select id="glass-gradient-motion">
+            <option value="drift">Drift</option><option value="rotate">Rotate</option>
+            <option value="pulse">Pulse</option><option value="still">Still</option>
+          </select>
+        </label>
+        <label id="glass-gradient-speed-label">Gradient Speed
+          <select id="glass-gradient-speed">
+            <option value="slow">Slow</option><option value="normal" selected>Normal</option><option value="fast">Fast</option>
+          </select>
+        </label>
+      </fieldset>
       <label for="glass-wallpaper-file">Choose a custom image</label>
       <input id="glass-wallpaper-file" type="file" accept="image/*">
       <img id="glass-wallpaper-preview" alt="Current Liquid Glass background" hidden>

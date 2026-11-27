@@ -23,10 +23,10 @@
               var(--iplex-background, transparent) !important;
 }
 :root[data-iplex-archive] body {
-  background: transparent !important;
   color: var(--text);
   font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
+:root[data-iplex-archive]:not([data-animated-gradient]) body { background: transparent !important; }
 :root[data-iplex-archive] .shell {
   max-width: none !important;
   padding-inline: 28px !important;

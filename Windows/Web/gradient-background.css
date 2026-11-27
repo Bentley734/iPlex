@@ -1,0 +1,40 @@
+@property --gradient-angle {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 122deg;
+}
+:root:is([data-glass],[data-iplex-archive])[data-animated-gradient] :is(body, #glass-gradient-preview) {
+  background-image:linear-gradient(#0006,#0006),
+    radial-gradient(ellipse at 40% 48%,var(--gradient-color-2),transparent 57%),
+    linear-gradient(var(--gradient-angle),var(--gradient-color-1),var(--gradient-color-2),var(--gradient-color-3));
+  background-size:100% 100%,160% 160%,100% 100%;
+  background-position:center;
+  background-repeat:no-repeat;
+  animation:none;
+}
+:root:is([data-glass],[data-iplex-archive])[data-animated-gradient] main { background-image:var(--glass-surface); animation:none; }
+/* Keep the gradient in the app shell when the video details are open. */
+:root[data-glass][data-animated-gradient] #movie-details { background:var(--ink); border-radius:inherit; }
+@media (prefers-reduced-motion:no-preference) {
+  :root:is([data-glass],[data-iplex-archive])[data-animated-gradient][data-gradient-motion="drift"] :is(body,#glass-gradient-preview) {
+    animation:gradient-drift var(--gradient-duration) ease-in-out infinite;
+  }
+  :root:is([data-glass],[data-iplex-archive])[data-animated-gradient][data-gradient-motion="rotate"] :is(body,#glass-gradient-preview) {
+    animation:gradient-rotate var(--gradient-duration) linear infinite;
+  }
+  :root:is([data-glass],[data-iplex-archive])[data-animated-gradient][data-gradient-motion="pulse"] :is(body,#glass-gradient-preview) {
+    animation:gradient-pulse var(--gradient-duration) ease-in-out infinite;
+  }
+}
+@keyframes gradient-drift {
+  0%,100% { background-position:center,15% 70%,center; }
+  50% { background-position:center,85% 25%,center; }
+}
+@keyframes gradient-rotate { to { --gradient-angle:482deg; } }
+@keyframes gradient-pulse {
+  0%,100% { background-size:100% 100%,125% 125%,100% 100%; }
+  50% { background-size:100% 100%,215% 215%,100% 100%; }
+}
+@media (prefers-reduced-transparency:reduce) {
+  :root:is([data-glass],[data-iplex-archive])[data-animated-gradient] body { background:var(--ink); animation:none !important; }
+}

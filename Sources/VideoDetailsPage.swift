@@ -13,6 +13,7 @@ struct PlexVideoDetails {
     let classification: String?
     let genres: [String]
     let backdrop: String?
+    let thumbnail: String?
     let credits: [PlexVideoCredit]
     let formats: [String]
 }
@@ -32,75 +33,95 @@ struct VideoDetailsPage<Actions: View, Episodes: View>: View {
     @ViewBuilder let episodes: () -> Episodes
 
     @MusicAppearance private var theme
+    @ObservedObject private var wallpaper = GlassWallpaper.shared
     @ObservedObject private var downloads = MediaDownloads.shared
     @State private var requestedDownload = false
     @State private var details: PlexVideoDetails?
     @State private var loadError = false
     @State private var retry = 0
 
+    private var isEpisode: Bool { item.type == "episode" }
+
     private var facts: [String] {
-        [details?.year.map { String($0) } ?? item.subtitle,
+        [isEpisode ? item.subtitle : details?.year.map { String($0) } ?? item.subtitle,
          details?.minutes.map { "\($0) min" } ?? "",
          details?.classification ?? ""].filter { !$0.isEmpty }
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                Button("Back to " + sectionName, systemImage: "chevron.backward", action: back)
-                    .buttonStyle(.bordered)
-                    #if !os(tvOS)
-                    .keyboardShortcut(.cancelAction)
-                    #endif
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 24) {
-                        artwork(item.thumb, icon: "film").frame(width: 132, height: 198)
-                        information.frame(minWidth: 290)
+        VStack(alignment: .leading, spacing: 0) {
+            Button(action: back) {
+                Label("Back to " + sectionName, systemImage: "chevron.backward")
+                    .padding(.vertical, 5)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.bordered)
+            #if !os(tvOS)
+            .keyboardShortcut(.cancelAction)
+            #endif
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 24) {
+                            thumbnail
+                                .frame(width: isEpisode ? 224 : 132, height: isEpisode ? 126 : 198)
+                            information.frame(minWidth: 290)
+                        }
+                        .padding(24)
+                        VStack(alignment: .leading, spacing: 16) {
+                            if isEpisode {
+                                thumbnail.aspectRatio(16 / 9, contentMode: .fit).frame(maxWidth: 320)
+                            }
+                            information
+                        }.padding(18)
                     }
-                    .padding(24)
-                    information.padding(18)
-                }
-                .frame(maxWidth: 750, alignment: .leading)
-                .musicGlass(theme, radius: 20)
-                .padding(20)
-                .frame(maxWidth: .infinity, minHeight: 370, alignment: .bottomLeading)
-                .background { backdrop }
-                .clipShape(.rect(cornerRadius: 24))
-                if requestedDownload && !downloads.status.isEmpty {
-                    Text(downloads.status)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-                let summary = details?.summary ?? item.summary
-                if !summary.isEmpty {
-                    sectionPanel("Synopsis") {
-                        Text(summary)
-                            .foregroundStyle(theme.text.opacity(0.84))
-                            .frame(maxWidth: 880, alignment: .leading)
-                            .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 750, alignment: .leading)
+                    .musicGlass(theme, radius: 20)
+                    .padding(20)
+                    .frame(maxWidth: .infinity, minHeight: isEpisode ? 280 : 370, alignment: .bottomLeading)
+                    .background { backdrop }
+                    .clipShape(.rect(cornerRadius: 24))
+                    if requestedDownload && !downloads.status.isEmpty {
+                        Text(downloads.status)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
                     }
-                }
-                if let details, !details.credits.isEmpty {
-                    sectionPanel("Cast and Crew") { credits(details.credits) }
-                }
-                episodes()
-                if let details, !details.formats.isEmpty {
-                    sectionPanel(details.formats.count == 1 ? "Video Format" : "Video Formats") {
-                        ForEach(Array(details.formats.enumerated()), id: \.offset) { _, format in
-                            Text(format).font(.callout.monospaced()).foregroundStyle(theme.text.opacity(0.8))
+                    let summary = details?.summary ?? item.summary
+                    if !summary.isEmpty {
+                        sectionPanel("Synopsis") {
+                            Text(summary)
+                                .foregroundStyle(theme.text.opacity(0.84))
+                                .frame(maxWidth: 880, alignment: .leading)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    if let details, !details.credits.isEmpty {
+                        sectionPanel("Cast and Crew") { credits(details.credits) }
+                    }
+                    episodes()
+                    if let details, !details.formats.isEmpty {
+                        sectionPanel(details.formats.count == 1 ? "Video Format" : "Video Formats") {
+                            ForEach(Array(details.formats.enumerated()), id: \.offset) { _, format in
+                                Text(format).font(.callout.monospaced()).foregroundStyle(theme.text.opacity(0.8))
+                            }
+                        }
+                    }
+                    if loadError {
+                        HStack {
+                            Text("Plex couldn’t load the full details.").foregroundStyle(.secondary)
+                            Button("Retry") { retry += 1 }.buttonStyle(.bordered)
                         }
                     }
                 }
-                if loadError {
-                    HStack {
-                        Text("Plex couldn’t load the full details.").foregroundStyle(.secondary)
-                        Button("Retry") { retry += 1 }.buttonStyle(.bordered)
-                    }
-                }
+                .padding(20)
+                .frame(maxWidth: 1380)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
-            .padding(20)
-            .frame(maxWidth: 1380)
-            .frame(maxWidth: .infinity, alignment: .center)
+        }
+        .background {
+            if wallpaper.background == .gradient { theme.backdrop }
         }
         .task(id: [section, item.id, String(ready), String(retry)]) {
             guard ready else { return }
@@ -112,6 +133,10 @@ struct VideoDetailsPage<Actions: View, Episodes: View>: View {
                 if !Task.isCancelled { loadError = true }
             }
         }
+    }
+
+    private var thumbnail: some View {
+        artwork(details?.thumbnail ?? item.thumb, icon: isEpisode ? "tv" : "film")
     }
 
     private var backdrop: some View {
@@ -156,8 +181,8 @@ struct VideoDetailsPage<Actions: View, Episodes: View>: View {
     }
 
     @ViewBuilder private var controls: some View {
-        if item.type == "movie" {
-            Button(resume == nil ? "Play Movie" : "Resume", systemImage: "play.fill", action: play)
+        if item.type != "show" {
+            Button(resume == nil ? (isEpisode ? "Play Episode" : "Play Movie") : "Resume", systemImage: "play.fill", action: play)
                 .buttonStyle(.borderedProminent)
                 .disabled(!ready)
             Button("Download", systemImage: "arrow.down.circle") {
@@ -167,7 +192,7 @@ struct VideoDetailsPage<Actions: View, Episodes: View>: View {
             .buttonStyle(.bordered)
             .disabled(!ready || downloads.busy)
         }
-        Menu(item.type == "show" ? "Show Actions" : "Movie Actions", systemImage: "ellipsis.circle", content: actions)
+        Menu(isEpisode ? "Episode Actions" : item.type == "show" ? "Show Actions" : "Movie Actions", systemImage: "ellipsis.circle", content: actions)
             .disabled(!ready)
     }
 

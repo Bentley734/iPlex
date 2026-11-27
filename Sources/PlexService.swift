@@ -2134,6 +2134,7 @@ extension PlexParser {
                                 minutes: duration, classification: string(row["contentRating"], maximum: 24),
                                 genres: tags("Genre", limit: 12).compactMap { string($0["tag"], maximum: 80) },
                                 backdrop: videoArtworkPath(row["art"] as? String),
+                                thumbnail: musicArtworkPath(row["thumb"] as? String),
                                 credits: directors + cast, formats: formats)
     }
 
@@ -2360,8 +2361,8 @@ extension PlexService {
     }
 
     func videoDetails(server: String, section: String, item: PlexVideoItem) async throws -> PlexVideoDetails {
-        guard PlexVideoKind(rawValue: item.type) != nil, PlexParser.validPlaylistID(item.id) else {
-            throw PlexServiceError("Choose a movie or TV show first.")
+        guard ["movie", "show", "episode"].contains(item.type), PlexParser.validPlaylistID(item.id) else {
+            throw PlexServiceError("Choose a movie, TV show, or episode first.")
         }
         return try await serverOperation(server: server) { record, base, operation in
             let request = try self.serverRequest(base: base, path: "/library/metadata/" + item.id, query: [], token: record.token)

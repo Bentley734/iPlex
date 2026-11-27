@@ -107,20 +107,23 @@ struct MusicTheme {
 
     func surface(using palette: ArtworkPalette?) -> Color { palette?.wash(in: scheme) ?? surface }
 
-    func backdrop(using palette: ArtworkPalette?) -> some View {
-        ThemeArtworkBackdrop(theme: self, palette: palette)
+    func backdrop(using palette: ArtworkPalette?, allowsAnimatedGradient: Bool = true) -> some View {
+        ThemeArtworkBackdrop(theme: self, palette: palette, allowsAnimatedGradient: allowsAnimatedGradient)
     }
 }
 
 private struct ThemeArtworkBackdrop: View {
     let theme: MusicTheme
     let palette: ArtworkPalette?
+    let allowsAnimatedGradient: Bool
     @ObservedObject private var wallpaper = GlassWallpaper.shared
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         theme.backdrop.overlay {
-            if !reduceTransparency, let image = wallpaper.image {
+            if allowsAnimatedGradient, !reduceTransparency, wallpaper.background == .gradient {
+                AnimatedGradientBackdrop()
+            } else if !reduceTransparency, let image = wallpaper.image {
                 GlassWallpaperBackdrop(image: image, isPreset: wallpaper.background.isPreset)
             } else if let palette {
                 ArtworkColorWash(palette: palette, scheme: theme.scheme)
@@ -656,7 +659,7 @@ struct MusicSettings: View {
 }
 
 
-private struct GlassColorControl: View {
+struct GlassColorControl: View {
     let title: String
     @Binding var saved: String
     let defaultHex: String

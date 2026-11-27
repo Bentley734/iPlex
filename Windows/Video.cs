@@ -339,8 +339,9 @@ namespace MusicRoom
             }
             if (action == "videoDetails")
             {
-                if ((kind == "movie" || kind == "show") && ItemID.IsMatch(key))
-                    await LoadVideoDetails(server, library, key, kind, id);
+                string type = expected.Length == 0 ? kind : expected;
+                if (ItemID.IsMatch(key) && (type == kind || (kind == "show" && type == "episode")))
+                    await LoadVideoDetails(server, library, key, type, id);
                 return;
             }
             if (action == "videoPlay") ReleaseVideoPlayback();
@@ -507,6 +508,7 @@ namespace MusicRoom
                     classification = MediaLabel(Str(row, "contentRating")),
                     genres = Rows(Get(row, "Genre")).Take(12).Select(genre => Str(genre, "tag")).Where(value => value.Length > 0).ToArray(),
                     backdrop = art.Length < 180 && BackdropPath.IsMatch(art) ? RegisterVideoArt(server.Id, library, art) : "",
+                    thumbnail = RegisterVideoArt(server.Id, library, ArtworkPath(row, "thumb")),
                     credits, formats
                 });
             }

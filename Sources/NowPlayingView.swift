@@ -85,7 +85,7 @@ struct NowPlayingView: View {
             }
         }
         .background {
-            theme.backdrop(using: palette)
+            theme.backdrop(using: palette, allowsAnimatedGradient: false)
                 .animation(!reduceMotion ? .easeInOut(duration: 0.8) : nil,
                            value: palette?.wash(in: theme.scheme))
                 .overlay {

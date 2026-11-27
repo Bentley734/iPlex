@@ -60,6 +60,13 @@
       root.style.removeProperty('--iplex-wash');
     }
     root.toggleAttribute('data-iplex-hover', settings.hover);
+    const gradient = settings.gradient;
+    root.toggleAttribute('data-animated-gradient', Boolean(gradient));
+    if (gradient) {
+      root.dataset.gradientMotion = gradient.motion;
+      root.style.setProperty('--gradient-duration', gradient.duration);
+      gradient.colors.forEach((color, index) => root.style.setProperty('--gradient-color-' + (index+1), color));
+    }
   };
   if (window.initialIPlexArchiveAppearance) window.applyIPlexArchiveAppearance(window.initialIPlexArchiveAppearance);
   if (window.toolWindows) {
