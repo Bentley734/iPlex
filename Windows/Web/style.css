@@ -794,3 +794,41 @@ body {
 #archive-eq label { display:flex; justify-content:space-between; gap:12px; }
 .archive-spectrum { display:flex; align-items:center; justify-content:center; gap:12px; height:75%; width:75%; margin:auto; }
 .archive-spectrum i { background:var(--accent); border-radius:8px; width:15%; height:4%; }
+
+/* Movie details share the browser's panel and keep the listing in place for Back. */
+#movie-details { flex:1; min-height:0; overflow:auto; padding:clamp(12px,2vw,26px); }
+#movie-details > * { max-width:1320px; margin-inline:auto; }
+#movie-back { display:block; margin:0 auto 15px 0; }
+.movie-hero {
+  position:relative; isolation:isolate; min-height:340px; display:flex; align-items:end; overflow:hidden;
+  border-radius:23px; padding:clamp(12px,2vw,24px);
+  background:linear-gradient(145deg, color-mix(in srgb,var(--accent) 38%,transparent), var(--panel) 65%, #141923);
+}
+#movie-backdrop, .movie-hero::after { position:absolute; inset:0; width:100%; height:100%; z-index:-1; }
+#movie-backdrop { object-fit:cover; object-position:center 38%; }
+.movie-hero::after { content:""; background:linear-gradient(180deg,transparent 28%,#10101ad9); }
+.movie-feature {
+  display:flex; align-items:center; gap:18px; width:min(100%,750px); min-width:0; padding:16px;
+  background:color-mix(in srgb,var(--panel) 74%,#151b27); backdrop-filter:blur(24px);
+  border:1px solid rgb(255 255 255 / .22); border-radius:17px;
+}
+#movie-poster { flex:0 0 110px; width:110px; aspect-ratio:2 / 3; object-fit:cover; border-radius:10px; }
+.movie-feature > div { min-width:0; }
+#movie-detail-title { font-size:clamp(1.6rem,3.4vw,2.8rem); line-height:1.08; margin:0 0 .4em; overflow-wrap:anywhere; }
+.movie-feature p { margin:.5em 0; }
+.movie-controls { display:flex; flex-wrap:wrap; gap:8px; margin-top:13px; }
+#movie-play { background:var(--accent); color:var(--accent-ink,#101822); font-weight:700; }
+.movie-detail-panel { margin-top:16px; padding:16px 20px; border:1px solid rgb(255 255 255 / .16); border-radius:16px; background:rgb(255 255 255 / .06); }
+.movie-detail-panel h2 { font-size:1.1rem; margin:0 0 10px; }
+.movie-detail-panel p, .movie-detail-panel ul { margin:0; }
+#movie-credits ul { display:flex; gap:13px; overflow:auto; list-style:none; padding:0 0 8px; }
+#movie-credits li { flex:0 0 112px; min-width:0; }
+#movie-credits img, .movie-credit-symbol { width:62px; height:62px; border-radius:12px; object-fit:cover; }
+.movie-credit-symbol { display:grid; place-items:center; background:rgb(255 255 255 / .13); font-weight:700; }
+#movie-credits strong, #movie-credits small { display:block; margin-top:4px; overflow-wrap:anywhere; }
+#movie-formats ul { padding-inline-start:20px; }
+#movie-detail-status { padding-top:10px; }
+@media (max-width:650px) {
+  .movie-hero { min-height:270px; }
+  #movie-poster { display:none; }
+}

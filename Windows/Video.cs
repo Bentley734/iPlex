@@ -14,6 +14,7 @@ namespace MusicRoom
     internal sealed partial class WindowsMediaService
     {
         const string VideoPrefix = "/video/:/transcode/universal/";
+        static readonly Regex BackdropPath = new Regex(@"^/library/metadata/[0-9]+/art(?:/[0-9]+)?\z");
         const string VideoOrigin = "https://media.musicroom.invalid/video/";
         readonly VideoWatchStore videoWatch;
         List<Section> videoSections = new List<Section>();
@@ -21,7 +22,7 @@ namespace MusicRoom
         readonly Dictionary<string, string> videoArtIds = new Dictionary<string, string>();
         readonly Dictionary<string, VideoResource> videoResources = new Dictionary<string, VideoResource>();
         readonly Dictionary<Uri, string> videoAliases = new Dictionary<Uri, string>();
-        CancellationTokenSource videoJob;
+        CancellationTokenSource videoJob, movieDetailsJob;
         string activeVideoServer, activeVideoLibrary, activeVideoKey, activeVideoShow;
 
         sealed class VideoResource
@@ -297,7 +298,9 @@ namespace MusicRoom
             if (!servers.TryGetValue(selectedServer, out server) ||
                 !videoSections.Any(s => s.id == library && s.type == kind))
             {
-                Send("plexVideoError", new { id, message = "Choose a video library first." });
+                if (action == "movieDetails")
+                    Send("plexMovieDetails", new { id, key, error = "Choose a video library first." });
+                else Send("plexVideoError", new { id, message = "Choose a video library first." });
                 return;
             }
             if (action == "videoNext" && (Str(request, "server") != server.Id || kind != "show"
@@ -332,6 +335,12 @@ namespace MusicRoom
                     if (id == 0) return;
                 }
                 SendVideoWatchState(server, library, id);
+                return;
+            }
+            if (action == "movieDetails")
+            {
+                if (kind == "movie" && ItemID.IsMatch(key))
+                    await LoadMovieDetails(server, library, key, id);
                 return;
             }
             if (action == "videoPlay") ReleaseVideoPlayback();
@@ -440,6 +449,54 @@ namespace MusicRoom
             finally
             {
                 if (videoJob == job) videoJob = null;
+                job.Dispose();
+            }
+        }
+
+        async Task LoadMovieDetails(Server server, string library, string key, long id)
+        {
+            if (movieDetailsJob != null) movieDetailsJob.Cancel();
+            var job = CancellationTokenSource.CreateLinkedTokenSource(shutdown.Token);
+            movieDetailsJob = job;
+            try
+            {
+                var result = await WithServer(server, url => FetchPlex(HttpMethod.Get,
+                    new Uri(url, "/library/metadata/" + key), server.Token, job.Token, 8 * 1024 * 1024), job.Token);
+                job.Token.ThrowIfCancellationRequested();
+                var row = Metadata(result, library).FirstOrDefault(item => Str(item, "type") == "movie" && Str(item, "ratingKey") == key);
+                if (row == null) throw Problem("This movie is no longer available in the selected library.");
+                var art = Str(row, "art");
+                var duration = Num(row, "duration");
+                var credits = Rows(Get(row, "Director")).Take(8).Select(person => new {
+                    name = Str(person, "tag"), role = "Director", photo = RegisterVideoArt(server.Id, library, ArtworkPath(person, "thumb"))
+                }).Concat(Rows(Get(row, "Role")).Take(24).Select(person => new {
+                    name = Str(person, "tag"), role = Str(person, "role"), photo = RegisterVideoArt(server.Id, library, ArtworkPath(person, "thumb"))
+                })).Where(person => person.name.Length > 0).ToArray();
+                var formats = Rows(Get(row, "Media")).Take(8).Select(media => {
+                    string resolution = MediaLabel(Str(media, "videoResolution"));
+                    int pixels;
+                    if (Int32.TryParse(resolution, out pixels)) resolution += "p";
+                    return String.Join(" · ", new[] { resolution, MediaLabel(Str(media, "videoCodec")),
+                        MediaLabel(Str(media, "audioCodec")), MediaLabel(Str(media, "container")) }.Where(value => value.Length > 0));
+                }).Where(value => value.Length > 0).ToArray();
+                Send("plexMovieDetails", new {
+                    id, key, summary = String.Concat(Str(row, "summary").Take(8000)), year = Str(row, "year"),
+                    minutes = duration > 0 && duration <= 259200000 ? duration / 60000 : 0,
+                    classification = MediaLabel(Str(row, "contentRating")),
+                    genres = Rows(Get(row, "Genre")).Take(12).Select(genre => Str(genre, "tag")).Where(value => value.Length > 0).ToArray(),
+                    backdrop = art.Length < 180 && BackdropPath.IsMatch(art) ? RegisterVideoArt(server.Id, library, art) : "",
+                    credits, formats
+                });
+            }
+            catch (Exception error)
+            {
+                if (!job.IsCancellationRequested)
+                    Send("plexMovieDetails", new { id, key, error = error is InvalidDataException
+                        ? error.Message : "Plex couldn’t load the full movie details." });
+            }
+            finally
+            {
+                if (movieDetailsJob == job) movieDetailsJob = null;
                 job.Dispose();
             }
         }

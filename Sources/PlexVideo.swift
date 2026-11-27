@@ -147,6 +147,7 @@ struct PlexVideoBrowser: View {
     @State private var discoveryRetry = 0
     @State private var generation = UUID()
     @State private var presentation: PlexVideoItem?
+    @State private var movie: PlexVideoItem?
     @State private var matching: PlexVideoItem?
     @AppStorage(LibraryPageSize.preferenceKey) private var pageSize = LibraryPageSize.standard
     @AppStorage(LibraryArtworkSize.videoPosterPreferenceKey) private var posterSize = LibraryArtworkSize.medium
@@ -179,6 +180,64 @@ struct PlexVideoBrowser: View {
     private var requestKey: [String] { [String(ready), selection, parent?.id ?? "", query, pageSize.rawValue, String(retry)] }
 
     var body: some View {
+        ZStack {
+            listing
+                .opacity(movie == nil ? 1 : 0)
+                .allowsHitTesting(movie == nil)
+                .accessibilityHidden(movie != nil)
+                .disabled(movie != nil)
+            if let movie {
+                MovieDetailsPage(item: movie, server: server, section: selection, service: service,
+                                 ready: ready, resume: resumePosition(for: movie), sectionName: sectionName,
+                                 back: { self.movie = nil },
+                                 play: { presentation = movie }, download: {
+                    MediaDownloads.shared.downloadVideo(service: service, server: server, section: selection, item: movie)
+                }) {
+                    watchActions(movie)
+                    Button("Fix Match", systemImage: "magnifyingglass") { matching = movie }
+                        .disabled(!ready)
+                }
+                .id(movie.id)
+                #if os(tvOS)
+                .onExitCommand { self.movie = nil }
+                #endif
+            }
+        }
+        .pageTransition(on: movie?.id)
+        .clipped()
+        .task(id: [String(serverReady), String(discoveryRetry)]) {
+            if serverReady { await discover() }
+            else { discovered = false }
+        }
+        .task(id: requestKey) {
+            let current = UUID()
+            generation = current
+            items = showingRoot && snapshot?.library.id == selection ? snapshot?.items ?? [] : []
+            next = nil
+            refreshWatchState()
+            if ready { await load(offset: 0, generation: current) }
+        }
+        .onChange(of: selection) { _, value in
+            if !value.isEmpty { UserDefaults.standard.set(value, forKey: preference) }
+            trail = []
+            movie = nil
+            items = showingRoot && snapshot?.library.id == value ? snapshot?.items ?? [] : []
+            refreshWatchState()
+        }
+        .sheet(item: $matching) { item in
+            PlexVideoMatchEditor(item: item, server: server, section: selection, service: service) {
+                if movie?.id == item.id { movie = nil }
+                retry += 1
+            }
+        }
+        #if os(macOS)
+        .sheet(item: $presentation, onDismiss: refreshWatchState, content: videoSession)
+        #else
+        .fullScreenCover(item: $presentation, onDismiss: refreshWatchState, content: videoSession)
+        #endif
+    }
+
+    private var listing: some View {
         VStack(alignment: .leading, spacing: 14) {
             #if os(macOS)
             LibraryBrowseHeader {
@@ -209,34 +268,6 @@ struct PlexVideoBrowser: View {
         }
         #if !os(macOS)
         .padding(14)
-        #endif
-        .task(id: [String(serverReady), String(discoveryRetry)]) {
-            if serverReady { await discover() }
-            else { discovered = false }
-        }
-        .task(id: requestKey) {
-            let current = UUID()
-            generation = current
-            items = showingRoot && snapshot?.library.id == selection ? snapshot?.items ?? [] : []
-            next = nil
-            refreshWatchState()
-            if ready { await load(offset: 0, generation: current) }
-        }
-        .onChange(of: selection) { _, value in
-            if !value.isEmpty { UserDefaults.standard.set(value, forKey: preference) }
-            trail = []
-            items = showingRoot && snapshot?.library.id == value ? snapshot?.items ?? [] : []
-            refreshWatchState()
-        }
-        .sheet(item: $matching) { item in
-            PlexVideoMatchEditor(item: item, server: server, section: selection, service: service) {
-                retry += 1
-            }
-        }
-        #if os(macOS)
-        .sheet(item: $presentation, onDismiss: refreshWatchState, content: videoSession)
-        #else
-        .fullScreenCover(item: $presentation, onDismiss: refreshWatchState, content: videoSession)
         #endif
     }
 
@@ -296,7 +327,7 @@ struct PlexVideoBrowser: View {
         LazyVGrid(columns: layout.columns, alignment: .leading, spacing: 22) {
             ForEach(items) { item in
                 Button {
-                    if item.type == "movie" { presentation = item }
+                    if item.type == "movie" { movie = item }
                     else { trail.append(item) }
                 } label: {
                     VStack(alignment: .leading, spacing: 8) {
@@ -396,12 +427,12 @@ struct PlexVideoBrowser: View {
     @ViewBuilder
     private func watchActions(_ item: PlexVideoItem) -> some View {
         if watchedItems.contains(item.id) {
-            Button("Mark Unwatched") {
+            Button("Mark Unwatched", systemImage: "eye.slash") {
                 VideoWatchStore.shared.clear(server: server, library: selection, id: item.id)
                 refreshWatchState()
             }
         } else {
-            Button("Mark Watched") {
+            Button("Mark Watched", systemImage: "eye") {
                 VideoWatchStore.shared.update(server: server, library: selection, item: item, seconds: 0, watched: true)
                 refreshWatchState()
             }
@@ -412,6 +443,11 @@ struct PlexVideoBrowser: View {
                 }
             }
         }
+    }
+
+    private func resumePosition(for item: PlexVideoItem) -> Double? {
+        let record = VideoWatchStore.shared.record(server: server, library: selection, id: item.id)
+        return record?.canResume == true ? record?.seconds : nil
     }
 
     private func refreshWatchState() {
@@ -594,7 +630,7 @@ private struct PlexVideoMatchEditor: View {
     }
 }
 
-private struct PlexVideoPoster: View {
+struct PlexVideoPoster: View {
     let path: String?
     let server: String
     let section: String
@@ -602,6 +638,7 @@ private struct PlexVideoPoster: View {
     let icon: String
     var cachedOnly = false
     var cache = false
+    var showPlaceholder = true
     @State private var image: Image?
     @State private var loadedKey: [String]?
 
@@ -611,7 +648,7 @@ private struct PlexVideoPoster: View {
         Color.primary.opacity(0.07)
             .overlay {
                 if loadedKey == artworkKey, let image { image.resizable().scaledToFill() }
-                else { Image(systemName: icon).font(.title).foregroundStyle(.secondary) }
+                else if showPlaceholder { Image(systemName: icon).font(.title).foregroundStyle(.secondary) }
             }
             .clipShape(.rect(cornerRadius: 12))
             .task(id: artworkKey + [String(cachedOnly), String(cache)]) {
@@ -1059,7 +1096,7 @@ private struct SystemVideoPlayer: UIViewControllerRepresentable {
 }
 #endif
 
-private func videoTime(_ seconds: Double) -> String {
+func videoTime(_ seconds: Double) -> String {
     let total = Int(max(0, seconds))
     if total >= 3_600 { return String(format: "%d:%02d:%02d", total / 3_600, total / 60 % 60, total % 60) }
     return String(format: "%d:%02d", total / 60, total % 60)

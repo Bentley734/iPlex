@@ -122,6 +122,39 @@
         <button id="video-retry" type="button" hidden>Retry</button>
         <button id="video-more" type="button" hidden>Load more</button>
       </div>
+      <article id="movie-details" aria-labelledby="movie-detail-title" hidden>
+        <button id="movie-back" type="button">‹ Back to Movies</button>
+        <div class="movie-hero">
+          <img id="movie-backdrop" alt="" hidden>
+          <div class="movie-feature">
+            <img id="movie-poster" alt="" hidden>
+            <div>
+              <h1 id="movie-detail-title" tabindex="-1"></h1>
+              <p id="movie-facts"></p>
+              <p id="movie-genres" hidden></p>
+              <div class="movie-controls">
+                <button id="movie-play" type="button">Play Movie</button>
+                <button id="movie-download" type="button">Download</button>
+                <button id="movie-watch" type="button">Mark Watched</button>
+                <button id="movie-match" type="button">Fix Match</button>
+              </div>
+              <p id="movie-resume" hidden></p>
+            </div>
+          </div>
+        </div>
+        <section class="movie-detail-panel" id="movie-synopsis" hidden>
+          <h2>Synopsis</h2><p></p>
+        </section>
+        <section class="movie-detail-panel" id="movie-credits" hidden>
+          <h2>Cast and Crew</h2><ul></ul>
+        </section>
+        <section class="movie-detail-panel" id="movie-formats" hidden>
+          <h2>Video Format</h2><ul></ul>
+        </section>
+        <p id="movie-download-status" role="status" hidden></p>
+        <p id="movie-detail-status" role="status" hidden></p>
+        <button id="movie-detail-retry" type="button" hidden>Retry</button>
+      </article>
     </section>
   </main>
   <dialog id="remove-download" aria-labelledby="remove-download-title">

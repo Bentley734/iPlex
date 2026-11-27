@@ -101,6 +101,7 @@
 		AAF9B4BC379E24A631ED8D0D /* TVKaleidoscopeSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA95B8C22D26F273C6476DD1 /* TVKaleidoscopeSurface.swift */; };
 		AD0027C3EA6B7D84AD57F90D /* ClickWheelPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2DA695E5F978CFBEDD54C3D /* ClickWheelPlayer.swift */; };
 		AD96252D7ED6ED6CE1A3368C /* VideoWatchStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2039AEF6F237EEFE851F5A1 /* VideoWatchStore.swift */; };
+		AEA74D3352E692B80C640975 /* MovieDetailsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A89EF96B9B29109A46C8C0D /* MovieDetailsPage.swift */; };
 		AFF18AC279DDCC25E54C7F9C /* TVBackgroundTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8B43425C6A64C40B6762686 /* TVBackgroundTransfer.swift */; };
 		B0BBD7ED21A32E626ECC7A08 /* AlbumCoverCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6581BBFF504F8BAA5B38470 /* AlbumCoverCache.swift */; };
 		B14DB919AF1E5EA88CF12FE5 /* AudioAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED8702E61EE0F31C7677EC30 /* AudioAnalysis.swift */; };
@@ -138,6 +139,7 @@
 		F182B582B8AD5EA4BE657200 /* MobileVLCKit.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = F28951F1D53D43A1D29492C2 /* MobileVLCKit.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		F307562545993D2771A354AC /* GlassWallpaperPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84303833AB4AE2FE7352B25A /* GlassWallpaperPreferences.swift */; };
 		F7D000EAFF036916AC9FA4E6 /* GlassBackgrounds in Resources */ = {isa = PBXBuildFile; fileRef = E359008C174456F0E7E13E19 /* GlassBackgrounds */; };
+		F8597C00529725D62A1FC64B /* MovieDetailsPage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3A89EF96B9B29109A46C8C0D /* MovieDetailsPage.swift */; };
 		F905822CE1DFB0F1DB80A2B6 /* TVKaleidoscope.metal in Sources */ = {isa = PBXBuildFile; fileRef = 4CEB33019888933A2455EB19 /* TVKaleidoscope.metal */; };
 		FADC6818B7AC6229F0DB486F /* TVIconPreviews in Resources */ = {isa = PBXBuildFile; fileRef = C9C23189D2582E8551851186 /* TVIconPreviews */; };
 		FAF17BE90AAB14D3F3CA8252 /* MobileLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01FF8E43B6C80BBAEE5E8F6 /* MobileLibrary.swift */; };
@@ -206,6 +208,7 @@
 		295A13765A52602FCE1765AD /* music-wordmarks.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "music-wordmarks.png"; sourceTree = "<group>"; };
 		34ADE339974C3A8F521D95AD /* ArchiveScrollingTitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveScrollingTitle.swift; sourceTree = "<group>"; };
 		37B149D29AEDD40D097193E3 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
+		3A89EF96B9B29109A46C8C0D /* MovieDetailsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MovieDetailsPage.swift; sourceTree = "<group>"; };
 		3BC1D71E65269005100C4E31 /* PlaybackEqualizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackEqualizer.swift; sourceTree = "<group>"; };
 		3C9BAB797374ADD5B2683083 /* Updates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updates.swift; sourceTree = "<group>"; };
 		41756213822D289CE6E5D98A /* NativeVideoPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeVideoPlayer.swift; sourceTree = "<group>"; };
@@ -463,6 +466,7 @@
 				EF714F069BFA8BAE334EE31F /* MacVideoPresentation.swift */,
 				62D082230979C3114636B87D /* MediaDownloads.swift */,
 				C97A49FCD6AC086C13007CEB /* MobileMusicRoomApp.swift */,
+				3A89EF96B9B29109A46C8C0D /* MovieDetailsPage.swift */,
 				A0B6189D5420E12F096AED5C /* MusicAppIconPicker.swift */,
 				A7C3DEA02512BD0C8E406A0F /* MusicGenreList.swift */,
 				12CCA42EAE03D88BB3496D33 /* MusicPlatform.swift */,
@@ -652,6 +656,7 @@
 				50FD1E765EF3D610380E5C03 /* MacVideoPresentation.swift in Sources */,
 				3D9F5B0880ED9C632AADB43B /* MediaDownloads.swift in Sources */,
 				733CA465AF821A663909CC7B /* MobileMusicRoomApp.swift in Sources */,
+				AEA74D3352E692B80C640975 /* MovieDetailsPage.swift in Sources */,
 				42811EF14C7EB41CB2F0D3CD /* MusicAppIconPicker.swift in Sources */,
 				E301E1E7838B11175D01EF9A /* MusicGenreList.swift in Sources */,
 				8E529B00CBCA255DA72EBCA3 /* MusicPlatform.swift in Sources */,
@@ -754,6 +759,7 @@
 				30FB9912CFC98B40FC532C8F /* MacVideoPresentation.swift in Sources */,
 				D7F3323D37C9FD9A46742C77 /* MediaDownloads.swift in Sources */,
 				B7E443953550133C851BC0A2 /* MobileMusicRoomApp.swift in Sources */,
+				F8597C00529725D62A1FC64B /* MovieDetailsPage.swift in Sources */,
 				0D8B9B802C2B23D503C305AE /* MusicAppIconPicker.swift in Sources */,
 				CFCAD59E994057089D18A941 /* MusicGenreList.swift in Sources */,
 				564AA314BCCD696C8A91607B /* MusicPlatform.swift in Sources */,
@@ -871,7 +877,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 51;
+				CURRENT_PROJECT_VERSION = 52;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -886,7 +892,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
-				MARKETING_VERSION = 0.1.50;
+				MARKETING_VERSION = 0.1.51;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -976,7 +982,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 51;
+				CURRENT_PROJECT_VERSION = 52;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -997,7 +1003,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
-				MARKETING_VERSION = 0.1.50;
+				MARKETING_VERSION = 0.1.51;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
