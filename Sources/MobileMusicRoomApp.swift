@@ -71,6 +71,7 @@ private struct MusicLibraryScreen: View {
             }
         }
         .modifier(NowPlayingPresentation(showing: showPlayer))
+        .task { await archiveTransport.prepareCatalog() }
         .foregroundStyle(theme.text)
         .tint(accent)
         #if os(iOS)

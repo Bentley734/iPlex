@@ -41,6 +41,8 @@ final class AppDelegate: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
     func setPlaybackVisualizer(_ active: Bool) { playerController.setVisualizerActive(active) }
     var web: WKWebView!
     private var iplexAppearance: NSDictionary?
+    private var catalogActive = false
+    private var checkedCatalogOnOpen = false
 
     func setIPlexAppearance(_ appearance: [String: Any]) {
         guard iplexAppearance != appearance as NSDictionary else { return }
@@ -231,12 +233,49 @@ final class AppDelegate: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
         }
         configurePlayerCallbacks()
         if !testing { configurePlexCallbacks() }
-        guard let html = ArchiveResources.url("index", "html") else { fatalError("Missing bundled catalog") }
-        web.loadFileURL(html, allowingReadAccessTo: html.deletingLastPathComponent())
+        loadCatalogPage()
         if storageWarning {
             DispatchQueue.main.async { self.alert("Saved shows could not be read", "The catalog is still available. Your saved-shows file has not been changed.") }
         }
     }
+    func loadCatalogPage() {
+        guard let html = ArchiveResources.url("index", "html") else {
+            transport?.updateCatalog(ready: false, failed: true)
+            return
+        }
+        transport?.updateCatalog(ready: false)
+        web?.loadFileURL(html, allowingReadAccessTo: html.deletingLastPathComponent())
+    }
+
+    func setCatalogActive(_ active: Bool) {
+        guard catalogActive != active else { return }
+        catalogActive = active
+        // A representable update must finish before publishing observable state.
+        DispatchQueue.main.async { [weak self] in
+            guard let self, self.catalogActive == active, self.web != nil else { return }
+            if active {
+                if self.transport?.catalogReady == true {
+                    self.openReadyCatalog()
+                }
+            } else {
+                self.cancelPlexSearch()
+                self.stopComparisonPreview(notify: true)
+                self.playerController.pause()
+                if let focused = self.window?.firstResponder as? NSView, focused.isDescendant(of: self.web) {
+                    self.window?.makeFirstResponder(nil)
+                }
+            }
+        }
+    }
+
+    private func openReadyCatalog() {
+        handlePlex(["action": "status"])
+        if !checkedCatalogOnOpen {
+            checkedCatalogOnOpen = true
+            startCatalogUpdate()
+        }
+    }
+
     @objc func openSettings() { web.evaluateJavaScript("window.macOpenSettings?.()", completionHandler: nil) }
 
     private func chooseCustomBackground() {
@@ -645,6 +684,7 @@ final class AppDelegate: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
             switch action {
             case "openSettings": openPlexSettings(); return
             case "status":
+                guard catalogActive else { return }
                 if plexService.hasStoredAccount {
                     if plexService.status.phase != "loadingServers" && !plexLoadingLibraries &&
                         (plexServers.isEmpty || plexService.status.selectedServerID != plexService.preferredServerID ||
@@ -1250,9 +1290,24 @@ final class AppDelegate: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
     func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         syncLiquidGlassPage()
         publishIPlexAppearance()
+        transport?.updateCatalog(ready: true)
         updateState("catalog", cacheNotice)
-        startCatalogUpdate()
+        if catalogActive { openReadyCatalog() }
         updateState("app", "Managed in iPlex Settings.")
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        if (error as NSError).code != NSURLErrorCancelled {
+            transport?.updateCatalog(ready: false, failed: true)
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        self.webView(webView, didFail: navigation, withError: error)
+    }
+
+    func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
+        transport?.updateCatalog(ready: false, failed: true)
     }
 
     func stop() {

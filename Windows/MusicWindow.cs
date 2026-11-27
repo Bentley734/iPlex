@@ -21,6 +21,10 @@ namespace MusicRoom
         readonly Dictionary<string, byte[]> assets = new Dictionary<string, byte[]>(StringComparer.Ordinal);
         Icon dockIcon;
         ToolDriveOffline.ArchiveWindow toolDrive;
+        Rectangle? toolDriveBounds;
+        int toolDriveEntry, presentedToolDriveEntry = -1;
+        object toolDriveMotion;
+        bool preparingToolDrive;
         bool closing;
         string updateAcknowledgment;
         CancellationTokenSource checkUpdate;
@@ -279,9 +283,10 @@ namespace MusicRoom
             object visible;
             if (!request.TryGetValue("visible", out visible) || !Object.Equals(visible, true))
             {
+                toolDriveBounds = null;
                 if (toolDrive != null)
                 {
-                    toolDrive.Hide();
+                    if (toolDrive.IsPageReady) toolDrive.Hide();
                     object paused;
                     if (request.TryGetValue("pause", out paused) && Object.Equals(paused, true)) toolDrive.PausePlayback();
                 }
@@ -292,6 +297,11 @@ namespace MusicRoom
             int width = (int)Math.Max(0, Math.Min(10000 - left, WindowsMediaService.Num(request, "width")));
             int height = (int)Math.Max(0, Math.Min(10000 - top, WindowsMediaService.Num(request, "height")));
             if (width == 0 || height == 0) return;
+            toolDriveBounds = new Rectangle(view.Left + view.Width * left / 10000,
+                view.Top + view.Height * top / 10000, view.Width * width / 10000, view.Height * height / 10000);
+            toolDriveEntry = (int)WindowsMediaService.Num(request, "entry");
+            request.TryGetValue("motion", out toolDriveMotion);
+
             if (toolDrive == null || toolDrive.IsDisposed)
             {
                 string warning;
@@ -300,14 +310,50 @@ namespace MusicRoom
                 toolDrive.OpenPlexSettings = () => Emit("openToolDrivePlexSettings", null);
                 toolDrive.TransportChanged = state => Emit("toolDriveTransport", state);
                 toolDrive.VisualizerChanged = levels => Emit("toolDriveVisualizer", levels);
+                toolDrive.PageReady = () => {
+                    if (toolDriveBounds.HasValue) PresentToolDrive();
+                    else toolDrive.Hide();
+                };
+                presentedToolDriveEntry = -1;
                 Controls.Add(toolDrive);
             }
             object appearance;
             if (request.TryGetValue("appearance", out appearance)) toolDrive.SetAppearance(appearance);
-            toolDrive.Bounds = new Rectangle(view.Left + view.Width * left / 10000,
-                view.Top + view.Height * top / 10000, view.Width * width / 10000, view.Height * height / 10000);
+            if (toolDrive.IsPageReady)
+            {
+                PresentToolDrive();
+            }
+            else if (!toolDrive.Visible)
+            {
+                Emit("toolDrivePageReady", false);
+                // Start WebView2 beyond the clipped client area while the main page shows progress.
+                var size = toolDriveBounds.Value.Size;
+                toolDrive.Bounds = new Rectangle(new Point(ClientSize.Width, ClientSize.Height), size);
+                toolDrive.Show();
+            }
+        }
+
+        async void PresentToolDrive()
+        {
+            if (closing || preparingToolDrive || toolDrive == null || !toolDrive.IsPageReady || !toolDriveBounds.HasValue) return;
+            if (presentedToolDriveEntry != toolDriveEntry)
+            {
+                preparingToolDrive = true;
+                int entry = toolDriveEntry;
+                await toolDrive.PreparePageTransition(toolDriveMotion);
+                preparingToolDrive = false;
+                if (entry != toolDriveEntry)
+                {
+                    PresentToolDrive();
+                    return;
+                }
+                presentedToolDriveEntry = entry;
+            }
+            if (closing || !toolDriveBounds.HasValue || toolDrive.IsDisposed) return;
+            toolDrive.Bounds = toolDriveBounds.Value;
             toolDrive.BringToFront();
             toolDrive.Show();
+            Emit("toolDrivePageReady", true);
         }
 
         async Task UpdateApp()

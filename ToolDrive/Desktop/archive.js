@@ -63,6 +63,13 @@
   };
   if (window.initialIPlexArchiveAppearance) window.applyIPlexArchiveAppearance(window.initialIPlexArchiveAppearance);
   if (window.toolWindows) {
+    let transition;
+    window.presentIPlexArchive = motion => {
+      transition?.cancel();
+      transition = motion && !matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? document.querySelector('.shell').animate(motion.frames, motion.options)
+        : null;
+    };
     const updateArchivePlayer = window.macPlayerState;
     window.macPlayerState = state => {
       updateArchivePlayer?.(state);
@@ -94,4 +101,5 @@
     };
   }
   root.removeAttribute('data-iplex-archive-loading');
+  window.toolWindows?.send('iplexArchiveReady', {});
 })();

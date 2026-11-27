@@ -33,6 +33,20 @@ namespace ToolDriveOffline
         internal Action<object> TransportChanged;
         internal Action<object> VisualizerChanged;
         internal Action OpenPlexSettings;
+        internal Action PageReady;
+        internal bool IsPageReady { get; private set; }
+
+        internal async Task PreparePageTransition(object motion)
+        {
+            if (closing || !IsPageReady || view.CoreWebView2 == null) return;
+            try
+            {
+                await view.CoreWebView2.ExecuteScriptAsync(
+                    "window.presentIPlexArchive?.(" + CatalogUpdater.Serializer().Serialize(motion) + ")");
+            }
+            catch (InvalidOperationException) { }
+            catch (System.Runtime.InteropServices.COMException) { }
+        }
 
         internal void RefreshPlex() { Script("window.refreshIPlexArchivePlex?.()"); }
 
@@ -208,6 +222,11 @@ namespace ToolDriveOffline
                         if (startupWarning != null) Notice(startupWarning);
                         UpdateState("app", "Managed in iPlex Settings.", "Check now", false, false);
                         await UpdateCatalog();
+                        break;
+                    case "iplexArchiveReady":
+                        if (IsPageReady) return;
+                        IsPageReady = true;
+                        if (PageReady != null) PageReady();
                         break;
                     case "iplexPlexSettings":
                         if (OpenPlexSettings != null) OpenPlexSettings();

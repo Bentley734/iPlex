@@ -2,10 +2,13 @@ import Combine
 
 @MainActor
 public final class ToolDriveTransport: ObservableObject {
+    let catalog = ArchiveStore()
     private weak var player: AudioPlayer?
     private var playbackChanges: AnyCancellable?
 
     public init() {}
+
+    public func prepareCatalog() async { await catalog.load() }
 
     public var title: String? {
         guard let player, player.isVisible else { return nil }

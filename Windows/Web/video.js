@@ -49,6 +49,11 @@
   const tabs = new Map([['movie', get('movies')], ['show', get('television')]]);
   const defaults = {movie:'Movies', show:'TV Shows', toolDrive:'Tool Drive', music:'Music', downloads:'Downloads'};
   const toolDrivePanel = get('tool-drive-panel');
+  let archiveEntry = 0;
+  let archiveMotion = null;
+  window.toolDrivePageReady = ready => {
+    get('tool-drive-loading').hidden = ready;
+  };
   const downloadsPanel = get('downloads-panel');
   const sectionButtons = new Map([...tabs, ['toolDrive', get('tool-drive')], ['music', get('music')],
     ['downloads', get('downloads')]]);
@@ -382,7 +387,8 @@
     const {left, top, width, height} = toolDrivePanel.getBoundingClientRect();
     const unit = (value, size) => Math.round(value * 10000 / Math.max(1, size));
     host({action:'toolDrivePanel', visible, pause:!archiveOpen, left:unit(left,innerWidth), top:unit(top,innerHeight),
-          width:unit(width,innerWidth), height:unit(height,innerHeight), appearance:archiveAppearance()});
+          width:unit(width,innerWidth), height:unit(height,innerHeight),
+          entry:archiveEntry, motion:archiveMotion, appearance:archiveAppearance()});
   }
   function archiveAppearance() {
     const root = document.documentElement;
@@ -395,6 +401,7 @@
             background:value('panel'), hover:root.hasAttribute('data-glass-hover')};
   }
   function openArchive(open) {
+    const entering = open && !archiveOpen;
     if (open) {
       showMusic();
       if (downloadsOpen) openDownloads(false);
@@ -404,6 +411,10 @@
     document.documentElement.toggleAttribute('data-tool-drive-open', open);
     window.showToolDriveTransport?.(open);
     toolDrivePanel.hidden = !open;
+    if (entering) {
+      archiveEntry++;
+      window.interfaceMotion.show(toolDrivePanel, ['toolDrive'], motion => { archiveMotion = motion; });
+    }
     present();
     reportArchiveBounds();
     if (!open) window.renderMusicPage?.();

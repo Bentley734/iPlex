@@ -10,12 +10,13 @@ public struct ToolDriveArchiveView: View {
                 transport: ToolDriveTransport, pauseOutsidePlayback: @escaping () -> Void,
                 plexSettings: @escaping () -> AnyView) {
         self.transport = transport
+        archive = transport.catalog
         appearance = IPlexArchiveAppearance(title: title, text: text, accent: accent, tint: tint, density: density)
         self.pauseOutsidePlayback = pauseOutsidePlayback
         self.plexSettings = plexSettings
     }
     @Environment(\.scenePhase) private var scenePhase
-    @StateObject private var archive = ArchiveStore()
+    @ObservedObject private var archive: ArchiveStore
     @StateObject private var player = AudioPlayer()
     @StateObject private var library = MobileLibrary(directory: URL.cachesDirectory.appending(path: "Recordings", directoryHint: .isDirectory))
     @StateObject private var downloads = TVLibraryTransfers()

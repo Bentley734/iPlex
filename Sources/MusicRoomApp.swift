@@ -108,7 +108,10 @@ private struct MusicWindow: View {
     }
 
     private var browseRoute: [String] {
-        if model.toolDriveSelected || model.downloadsSelected { return [model.activeSection.rawValue] }
+        if model.toolDriveSelected {
+            return [model.activeSection.rawValue, archiveTransport.catalogReady ? "ready" : "loading"]
+        }
+        if model.downloadsSelected { return [model.activeSection.rawValue] }
         if let videoSection { return [videoSection.rawValue] }
         return ["music", model.libraryID, model.kind.rawValue, model.selectedGroup?.id ?? "", model.selectedDetail?.id ?? ""]
     }
@@ -255,19 +258,42 @@ private struct MusicWindow: View {
     }
 
     private var mainPanel: some View {
-        VStack(alignment: .leading, spacing: 0) {
+        let showCatalog = model.toolDriveSelected && archiveTransport.catalogReady
+        return ZStack {
+            ToolDriveArchiveView(title: model.sectionName(.toolDrive), active: model.toolDriveSelected,
+                                 text: LiquidGlassColor.hex(theme.text) ?? "#f2f7ff",
+                                 accent: LiquidGlassColor.hex(copper) ?? "#abe3ff",
+                                 tint: glassTint.color(for: theme).flatMap(LiquidGlassColor.hex),
+                                 density: LiquidGlassAppearance.density(glassTransparency),
+                                 hover: glassHoverEffects, transport: archiveTransport,
+                                 volume: model.playbackVolume, pauseOutsidePlayback: model.player.pause,
+                                 openPlexSettings: { showSettings = true })
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .clipShape(.rect(cornerRadius: 22))
+                .opacity(showCatalog ? 1 : 0)
+                .allowsHitTesting(showCatalog)
+                .accessibilityHidden(!showCatalog)
             if model.toolDriveSelected {
-                ToolDriveArchiveView(title: model.sectionName(.toolDrive),
-                                     text: LiquidGlassColor.hex(theme.text) ?? "#f2f7ff",
-                                     accent: LiquidGlassColor.hex(copper) ?? "#abe3ff",
-                                     tint: glassTint.color(for: theme).flatMap(LiquidGlassColor.hex),
-                                     density: LiquidGlassAppearance.density(glassTransparency),
-                                     hover: glassHoverEffects, transport: archiveTransport,
-                                     volume: model.playbackVolume, pauseOutsidePlayback: model.player.pause,
-                                     openPlexSettings: { showSettings = true })
+                if !archiveTransport.catalogReady {
+                    VStack(spacing: 12) {
+                        if archiveTransport.catalogFailed {
+                            Text("Tool Drive could not open.")
+                            Button("Retry", action: archiveTransport.reloadCatalog)
+                        } else {
+                            ProgressView("Loading Tool Drive…")
+                        }
+                    }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .clipShape(.rect(cornerRadius: 22))
-            } else if model.downloadsSelected {
+                }
+            } else {
+                standardPanel
+            }
+        }
+    }
+
+    private var standardPanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if model.downloadsSelected {
                 DownloadsBrowser(library: model)
             } else if let videoSection, !model.serverID.isEmpty {
                 PlexVideoBrowser(kind: videoSection, server: model.serverID, service: model.service,

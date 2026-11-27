@@ -9,6 +9,8 @@ enum ArchiveResources {
 
 @MainActor
 public final class ToolDriveTransport: ObservableObject {
+    @Published public private(set) var catalogReady = false
+    @Published public private(set) var catalogFailed = false
     @Published public private(set) var title: String?
     @Published public private(set) var context = ""
     @Published public private(set) var message = ""
@@ -53,6 +55,12 @@ public final class ToolDriveTransport: ObservableObject {
         if trackIndex != index { trackIndex = index }
     }
 
+    func updateCatalog(ready: Bool, failed: Bool = false) {
+        if catalogReady != ready { catalogReady = ready }
+        if catalogFailed != failed { catalogFailed = failed }
+    }
+
+    public func reloadCatalog() { controller?.loadCatalogPage() }
     public func refreshPlex() { controller?.handlePlex(["action": "status"]) }
     public func toggle() { controller?.handlePlayer(["action": "toggle"]) }
     public func previous() { controller?.handlePlayer(["action": "previous"]) }
@@ -74,15 +82,17 @@ public final class ToolDriveTransport: ObservableObject {
 
 public struct ToolDriveArchiveView: NSViewRepresentable {
     private let appearance: [String: Any]
+    private let active: Bool
     private let transport: ToolDriveTransport
     private let volume: Double
     private let pauseOutsidePlayback: () -> Void
     private let openPlexSettings: () -> Void
 
-    public init(title: String, text: String, accent: String, tint: String?, density: Double,
+    public init(title: String, active: Bool, text: String, accent: String, tint: String?, density: Double,
                 hover: Bool, transport: ToolDriveTransport, volume: Double, pauseOutsidePlayback: @escaping () -> Void,
                 openPlexSettings: @escaping () -> Void) {
         self.transport = transport
+        self.active = active
         self.volume = volume
         appearance = ["title": title, "text": text, "accent": accent, "tint": tint ?? "",
                       "density": density, "hover": hover]
@@ -100,19 +110,25 @@ public struct ToolDriveArchiveView: NSViewRepresentable {
         let controller = context.coordinator.controller
         transport.controller = controller
         controller.transport = transport
+        controller.content.isHidden = !active
         controller.setPlaybackVolume(volume)
         controller.pauseOutsidePlayback = pauseOutsidePlayback
         controller.openPlexSettings = openPlexSettings
         controller.setIPlexAppearance(appearance)
-        controller.start()
+        controller.setCatalogActive(active)
+        DispatchQueue.main.async { [weak controller] in
+            if controller?.transport != nil { controller?.start() }
+        }
         return controller.content
     }
 
     public func updateNSView(_ view: NSView, context: Context) {
+        view.isHidden = !active
         context.coordinator.controller.pauseOutsidePlayback = pauseOutsidePlayback
         context.coordinator.controller.openPlexSettings = openPlexSettings
         context.coordinator.controller.setIPlexAppearance(appearance)
         context.coordinator.controller.setPlaybackVolume(volume)
+        context.coordinator.controller.setCatalogActive(active)
     }
 
     public static func dismantleNSView(_ view: NSView, coordinator: Coordinator) {
@@ -123,6 +139,7 @@ public struct ToolDriveArchiveView: NSViewRepresentable {
         Task { @MainActor in
             if transport?.controller === controller {
                 transport?.controller = nil
+                transport?.updateCatalog(ready: false)
                 transport?.update([:])
             }
         }
