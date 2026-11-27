@@ -1180,7 +1180,8 @@
     ['disney-plus', 'disney-plus'], ['disney-plus-mono', 'disney-plus-mono'],
     ['apple-tv', 'apple-tv'], ['apple-tv-classic', 'apple-tv-classic'], ['apple-tv-glass', 'apple-tv-glass'],
     ['tool-drive-project', 'tool-drive-project-wordmark'],
-    ...wordmarkOptions.filter(option => option.hasAttribute('data-video-brand')).map(option => [option.value, option.value])
+    ...wordmarkOptions.filter(option => option.hasAttribute('data-video-brand') || option.hasAttribute('data-tool-drive'))
+      .map(option => [option.value, option.value])
   ]);
   const headerChoices = new Map();
   let activeHeaderSection = 'music';
@@ -1195,7 +1196,8 @@
     const options = part === 'logo' ? logoOptions : wordmarkOptions;
     return options.filter(option => {
       if (option.hasAttribute('data-video-brand')) return section === 'movie' || section === 'show';
-      return section === 'toolDrive' || !option.hasAttribute('data-tool-drive');
+      if (option.hasAttribute('data-tool-drive')) return section === 'toolDrive';
+      return part !== 'logo' || section !== 'toolDrive' || option.value !== 'tool-drive-project';
     });
   }
   function loadHeaderSection() {
@@ -1281,8 +1283,17 @@
       renderHeaderBrands();
     });
   });
+  const toolDriveLogoKey = brandKey('toolDrive', 'logo');
+  try {
+    const legacyLogo = localStorage.getItem(toolDriveLogoKey);
+    if (legacyLogo === 'tool-drive-project' ||
+        wordmarkOptions.some(option => option.value === legacyLogo && option.hasAttribute('data-tool-drive'))) {
+      localStorage.setItem(brandKey('toolDrive', 'wordmark'), legacyLogo);
+      localStorage.setItem(toolDriveLogoKey, 'none');
+    }
+  } catch {}
   for (const {value: section} of headerSection.options) {
-    const choices = {logo:section === 'toolDrive' ? 'tool-archive-classic' : 'none', wordmark:'iplex'};
+    const choices = {logo:'none', wordmark:section === 'toolDrive' ? 'tool-archive-classic' : 'iplex'};
     for (const part of Object.keys(choices)) {
       try {
         const saved = localStorage.getItem(brandKey(section, part));

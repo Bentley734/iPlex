@@ -109,6 +109,7 @@ final class LibraryModel: ObservableObject {
         artwork.countLimit = 100
         connected = service.status.connected
         let defaults = UserDefaults.standard
+        HeaderBrandChoices.migrateToolDriveLogo(in: defaults)
         sectionNames = defaults.dictionary(forKey: Self.sectionNamesKey) as? [String: String] ?? [:]
         if let saved = defaults.stringArray(forKey: "VisibleMusicSections") {
             let enabled = MusicKind.allCases.filter { saved.contains($0.rawValue) }

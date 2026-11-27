@@ -184,12 +184,39 @@ enum HeaderWordmark: String, CaseIterable, Identifiable {
     case dishNetwork = "dish-network"
     case directv
     case directvClassic = "directv-classic"
+
+    case toolArchiveClassic = "tool-archive-classic"
+    case toolArchive2006 = "tool-archive-2006"
+    case toolArchiveOpiate = "tool-archive-opiate"
+    case toolArchiveOpiate2 = "tool-archive-opiate2"
+    case toolArchiveFearInoculum = "tool-archive-fear-inoculum"
+    case toolArchiveMulticolor = "tool-archive-multicolor"
+    case toolArchiveMarbled = "tool-archive-marbled"
+    case toolArchiveSpectrum = "tool-archive-spectrum"
+    case toolArchiveBlock = "tool-archive-block"
+    case toolArchiveReflection = "tool-archive-reflection"
+    case toolArchiveFramed = "tool-archive-framed"
+    case toolArchiveOrbit = "tool-archive-orbit"
+    case toolArchiveStatic = "tool-archive-static"
+    case toolArchiveErosion = "tool-archive-erosion"
+    case toolArchiveAfterimage = "tool-archive-afterimage"
+    case toolArchiveLightTrail = "tool-archive-light-trail"
+    case toolArchiveFlare = "tool-archive-flare"
+    case toolArchiveBlueMist = "tool-archive-blue-mist"
+    case toolArchive1992 = "tool-archive-1992"
+    case toolArchiveAenima = "tool-archive-aenima"
+    case toolArchiveBone = "tool-archive-bone"
     case none
 
     var videoBrand: VideoHeaderBrand? { VideoHeaderBrand(rawValue: rawValue) }
 
+    var isToolArchive: Bool { rawValue.hasPrefix("tool-archive-") }
+
     static func choices(for section: HeaderBrandSection) -> [Self] {
-        allCases.filter { section.supportsVideoBranding || $0.videoBrand == nil }
+        allCases.filter {
+            if $0.isToolArchive { return section == .toolDrive }
+            return section.supportsVideoBranding || $0.videoBrand == nil
+        }
     }
 
     var id: Self { self }
@@ -216,6 +243,27 @@ enum HeaderWordmark: String, CaseIterable, Identifiable {
         case .realPlayerPlus: "RealPlayer Plus"
         case .comcast2000, .attUverse2016, .att2016, .xfinity,
              .dishNetwork, .directv, .directvClassic: videoBrand?.label ?? rawValue
+        case .toolArchiveClassic: "Tool Classic"
+        case .toolArchive2006: "Tool 2006"
+        case .toolArchiveOpiate: "Tool Opiate"
+        case .toolArchiveOpiate2: "Tool Opiate²"
+        case .toolArchiveFearInoculum: "Tool Fear Inoculum"
+        case .toolArchiveMulticolor: "Tool Multicolor"
+        case .toolArchiveMarbled: "Tool Marbled"
+        case .toolArchiveSpectrum: "Tool Spectrum"
+        case .toolArchiveBlock: "Tool Block"
+        case .toolArchiveReflection: "Tool Reflection"
+        case .toolArchiveFramed: "Tool Framed"
+        case .toolArchiveOrbit: "Tool Orbit"
+        case .toolArchiveStatic: "Tool Static"
+        case .toolArchiveErosion: "Tool Erosion"
+        case .toolArchiveAfterimage: "Tool Afterimage"
+        case .toolArchiveLightTrail: "Tool Light Trail"
+        case .toolArchiveFlare: "Tool Flare"
+        case .toolArchiveBlueMist: "Tool Blue Mist"
+        case .toolArchive1992: "Tool 1992"
+        case .toolArchiveAenima: "Tool Ænima"
+        case .toolArchiveBone: "Tool Bone"
         case .none: "None"
         }
     }
@@ -232,24 +280,21 @@ enum HeaderWordmark: String, CaseIterable, Identifiable {
         case .netflix: "netflix-wordmark"
         case .toolDriveProject: "tool-drive-project-wordmark"
         case .hulu, .disneyPlus, .disneyPlusMono, .appleTV, .appleTVClassic, .appleTVGlass: rawValue
-        default: videoBrand?.rawValue
+        default: videoBrand != nil || isToolArchive ? rawValue : nil
         }
     }
 
     var preservesColors: Bool {
         switch self {
         case .spotify, .netflix, .hulu, .disneyPlus, .appleTVGlass: true
-        default: videoBrand != nil || region(dark: false) != region(dark: true)
+        case .toolArchiveClassic, .toolArchive2006: false
+        default: isToolArchive || videoBrand != nil || region(dark: false) != region(dark: true)
         }
     }
 
     // Pixel coordinates shared with the Windows asset sheet.
     func region(dark: Bool) -> CGRect? {
         switch self {
-        case .iplex, .spotify, .netflix, .hulu, .disneyPlus, .disneyPlusMono, .appleTV, .appleTVClassic,
-             .appleTVGlass, .toolDriveProject, .none,
-             .comcast2000, .attUverse2016, .att2016, .xfinity,
-             .dishNetwork, .directv, .directvClassic: nil
         case .music: CGRect(x: 722, y: 251, width: 684, height: 210)
         case .musicBold: CGRect(x: 645, y: 609, width: 810, height: 193)
         case .plex: CGRect(x: 0, y: dark ? 1745 : 1255, width: 1024, height: 332)
@@ -261,6 +306,7 @@ enum HeaderWordmark: String, CaseIterable, Identifiable {
         case .realPlayer: CGRect(x: 0, y: dark ? 2988 : 2808, width: 471, height: 146)
         case .realPlayerBasic: CGRect(x: 520, y: dark ? 2988 : 2808, width: 482, height: 175)
         case .realPlayerPlus: CGRect(x: 1040, y: dark ? 2988 : 2808, width: 471, height: 176)
+        default: nil
         }
     }
 }
@@ -295,34 +341,12 @@ enum HeaderMark: String, CaseIterable, Identifiable {
     case directv
     case directvClassic = "directv-classic"
 
-    case toolArchiveClassic = "tool-archive-classic"
-    case toolArchive2006 = "tool-archive-2006"
-    case toolArchiveOpiate = "tool-archive-opiate"
-    case toolArchiveOpiate2 = "tool-archive-opiate2"
-    case toolArchiveFearInoculum = "tool-archive-fear-inoculum"
-    case toolArchiveMulticolor = "tool-archive-multicolor"
-    case toolArchiveMarbled = "tool-archive-marbled"
-    case toolArchiveSpectrum = "tool-archive-spectrum"
-    case toolArchiveBlock = "tool-archive-block"
     case toolArchiveSawblade = "tool-archive-sawblade"
-    case toolArchiveReflection = "tool-archive-reflection"
-    case toolArchiveFramed = "tool-archive-framed"
-    case toolArchiveOrbit = "tool-archive-orbit"
-    case toolArchiveStatic = "tool-archive-static"
-    case toolArchiveErosion = "tool-archive-erosion"
-    case toolArchiveAfterimage = "tool-archive-afterimage"
-    case toolArchiveLightTrail = "tool-archive-light-trail"
-    case toolArchiveFlare = "tool-archive-flare"
-    case toolArchiveBlueMist = "tool-archive-blue-mist"
-    case toolArchive1992 = "tool-archive-1992"
-    case toolArchiveAenima = "tool-archive-aenima"
-    case toolArchiveBone = "tool-archive-bone"
 
     var id: Self { self }
     var isMonochrome: Bool { self == .black || self == .white }
     var usesTextColor: Bool {
-        self == .disneyPlusMono || self == .appleTV || self == .appleTVClassic ||
-        self == .toolArchiveClassic || self == .toolArchive2006
+        self == .disneyPlusMono || self == .appleTV || self == .appleTVClassic
     }
 
     var videoBrand: VideoHeaderBrand? { VideoHeaderBrand(rawValue: rawValue) }
@@ -330,7 +354,8 @@ enum HeaderMark: String, CaseIterable, Identifiable {
     static func choices(for section: HeaderBrandSection) -> [Self] {
         allCases.filter {
             if $0.videoBrand != nil { return section.supportsVideoBranding }
-            return section == .toolDrive || !$0.rawValue.hasPrefix("tool-archive-")
+            if $0 == .toolArchiveSawblade { return section == .toolDrive }
+            return $0 != .toolDriveProject || section != .toolDrive
         }
     }
     var assetName: String { isMonochrome ? "monochrome" : rawValue }
@@ -346,28 +371,7 @@ enum HeaderMark: String, CaseIterable, Identifiable {
     }
     var label: String {
         switch self {
-        case .toolArchiveClassic: "Tool Classic"
-        case .toolArchive2006: "Tool 2006"
-        case .toolArchiveOpiate: "Tool Opiate"
-        case .toolArchiveOpiate2: "Tool Opiate²"
-        case .toolArchiveFearInoculum: "Tool Fear Inoculum"
-        case .toolArchiveMulticolor: "Tool Multicolor"
-        case .toolArchiveMarbled: "Tool Marbled"
-        case .toolArchiveSpectrum: "Tool Spectrum"
-        case .toolArchiveBlock: "Tool Block"
         case .toolArchiveSawblade: "Tool Sawblade"
-        case .toolArchiveReflection: "Tool Reflection"
-        case .toolArchiveFramed: "Tool Framed"
-        case .toolArchiveOrbit: "Tool Orbit"
-        case .toolArchiveStatic: "Tool Static"
-        case .toolArchiveErosion: "Tool Erosion"
-        case .toolArchiveAfterimage: "Tool Afterimage"
-        case .toolArchiveLightTrail: "Tool Light Trail"
-        case .toolArchiveFlare: "Tool Flare"
-        case .toolArchiveBlueMist: "Tool Blue Mist"
-        case .toolArchive1992: "Tool 1992"
-        case .toolArchiveAenima: "Tool Ænima"
-        case .toolArchiveBone: "Tool Bone"
         case .comcast2000, .attUverse2016, .att2016, .xfinity,
              .dishNetwork, .directv, .directvClassic: videoBrand?.label ?? rawValue
         case .none: "Text Only"
@@ -452,9 +456,20 @@ struct HeaderBrandChoices: DynamicProperty {
     @AppStorage private var wordmark: HeaderWordmark
 
     init(section: HeaderBrandSection) {
-        _mark = AppStorage(wrappedValue: section == .toolDrive ? .toolArchiveClassic : .none,
-                           section.preferenceKey(HeaderMark.preferenceKey))
-        _wordmark = AppStorage(wrappedValue: .iplex, section.preferenceKey(HeaderWordmark.preferenceKey))
+        _mark = AppStorage(wrappedValue: .none, section.preferenceKey(HeaderMark.preferenceKey))
+        _wordmark = AppStorage(wrappedValue: section == .toolDrive ? .toolArchiveClassic : .iplex,
+                               section.preferenceKey(HeaderWordmark.preferenceKey))
+    }
+
+    static func migrateToolDriveLogo(in defaults: UserDefaults) {
+        let section = HeaderBrandSection.toolDrive
+        let logoKey = section.preferenceKey(HeaderMark.preferenceKey)
+        let wordmarkKey = section.preferenceKey(HeaderWordmark.preferenceKey)
+        guard let saved = defaults.string(forKey: logoKey),
+              let wordmark = HeaderWordmark(rawValue: saved),
+              wordmark.isToolArchive || wordmark == .toolDriveProject else { return }
+        defaults.set(wordmark.rawValue, forKey: wordmarkKey)
+        defaults.set(HeaderMark.none.rawValue, forKey: logoKey)
     }
 
     var logoSelection: Binding<HeaderMark> { $mark }

@@ -48,9 +48,9 @@ aside { background:var(--panel); padding:25px 18px; display:flex; flex-direction
 .header-mark[data-mark="black"] { filter:drop-shadow(0 0 1px #ffffffb3); }
 .header-mark[data-video-brand] { width:min(calc(var(--header-height) * var(--mark-size) * 2.25), 75px); }
 :is(.header-mark,.wordmark)[data-video-brand] { filter:drop-shadow(0 0 1px #ffffff73); }
-.wordmark:is([data-wordmark="disney-plus-mono"],[data-wordmark="apple-tv"],[data-wordmark="apple-tv-classic"],[data-wordmark="tool-drive-project"]),
-.header-mark:is([data-mark="disney-plus-mono"],[data-mark="apple-tv"],[data-mark="apple-tv-classic"],
-  [data-mark="tool-archive-classic"],[data-mark="tool-archive-2006"]),
+.wordmark:is([data-wordmark="disney-plus-mono"],[data-wordmark="apple-tv"],[data-wordmark="apple-tv-classic"],[data-wordmark="tool-drive-project"],
+  [data-wordmark="tool-archive-classic"],[data-wordmark="tool-archive-2006"]),
+.header-mark:is([data-mark="disney-plus-mono"],[data-mark="apple-tv"],[data-mark="apple-tv-classic"]),
 .header-mark[data-mark="white"] { filter:brightness(0) invert(1); }
 #library-navigation { min-height:0; overflow:auto; padding:2px; }
 nav { display:grid; gap:6px; }
