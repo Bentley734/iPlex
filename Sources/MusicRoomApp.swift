@@ -208,6 +208,7 @@ private struct MusicWindow: View {
         Button { showSettings = true } label: {
             Label("Settings", systemImage: "gearshape")
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(.interaction, Rectangle())
         }
         .glassHover()
     }
@@ -224,6 +225,7 @@ private struct MusicWindow: View {
             .padding(.horizontal, 11).padding(.vertical, 10)
             .foregroundStyle(selected ? copper : theme.text)
             .background(selected ? copper.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 8))
+            .contentShape(.interaction, RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
         .glassHover()
