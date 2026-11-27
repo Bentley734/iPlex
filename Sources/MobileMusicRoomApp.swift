@@ -40,6 +40,7 @@ private struct MusicLibraryScreen: View {
 
     #if os(tvOS)
     @FocusState private var focusedSection: HeaderBrandSection?
+    @State private var videoDetailBack: (() -> Void)?
     #endif
 
     private var palette: ArtworkPalette? { artworkColors ? library.playingPalette : nil }
@@ -196,6 +197,9 @@ private struct MusicLibraryScreen: View {
                          searchResult: library.selectedVideoSearchResult,
                          searchRequest: library.videoSearchRequest,
                          onCredit: { library.selectedCredit = $0; showGlobalSearch = true })
+                #if os(tvOS)
+                .onTVDetailBack { videoDetailBack = $0 }
+                #endif
                 .id(library.serverID + videoSection.rawValue)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .musicGlass(theme, radius: 22)
@@ -268,7 +272,7 @@ private struct MusicLibraryScreen: View {
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
         .defaultFocus($focusedSection, library.activeSection)
-        .onExitCommand(perform: focusedSection == nil ? { focusedSection = library.activeSection } : nil)
+        .onExitCommand(perform: videoDetailBack ?? (focusedSection == nil ? { focusedSection = library.activeSection } : nil))
         .foregroundStyle(.white)
         .background {
             ZStack {

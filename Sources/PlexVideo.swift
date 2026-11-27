@@ -140,6 +140,9 @@ struct PlexVideoBrowser: View {
     let searchResult: PlexVideoItem?
     let searchRequest: UUID?
     let onCredit: ((PlexVideoCredit) -> Void)?
+    #if os(tvOS)
+    private var onDetailBack: (((() -> Void)?) -> Void)?
+    #endif
 
     @MusicAppearance private var theme
     @State private var snapshot: PlexVideoSnapshot?
@@ -207,22 +210,19 @@ struct PlexVideoBrowser: View {
                     .allowsHitTesting(episodeDetail == nil)
                     .accessibilityHidden(episodeDetail != nil)
                     .disabled(episodeDetail != nil)
-                    #if os(tvOS)
-                    .onExitCommand {
-                        if episodes { trail.removeLast() }
-                        else { closeDetails() }
-                    }
-                    #endif
             }
             if let episodeDetail {
                 detailsPage(episodeDetail, backTitle: parent?.title ?? sectionName) {
                     self.episodeDetail = nil
                 }
-                #if os(tvOS)
-                .onExitCommand { self.episodeDetail = nil }
-                #endif
             }
         }
+        #if os(tvOS)
+        .onChange(of: [detail?.id, episodeDetail?.id, parent?.id], initial: true) { _, _ in
+            onDetailBack?(detail != nil || episodeDetail != nil ? backFromVideoDetail : nil)
+        }
+        .onDisappear { onDetailBack?(nil) }
+        #endif
         .pageTransition(on: episodeDetail?.id ?? detail?.id)
         #if !os(tvOS)
         .clipped()
@@ -346,6 +346,20 @@ struct PlexVideoBrowser: View {
         .focusSection()
         #endif
     }
+
+    #if os(tvOS)
+    private func backFromVideoDetail() {
+        if episodeDetail != nil { episodeDetail = nil }
+        else if episodes { trail.removeLast() }
+        else { closeDetails() }
+    }
+
+    func onTVDetailBack(_ update: @escaping ((() -> Void)?) -> Void) -> Self {
+        var browser = self
+        browser.onDetailBack = update
+        return browser
+    }
+    #endif
 
     private func closeDetails() {
         episodeDetail = nil
