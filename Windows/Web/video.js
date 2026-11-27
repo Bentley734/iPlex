@@ -248,10 +248,11 @@
   });
 
   function syncTabs() {
-    get('music').setAttribute('aria-pressed', String(!kind && !archiveOpen && !downloadsOpen));
+    get('music').setAttribute('aria-pressed', String(!kind && !downloadsOpen));
     get('tool-drive').setAttribute('aria-pressed', String(archiveOpen));
     get('downloads').setAttribute('aria-pressed', String(downloadsOpen));
-    get('music-sections').hidden = Boolean(kind || archiveOpen || downloadsOpen);
+    get('music-sections').hidden = Boolean(kind || downloadsOpen);
+    window.syncMusicSectionSelection?.();
     for (const [type, tab] of tabs) {
       tab.hidden = !visibleSections.includes(type);
       tab.disabled = !videoServer();

@@ -183,16 +183,15 @@ private struct MusicWindow: View {
                                        theme: theme, width: min(155, width - padding * 2), height: 46)
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(model.visibleVideoKinds) { videoTab($0) }
-                        sidebarButton(model.sectionName(.toolDrive), icon: "waveform", selected: model.toolDriveSelected) {
-                            model.selectToolDrive()
-                        }
-                        sidebarButton(model.sectionName(.music), icon: "music.note", selected: model.activeSection == .music) {
+                        sidebarButton(model.sectionName(.music), icon: "music.note", selected: model.musicNavigationSelected) {
                             model.selectVideoSection(nil)
                         }
                     }
-                    if model.activeSection == .music {
+                    if model.musicNavigationSelected {
                         VStack(alignment: .leading, spacing: 4) {
                             ForEach(model.visibleKinds, id: \.self) { tab($0) }
+                            sidebarButton(model.sectionName(.toolDrive), icon: "waveform", selected: model.toolDriveSelected,
+                                          action: model.selectToolDrive)
                         }.padding(.leading, 8)
                     }
                     sidebarButton(model.sectionName(.downloads), icon: "arrow.down.circle",
@@ -242,7 +241,7 @@ private struct MusicWindow: View {
     }
 
     private func tab(_ kind: MusicKind) -> some View {
-        sidebarButton(kind.rawValue, icon: kind.symbol, selected: model.kind == kind) {
+        sidebarButton(kind.rawValue, icon: kind.symbol, selected: !model.toolDriveSelected && model.kind == kind) {
             searchTask?.cancel()
             model.selectKind(kind)
         }.disabled(model.libraryID.isEmpty)

@@ -358,6 +358,7 @@ final class LibraryModel: ObservableObject {
 
     func selectKind(_ section: MusicKind) {
         guard visibleKinds.contains(section) else { return }
+        if toolDriveSelected { selectVideoSection(nil) }
         pendingCachedOpen = nil
         kind = section
         UserDefaults.standard.set(section.rawValue, forKey: Self.musicSectionKey)
@@ -386,6 +387,8 @@ final class LibraryModel: ObservableObject {
         downloadsSelected = true
         UserDefaults.standard.set(HeaderBrandSection.downloads.rawValue, forKey: Self.videoSectionKey)
     }
+
+    var musicNavigationSelected: Bool { activeSection == .music || toolDriveSelected }
 
     var activeSection: HeaderBrandSection {
         if toolDriveSelected { return .toolDrive }

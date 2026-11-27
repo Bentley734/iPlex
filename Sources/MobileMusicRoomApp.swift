@@ -118,6 +118,14 @@ private struct MusicLibraryScreen: View {
             #else
             sectionTabs.focusSection()
             #endif
+            if library.musicNavigationSelected && (library.toolDriveSelected ||
+                (library.selectedDetail == nil && library.selectedGroup == nil)) {
+                #if os(tvOS)
+                sectionButtons.focusSection()
+                #else
+                ScrollView(.horizontal) { sectionButtons }.scrollIndicators(.hidden)
+                #endif
+            }
             VStack(spacing: 0) {
                 if library.toolDriveSelected {
                     ToolDriveArchiveView(title: library.sectionName(.toolDrive), text: theme.text,
@@ -195,7 +203,6 @@ private struct MusicLibraryScreen: View {
             ForEach(library.serverID.isEmpty ? [] : library.visibleVideoKinds) { kind in
                 sectionTab(HeaderBrandSection(video: kind), icon: kind.icon) { library.selectVideoSection(kind) }
             }
-            sectionTab(.toolDrive, icon: "waveform", action: library.selectToolDrive)
             sectionTab(.music, icon: "music.note") { library.selectVideoSection(nil) }
             sectionTab(.downloads, icon: "arrow.down.circle", action: library.selectDownloads)
         }
@@ -204,7 +211,7 @@ private struct MusicLibraryScreen: View {
     }
 
     private func sectionTab(_ section: HeaderBrandSection, icon: String, action: @escaping () -> Void) -> some View {
-        let selected = library.activeSection == section
+        let selected = section == .music ? library.musicNavigationSelected : library.activeSection == section
         return Button(library.sectionName(section), systemImage: icon, action: action)
             .lineLimit(1)
             .tint(selected ? accent : .primary)
@@ -249,13 +256,6 @@ private struct MusicLibraryScreen: View {
     private var browser: some View {
         VStack(alignment: .leading, spacing: 14) {
             if library.selectedDetail == nil && library.selectedGroup == nil {
-                #if os(tvOS)
-                HStack { sectionButtons }
-                #else
-                ScrollView(.horizontal) {
-                    HStack { sectionButtons }
-                }.scrollIndicators(.hidden)
-                #endif
                 if library.kind == .playlists {
                     Button("New Playlist", systemImage: "plus") { library.editPlaylist() }
                         .disabled(!library.canEditPlaylists)
@@ -344,15 +344,21 @@ private struct MusicLibraryScreen: View {
     }
 
     private var sectionButtons: some View {
-        ForEach(library.visibleKinds, id: \.self) { kind in
-            Button(kind.rawValue) {
-                search?.cancel()
-                library.selectKind(kind)
+        HStack {
+            ForEach(library.visibleKinds, id: \.self) { kind in
+                let selected = !library.toolDriveSelected && library.kind == kind
+                Button(kind.rawValue) {
+                    search?.cancel()
+                    library.selectKind(kind)
+                }
+                .disabled(library.libraryID.isEmpty)
+                .tint(selected ? accent : Color.gray)
+                .accessibilityAddTraits(selected ? .isSelected : [])
             }
-            .buttonStyle(.bordered)
-            .tint(library.kind == kind ? accent : Color.gray)
-            .accessibilityAddTraits(library.kind == kind ? .isSelected : [])
+            sectionTab(.toolDrive, icon: "waveform", action: library.selectToolDrive)
         }
+        .buttonStyle(.bordered)
+        .padding(.horizontal, 26).padding(.bottom, 8)
     }
 
     private func albumDetails(_ album: MusicEntry) -> some View {

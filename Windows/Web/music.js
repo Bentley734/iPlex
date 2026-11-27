@@ -518,6 +518,10 @@
     else window.interfaceMotion.show(panel, ['music', launchPreview?.library || library, kind, group?.id, album?.id]);
   }
   window.renderMusicPage = renderMusicPage;
+  window.syncMusicSectionSelection = () => {
+    const archiveOpen = layout.hasAttribute('data-tool-drive-open');
+    for (const tab of sectionNames) get(tab).setAttribute('aria-pressed', String(!archiveOpen && kind === tab));
+  };
   function render() {
     renderMusicPage();
     get('title').textContent = album?.title || group?.title || sectionLabel(kind);
@@ -534,7 +538,7 @@
     pageEnd.hidden = !readyToPage || pageFailed;
     pageObserver.unobserve(pageEnd);
     if (!pageEnd.hidden) pageObserver.observe(pageEnd);
-    for (const tab of sectionNames) get(tab).setAttribute('aria-pressed', String(kind === tab));
+    window.syncMusicSectionSelection();
     renderPins();
     if (!album) {
       const grid = get('grid');
