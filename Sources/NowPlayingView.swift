@@ -751,25 +751,6 @@ struct PlexPinButton: View {
     }
 }
 
-struct PlexLibrarySwitcher: View {
-    @ObservedObject var library: LibraryModel
-    var followsAvailableWidth = false
-
-    var body: some View {
-        if library.libraries.count > 1 {
-            Picker("Music Library", selection: Binding(get: { library.libraryID }, set: library.chooseLibrary)) {
-                if library.libraryID.isEmpty { Text("Choose Library").tag("") }
-                ForEach(library.libraries, id: \.id) { Text($0.name).tag($0.id) }
-            }
-            .labelsHidden()
-            .accessibilityLabel("Switch Music Library")
-            .fixedSize(horizontal: !followsAvailableWidth, vertical: true)
-            .frame(maxWidth: followsAvailableWidth ? .infinity : nil)
-            .disabled(library.reconnecting)
-        }
-    }
-}
-
 struct PinnedMusicShelf: View {
     @ObservedObject var library: LibraryModel
     let open: (MusicEntry) -> Void

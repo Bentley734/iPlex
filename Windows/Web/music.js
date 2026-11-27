@@ -651,9 +651,13 @@
     options(get('server'), state.servers, state.serverId, 'Choose server');
     options(get('library'), state.libraries, state.libraryId, 'Choose library');
     const quick = get('quick-library');
-    quick.replaceChildren(...state.libraries.map(row => new Option(row.name, row.id)));
-    quick.value = state.libraryId;
-    quick.hidden = !state.libraryId || state.libraries.length < 2;
+    const previewLibrary = state.preview;
+    const musicChoices = state.libraryId ? state.libraries :
+      previewLibrary ? [{name:previewLibrary.name || 'Music', id:previewLibrary.library}] : [];
+    quick.replaceChildren(...musicChoices.map(row => new Option(row.name, row.id)));
+    quick.value = state.libraryId || previewLibrary?.library || '';
+    quick.hidden = !musicChoices.length;
+    quick.disabled = !state.libraryId || state.loadingLibraries;
     pins = state.pins || [];
     renderPins();
     const before = launchPreview;

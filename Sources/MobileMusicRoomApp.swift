@@ -94,7 +94,6 @@ private struct MusicLibraryScreen: View {
                 Spacer()
                 Button { showAppIcons = true } label: { Image(systemName: "app.dashed") }
                     .accessibilityLabel("App Icon")
-                if videoSection == nil { PlexLibrarySwitcher(library: library) }
                 Button { showSettings = true } label: { Image(systemName: "gearshape") }
                     .accessibilityLabel("Settings")
 
@@ -130,9 +129,12 @@ private struct MusicLibraryScreen: View {
                     .id(library.serverID + videoSection.rawValue)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .musicGlass(theme, radius: 22)
+                    .padding(.horizontal, 12)
             } else if library.libraryID.isEmpty {
-                connection
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                VStack {
+                    if !library.libraries.isEmpty { musicBrowseControls.padding(14) }
+                    connection.frame(maxWidth: .infinity, maxHeight: .infinity)
+                }
                     .musicGlass(theme, radius: 22)
                     .padding(.horizontal, 12)
             } else {
@@ -193,12 +195,21 @@ private struct MusicLibraryScreen: View {
                 }
                 Button("Cancel", action: library.cancel)
             } else if library.connected {
-                Text("Choose a Plex server and music library in Settings.").foregroundStyle(.secondary)
+                Text(library.libraries.isEmpty ? "Choose a Plex server and music library in Settings." :
+                     "Select a music library above.").foregroundStyle(.secondary)
                 Button("Open Plex Settings") { showSettings = true }.buttonStyle(.borderedProminent)
             } else {
                 Button("Connect Plex", action: library.signIn).buttonStyle(.borderedProminent)
             }
         }.padding(24)
+    }
+
+    private var musicBrowseControls: some View {
+        LibraryBrowseControls(placeholder: "Search " + library.kind.rawValue.lowercased(),
+                              query: library.selectedDetail == nil && library.selectedGroup == nil ? $library.query : nil,
+                              searchDisabled: library.reconnecting || library.libraryID.isEmpty) {
+            PlexLibrarySwitcher(library: library)
+        }
     }
 
     private var browser: some View {
@@ -215,17 +226,13 @@ private struct MusicLibraryScreen: View {
                     Button("New Playlist", systemImage: "plus") { library.editPlaylist() }
                         .disabled(!library.canEditPlaylists)
                 }
-                TextField("Search " + library.kind.rawValue.lowercased(), text: $library.query).disabled(library.reconnecting)
-                    .textFieldStyle(.plain)
-                    .submitLabel(.search)
-                    .padding(10)
-                    .musicGlass(theme, radius: 13)
             } else {
                 Button {
                     if library.selectedDetail != nil { library.closeDetail() }
                     else { library.browse() }
                 } label: { Label("Back", systemImage: "chevron.left") }
             }
+            musicBrowseControls
             if let status = library.libraryConnectionStatus {
                 Text(status).font(.callout).foregroundStyle(.secondary)
             }

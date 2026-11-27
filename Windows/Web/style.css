@@ -65,7 +65,15 @@ h1 { font-size:32px; line-height:1.1; margin:0; letter-spacing:-.025em; }
 #welcome button { margin-top:6px; }
 #browser { height:100%; display:flex; flex-direction:column; }
 header { padding:25px 29px 20px; display:flex; align-items:center; gap:12px; }
-header input { margin-left:auto; width:min(220px,40%); min-width:0; }
+.library-page-header { flex-wrap:wrap; }
+.library-page-title { display:flex; align-items:center; gap:12px; flex:1; min-width:min(145px,100%); }
+.library-page-title h1 { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.library-page-title button { flex:none; }
+.library-browse-controls {
+  display:flex; align-items:center; justify-content:flex-end; gap:12px; margin-left:auto; width:min(377px,100%);
+}
+.library-browse-controls select { width:160px; min-width:0; text-overflow:ellipsis; }
+.library-browse-controls input { width:205px; min-width:0; }
 #back { line-height:1; font-size:21px; padding:5px 13px 9px; }
 .content { overflow:auto; padding:3px 30px 25px; }
 #message { color:var(--accent); }
@@ -439,7 +447,7 @@ body {
 :root[data-glass] .now-playing-header { margin:8px 8px 0; }
 :root[data-glass] .now-playing-controls { padding:clamp(8px,2vw,20px); }
 :root[data-glass] :is(
-  header input, nav button[aria-pressed=true], #settings, #quick-library, #settings-page button,
+  .library-browse-controls :is(input,select), nav button[aria-pressed=true], #settings, #settings-page button,
   #settings-page select, .now-playing-header button, .now-playing-controls button:not(.primary),
   #now-queue-list .now-queue-play, #now-queue summary, #close-expanded-artwork,
   .playback-sheet button, #mini-queue button
@@ -583,10 +591,9 @@ body {
   --glass-bevel:inset 0 1px 1px rgb(245 245 245 / calc(.55 - .19 * var(--glass-density))),
                 inset 1px 0 1px #e5e5e532, inset 0 -1px 1px #ababab48;
 }
-:root[data-video-open] :is(#welcome, #browser, #quick-library) { display:none !important; }
+:root[data-video-open] :is(#welcome, #browser) { display:none !important; }
 #video-browser { height:100%; display:flex; flex-direction:column; }
 #video-browser .content { overflow:auto; }
-#video-search,#video-library { min-width:0; max-width:210px; }
 #video-summary,#video-playing-summary { color:var(--muted); }
 .video-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(128px,1fr)); gap:20px; }
 .video-tile { display:grid; gap:8px; text-align:left; align-content:start; border:0; background:transparent; min-width:0; }

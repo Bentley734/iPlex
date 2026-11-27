@@ -218,6 +218,7 @@
     const choices = libraryReady ? available : (restored ? [{name:preview.name, id:restored}] : []);
     picker.replaceChildren(...choices.map(row => new Option(row.name, row.id)));
     picker.value = library;
+    picker.setAttribute('aria-label', 'Switch ' + titles[kind] + ' Library');
     picker.hidden = choices.length === 0;
     picker.disabled = !libraryReady;
     browse();
@@ -298,6 +299,8 @@
     }
     const current = parent.at(-1);
     get('video-title').textContent = current?.title || titles[kind];
+    search.placeholder = 'Search ' + titles[kind].toLowerCase();
+    search.setAttribute('aria-label', search.placeholder);
     search.hidden = Boolean(current) || !library;
     search.disabled = !libraryReady;
     get('video-back').hidden = !current;

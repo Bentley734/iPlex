@@ -334,6 +334,91 @@ struct HeaderBrand: View {
     }
 }
 
+struct PlexLibrarySwitcher: View {
+    @ObservedObject var library: LibraryModel
+
+    var body: some View {
+        if !library.libraries.isEmpty {
+            Picker("Music Library", selection: Binding(get: { library.libraryID }, set: library.chooseLibrary)) {
+                if library.libraryID.isEmpty { Text("Choose Library").tag("") }
+                ForEach(library.libraries, id: \.id) { Text($0.name).tag($0.id) }
+            }
+            .labelsHidden()
+            .accessibilityLabel("Switch Music Library")
+            .disabled(library.reconnecting)
+        }
+    }
+}
+
+struct LibraryBrowseControls<Selector: View>: View {
+    let placeholder: String
+    let query: Binding<String>?
+    let searchDisabled: Bool
+    @ViewBuilder let selector: () -> Selector
+    @MusicAppearance private var appearance
+
+    var body: some View {
+        Group {
+            #if os(iOS)
+            row(searchWidth: nil)
+            #else
+            ViewThatFits(in: .horizontal) {
+                row(searchWidth: 205).fixedSize(horizontal: true, vertical: false)
+                row(searchWidth: nil)
+            }
+            #endif
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+
+    private func row(searchWidth: CGFloat?) -> some View {
+        HStack(spacing: 12) {
+            selector()
+                #if os(iOS)
+                .frame(width: 120)
+                #else
+                .frame(width: 160)
+                #endif
+            if let query {
+                HStack(spacing: 7) {
+                    Image(systemName: "magnifyingglass").foregroundStyle(.secondary).accessibilityHidden(true)
+                    TextField(placeholder, text: query)
+                        .textFieldStyle(.plain)
+                        #if os(iOS)
+                        .submitLabel(.search)
+                        #endif
+                }
+                .padding(9)
+                .musicGlass(appearance, radius: 12)
+                .disabled(searchDisabled)
+                .frame(width: searchWidth)
+            }
+        }
+    }
+}
+
+#if os(macOS)
+struct LibraryBrowseHeader<Heading: View, Controls: View>: View {
+    @ViewBuilder let heading: () -> Heading
+    @ViewBuilder let controls: () -> Controls
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 15) {
+                heading()
+                controls().fixedSize(horizontal: true, vertical: false)
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                heading()
+                controls()
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 28).padding(.vertical, 20)
+    }
+}
+#endif
+
 struct PlexArtwork<Placeholder: View>: View {
     let item: MusicEntry
     let library: LibraryModel

@@ -40,7 +40,6 @@
       </nav>
     </div>
     <div class="sidebar-controls">
-      <select id="quick-library" aria-label="Switch Music Library" hidden></select>
       <button id="settings" type="button">Settings</button>
     </div>
   </aside>
@@ -57,11 +56,16 @@
       <button id="cancel" hidden>Cancel</button>
     </section>
     <section id="browser" hidden>
-      <header>
-        <button id="back" aria-label="Back" hidden>‹</button>
-        <h1 id="title">Albums</h1>
-        <button id="new-playlist" type="button" hidden>New Playlist</button>
-        <input type="search" id="search" aria-label="Search albums or artists" placeholder="Search library" maxlength="120">
+      <header class="library-page-header">
+        <div class="library-page-title">
+          <button id="back" aria-label="Back" hidden>‹</button>
+          <h1 id="title">Albums</h1>
+          <button id="new-playlist" type="button" hidden>New Playlist</button>
+        </div>
+        <div class="library-browse-controls">
+          <select id="quick-library" aria-label="Switch Music Library" hidden></select>
+          <input type="search" id="search" aria-label="Search albums" placeholder="Search albums" maxlength="120">
+        </div>
       </header>
       <div class="content" id="scroll">
         <p id="message" role="status" hidden></p>
@@ -79,11 +83,15 @@
       </div>
     </section>
     <section id="video-browser" hidden>
-      <header>
-        <button id="video-back" type="button" aria-label="Back" hidden>‹</button>
-        <h1 id="video-title">Movies</h1>
-        <input id="video-search" type="search" aria-label="Search videos" placeholder="Search videos" maxlength="120">
-        <select id="video-library" aria-label="Switch Video Library" hidden></select>
+      <header class="library-page-header">
+        <div class="library-page-title">
+          <button id="video-back" type="button" aria-label="Back" hidden>‹</button>
+          <h1 id="video-title">Movies</h1>
+        </div>
+        <div class="library-browse-controls">
+          <select id="video-library" aria-label="Switch Movies Library" hidden></select>
+          <input id="video-search" type="search" aria-label="Search movies" placeholder="Search movies" maxlength="120">
+        </div>
       </header>
       <div class="content">
         <section id="continue-video" aria-labelledby="continue-video-heading" hidden>

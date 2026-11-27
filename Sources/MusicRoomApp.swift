@@ -186,9 +186,6 @@ private struct MusicWindow: View {
             .frame(maxHeight: .infinity)
 
             VStack(alignment: .leading, spacing: 10) {
-                if videoSection == nil {
-                    PlexLibrarySwitcher(library: model, followsAvailableWidth: true)
-                }
                 settingsButton
             }
             .padding(.horizontal, padding)
@@ -204,16 +201,6 @@ private struct MusicWindow: View {
             Label("Settings", systemImage: "gearshape")
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-    }
-
-    private var librarySearch: some View {
-        HStack(spacing: 7) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField("Search \(model.kind.rawValue.lowercased())", text: $model.query).disabled(model.reconnecting)
-                .textFieldStyle(.plain)
-        }
-        .padding(9)
-        .musicGlass(theme, radius: 12)
     }
 
     private func sidebarButton(_ title: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
@@ -254,28 +241,10 @@ private struct MusicWindow: View {
                                  retryConnection: model.retryLibrary, pauseMusic: model.player.pause)
                     .id(model.serverID + videoSection.rawValue)
             } else if model.libraryID.isEmpty {
+                if !model.libraries.isEmpty { musicBrowseHeader }
                 welcome
             } else {
-                HStack(spacing: 15) {
-                    if model.selectedDetail != nil || model.selectedGroup != nil {
-                        Button {
-                            if model.selectedDetail != nil { model.closeDetail() }
-                            else { model.browse() }
-                        } label: { Image(systemName: "chevron.left") }
-                        .accessibilityLabel("Back")
-                    }
-                    Text(model.selectedDetail?.title ?? model.selectedGroup?.title ?? model.kind.rawValue)
-                        .font(.system(size: 31, weight: .bold)).lineLimit(1)
-                    if model.kind == .playlists && model.selectedDetail == nil && model.selectedGroup == nil {
-                        Button("New Playlist", systemImage: "plus") { model.editPlaylist() }
-                            .disabled(!model.canEditPlaylists)
-                    }
-                    Spacer()
-                    if model.selectedDetail == nil && model.selectedGroup == nil {
-                        librarySearch.frame(width: 205)
-                    }
-                }
-                .padding(.horizontal, 28).padding(.vertical, 20)
+                musicBrowseHeader
                 if let status = model.libraryConnectionStatus {
                     Text(status).font(.callout).foregroundStyle(.secondary)
                         .padding(.horizontal, 28).padding(.bottom, 12)
@@ -294,6 +263,34 @@ private struct MusicWindow: View {
         }
     }
 
+    private var musicBrowseHeader: some View {
+        LibraryBrowseHeader {
+            HStack(spacing: 15) {
+                if model.selectedDetail != nil || model.selectedGroup != nil {
+                    Button {
+                        if model.selectedDetail != nil { model.closeDetail() }
+                        else { model.browse() }
+                    } label: { Image(systemName: "chevron.left") }
+                    .accessibilityLabel("Back")
+                }
+                Text(model.libraryID.isEmpty ? "Music" :
+                     model.selectedDetail?.title ?? model.selectedGroup?.title ?? model.kind.rawValue)
+                    .font(.system(size: 31, weight: .bold)).lineLimit(1)
+                if model.kind == .playlists && model.selectedDetail == nil && model.selectedGroup == nil {
+                    Button("New Playlist", systemImage: "plus") { model.editPlaylist() }
+                        .disabled(!model.canEditPlaylists)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        } controls: {
+            LibraryBrowseControls(placeholder: "Search " + model.kind.rawValue.lowercased(),
+                                  query: model.selectedDetail == nil && model.selectedGroup == nil ? $model.query : nil,
+                                  searchDisabled: model.reconnecting || model.libraryID.isEmpty) {
+                PlexLibrarySwitcher(library: model)
+            }
+        }
+    }
+
     private var welcome: some View {
         VStack(alignment: .leading, spacing: 18) {
             Image(systemName: "record.circle")
@@ -302,8 +299,9 @@ private struct MusicWindow: View {
                 .accessibilityHidden(true)
             Text(model.connected ? "Choose your music library" : "Your music. Your server.")
                 .font(.system(size: 38, weight: .bold))
-            Text(model.connected ? "Choose a Plex server and music library in Settings." :
-                    "Connect to Plex to browse your collection and play your music.")
+            Text(!model.libraries.isEmpty ? "Select a music library above." :
+                 model.connected ? "Choose a Plex server and music library in Settings." :
+                 "Connect to Plex to browse your collection and play your music.")
                 .foregroundStyle(.secondary)
             connectionControls
         }
