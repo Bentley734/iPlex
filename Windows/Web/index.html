@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-glass>
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src https://media.musicroom.invalid blob:; connect-src https://media.musicroom.invalid; object-src 'none'; base-uri 'none'; form-action 'none'">
@@ -70,7 +70,6 @@
         <section id="pinned-shelf" aria-labelledby="pinned-heading" hidden>
           <h2 id="pinned-heading">Pinned</h2><div id="pinned-items"></div>
         </section>
-        <section id="plexify-feature" aria-label="From your library" hidden></section>
         <div id="library-track-headings" class="track-columns" aria-hidden="true" hidden>
           <span>#</span><span>Track</span><span>Artist</span><span>Album</span><span>Time</span>
         </div>
@@ -130,6 +129,8 @@
       <label id="video-version-field" hidden>Version <select id="video-version" aria-label="Video version"></select></label>
       <button id="video-version-play" type="button" hidden>Resume</button>
       <button id="video-compatibility" type="button" hidden>Use Compatibility Mode</button>
+      <button id="video-fullscreen" type="button" disabled>Fullscreen</button>
+      <button id="video-pip" type="button" disabled>Picture in Picture</button>
       <button id="video-watch-toggle" type="button">Mark Watched</button>
       <button id="video-done" type="button">Done</button>
     </header>
@@ -138,14 +139,11 @@
       <button id="video-next-cancel" type="button" hidden>Cancel</button>
       <button id="video-next-play" type="button" hidden>Play Next</button>
     </section>
-    <video id="video-player" controls playsinline></video>
+    <video id="video-player" controls controlslist="nofullscreen" disablepictureinpicture tabindex="0" playsinline></video>
+    <button id="video-restore" type="button" hidden>Exit Fullscreen</button>
     <p id="video-error" role="alert" hidden></p>
     <p id="video-playing-summary"></p>
   </dialog>
-  <section id="plexify-deck" aria-labelledby="plexify-deck-heading" hidden>
-    <h2 id="plexify-deck-heading">Now Playing</h2>
-    <div id="plexify-track">Nothing playing</div>
-  </section>
   <footer aria-label="Now playing">
     <button class="playing" id="playing" type="button" aria-haspopup="dialog" aria-label="Open Now Playing" disabled>Nothing playing</button>
     <button id="open-wheel" type="button" hidden>Mini-player</button>
@@ -156,7 +154,6 @@
     </div>
     <input id="seek" aria-label="Playback position" type="range" min="0" max="1" value="0" disabled>
     <time id="elapsed">0:00</time>
-    <button id="plexify-deck-toggle" type="button" aria-controls="plexify-deck" aria-expanded="false" hidden>Playing Sidebar</button>
   </footer>
   <dialog id="now-playing" aria-labelledby="now-playing-heading">
     <header class="now-playing-header">
@@ -285,22 +282,22 @@
       <p id="plex-settings-status" role="status" hidden></p>
       <button id="disconnect" type="button">Disconnect Plex</button>
     </section>
-    <label class="theme-choice">Theme
-      <select id="theme">
-        <option value="copper">Copper Groove</option>
-        <option value="classic">Classic iPod</option>
-        <option value="classicDark">Classic iPod Dark</option>
-        <option value="classicOLED">Classic iPod OLED</option>
-        <option value="video">iPod Video</option>
-        <option value="plexify">Plexify</option>
-        <option value="liquidGlass">Liquid Glass</option>
-        <option value="roseStudio">Rose Studio Light</option>
-        <option value="roseStudioDark">Rose Studio Dark</option>
-        <option value="nightSignal">Night Signal</option>
-        <option value="nightSignalOLED">Night Signal OLED</option>
-      </select>
-    </label>
-    <label id="glass-transparency-setting" class="theme-choice" hidden>
+    <section id="glass-colors" aria-labelledby="glass-colors-heading">
+      <h2 id="glass-colors-heading">Liquid Glass</h2>
+      <div class="glass-color">
+        <label for="glass-text-color">Text Color</label>
+        <input type="color" id="glass-text-color" value="#f2f7ff">
+        <output id="glass-text-value" for="glass-text-color">#F2F7FF</output>
+        <button type="button" id="glass-text-reset" aria-label="Reset Text Color" disabled>Reset</button>
+      </div>
+      <div class="glass-color">
+        <label for="glass-accent-color">Accent Color</label>
+        <input type="color" id="glass-accent-color" value="#abe3ff">
+        <output id="glass-accent-value" for="glass-accent-color">#ABE3FF</output>
+        <button type="button" id="glass-accent-reset" aria-label="Reset Accent Color" disabled>Reset</button>
+      </div>
+    </section>
+    <label id="glass-transparency-setting" class="theme-choice">
       <span>Liquid Glass Transparency</span>
       <input id="glass-transparency" type="range" min="0" max="100" step="5" value="40">
       <output id="glass-transparency-value" for="glass-transparency">40%</output>
@@ -308,7 +305,7 @@
     <label id="glass-tint-setting" class="theme-choice">
       <span>Liquid Glass Tint</span>
       <select id="glass-tint">
-        <option value="themeDefault">Theme Default</option>
+        <option value="themeDefault">Match Accent</option>
         <option value="none">No Tint</option>
         <option value="blue">Blue</option>
         <option value="mint">Mint</option>
@@ -320,7 +317,7 @@
     <section id="glass-wallpaper-setting">
       <label for="glass-wallpaper-choice">Liquid Glass Background</label>
       <select id="glass-wallpaper-choice">
-        <option value="themeDefault">Theme Default</option>
+        <option value="themeDefault">Default Background</option>
         <option value="prism-tide">Prism Tide</option>
         <option value="ember-fold">Ember Fold</option>
         <option value="violet-orbit">Violet Orbit</option>

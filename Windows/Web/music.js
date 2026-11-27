@@ -20,17 +20,11 @@
   let refreshAfterAlbum = false;
   const listingIDs = new Set();
   let caching = false;
-  let selectedTheme = 'copper';
-  const oledCanvas = theme => ['classicOLED', 'nightSignalOLED'].includes(theme);
-  const automaticArtwork = theme => theme.startsWith('roseStudio') || theme === 'nightSignal';
   let artworkColors = false;
   let paletteSource = '';
   let palette = null;
   let paletteRequest = 0;
   const artworkPattern = /^\/art\/[a-f0-9]{32}$/;
-  let deckOpen = window.matchMedia('(min-width: 1040px)').matches;
-  let featureKey = '';
-  let deckKey = '';
   let playbackState = {};
   let nowQueue = [];
   let pins = [];
@@ -86,14 +80,12 @@
   const layout = document.documentElement;
   const separator = get('sidebar-resize');
   const sidebarWidth = () => Math.round(separator.getBoundingClientRect().left - document.body.getBoundingClientRect().left);
-  const wideLayout = matchMedia('(min-width: 1040px)');
   const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
   let sidebarDrag = null;
   let savedSidebarWidth = 0;
 
   function sidebarMaximum() {
-    const deckWidth = selectedTheme === 'plexify' && deckOpen && wideLayout.matches ? 218 : 0;
-    return Math.max(164, Math.min(420, window.innerWidth - deckWidth - 408));
+    return Math.max(164, Math.min(420, window.innerWidth - 408));
   }
   function updateSidebar(width = savedSidebarWidth) {
     if (width) layout.style.setProperty('--sidebar-width', Math.max(164, Math.min(420, Math.round(width))) + 'px');
@@ -528,7 +520,6 @@
     if (!pageEnd.hidden) pageObserver.observe(pageEnd);
     for (const tab of sectionNames) get(tab).setAttribute('aria-pressed', String(kind === tab));
     renderPins();
-    renderFeature();
     if (!album) {
       const grid = get('grid');
       const mode = kind === 'genres' && !group ? 'genreList' : libraryLayout === 'trackList' || (libraryLayout === 'albumTracks' && (kind === 'albums' || group))
@@ -581,23 +572,6 @@
       list.append(entry);
     });
     get('details').replaceChildren(heading, list);
-  }
-  function renderFeature() {
-    const feature = get('plexify-feature');
-    const item = selectedTheme === 'plexify' && !album && !group && ['albums', 'artists'].includes(kind) && !get('search').value.trim() ? entries[0] : null;
-    feature.hidden = !item;
-    const key = JSON.stringify([item?.id, item?.title, item?.kind, item?.artwork]);
-    if (key === featureKey) return;
-    featureKey = key;
-    if (!item) { feature.replaceChildren(); return; }
-    const openFeature = button('', () => open(item));
-    const info = node('span', '', 'feature-info');
-    info.append(node('small', 'From your library'), node('strong', item.title));
-    if (item.artist) info.append(node('span', item.artist));
-    const arrow = node('span', '↗', 'feature-arrow');
-    arrow.setAttribute('aria-hidden', 'true');
-    openFeature.append(cover(item), info, arrow);
-    feature.replaceChildren(openFeature);
   }
   function playAlbum(index) {
     if (!album || !tracks[index] || pendingEnqueue || pendingAlbum) return;
@@ -736,15 +710,10 @@
   function applyPalette() {
     const root = document.documentElement;
     root.toggleAttribute('data-artwork-colors', artworkColors && Boolean(palette));
-    if (!palette) {
-      root.style.removeProperty('--playback-artwork-wash');
-      return;
-    }
-    const light = selectedTheme === 'classic' || selectedTheme === 'roseStudio';
+    if (!palette) return;
     const blend = (gray, amount) => `rgb(${palette.map(value => Math.round(value * (1 - amount) + gray * amount)).join(' ')})`;
-    root.style.setProperty('--artwork-accent', blend(light ? 0 : 255, 0.55));
-    root.style.setProperty('--artwork-wash', blend(light ? 255 : 20, light ? 0.72 : 0.67));
-    root.style.setProperty('--playback-artwork-wash', blend(light ? 245 : 20, light ? 0.45 : 0.54));
+    root.style.setProperty('--artwork-accent', blend(255, 0.55));
+    root.style.setProperty('--artwork-wash', blend(20, 0.67));
   }
   function pickPalette(image) {
     const canvas = document.createElement('canvas');
@@ -768,7 +737,7 @@
     return best.weight > 0 ? best.totals.map(value => value / best.weight) : null;
   }
   function updateArtworkColors(state) {
-    const path = artworkColors || automaticArtwork(selectedTheme) ? playingCover(state) : '';
+    const path = artworkColors ? playingCover(state) : '';
     const source = artworkPattern.test(path) ? path : '';
     if (source === paletteSource) return;
     paletteSource = source;
@@ -787,7 +756,7 @@
   function chooseArtworkColors(enabled) {
     artworkColors = enabled;
     get('artwork-colors').checked = enabled;
-    get('animate-artwork-colors').disabled = (!enabled && !automaticArtwork(selectedTheme)) || oledCanvas(selectedTheme);
+    get('animate-artwork-colors').disabled = !enabled;
     try { localStorage.setItem('musicroom-artwork-colors', enabled ? '1' : '0'); } catch {}
     updateArtworkColors(playbackState);
     applyPalette();
@@ -835,7 +804,6 @@
       if (playing) renderNowPlaying(state);
       else { closePlaybackSheets(); get('now-playing').close(); }
     }
-    if (selectedTheme === 'plexify') renderDeck(state);
     window.clickWheel.update(playing, state, cover);
     const active = state.status === 'playing';
     get('toggle').textContent = active ? '⏸' : '▶';
@@ -860,7 +828,6 @@
       else get('now-playing').style.removeProperty('--glass-artwork');
       if (expandedArtwork.open) refreshExpandedArtwork();
     }
-    get('now-playing').toggleAttribute('data-track-paused', state.status !== 'playing');
     get('signal-path-button').textContent = signalBadge(track.format);
     get('now-title').textContent = track.title || state.title || playing.title;
     get('now-artist').textContent = track.artist || playing.artist || '';
@@ -873,10 +840,8 @@
     seek.disabled = !state.duration;
     if (document.activeElement !== seek) seek.value = state.elapsed || 0;
     get('now-elapsed').textContent = time(state.elapsed);
-    const remaining = selectedTheme.startsWith('roseStudio') && state.duration > 0;
-    get('now-duration').textContent = remaining ? '−' + time(state.duration - (state.elapsed || 0)) : time(state.duration);
-    get('now-duration').setAttribute('aria-label', remaining ? 'Time remaining' : 'Track duration');
-    seek.style.setProperty('--seek-percent', 100 * Math.min(1, Math.max(0, Number(seek.value) / Number(seek.max))) + '%');
+    get('now-duration').textContent = time(state.duration);
+    get('now-duration').setAttribute('aria-label', 'Track duration');
     const active = state.status === 'playing';
     get('now-play').textContent = active ? '⏸' : '▶';
     get('now-play').setAttribute('aria-label', active ? 'Pause' : 'Play');
@@ -1116,22 +1081,6 @@
   get('now-next').onclick = () => player.action({action:'next'});
   get('now-seek').oninput = event => player.action({action:'seek', seconds:event.target.value});
   get('now-volume').oninput = event => player.action({action:'volume', value:event.target.value});
-  function renderDeck(state) {
-    const next = state.tracks?.[state.trackIndex + 1];
-    const key = JSON.stringify([playing?.id, playing?.artwork, state.title, next?.title]);
-    if (deckKey === key) return;
-    deckKey = key;
-    const panel = get('plexify-track');
-    if (!playing) { panel.textContent = 'Nothing playing'; return; }
-    const title = node('strong', state.title || playing.title);
-    const artist = node('small', [playing.artist, playing.title].filter(Boolean).join(' · '));
-    panel.replaceChildren(cover(playing), title, artist);
-    if (next?.title) {
-      const upNext = node('div', '', 'plexify-up-next');
-      upNext.append(node('small', 'Up Next'), node('span', next.title));
-      panel.append(upNext);
-    }
-  }
   get('connect').onclick = () => host({action:'connect'});
   get('refresh-plex').onclick = () => host({action:'servers'});
   const openSettings = () => {
@@ -1148,24 +1097,28 @@
     get('app-update').textContent = state.action;
     get('app-update').disabled = Boolean(state.disabled);
   };
-  function chooseTheme(value) {
-    const theme = ['classic', 'classicDark', 'classicOLED', 'video', 'plexify', 'liquidGlass', 'roseStudio', 'roseStudioDark', 'nightSignal', 'nightSignalOLED'].includes(value) ? value : 'copper';
-    selectedTheme = theme;
-    document.documentElement.dataset.theme = theme;
-    window.clickWheel.updateTheme(theme);
-    get('theme').value = theme;
-    const usesGlass = (['liquidGlass', 'classicDark', 'roseStudio', 'roseStudioDark'].includes(theme) || oledCanvas(theme));
-    layout.toggleAttribute('data-glass', usesGlass);
-    layout.toggleAttribute('data-oled-canvas', oledCanvas(theme));
-    get('glass-transparency-setting').hidden = !usesGlass;
-    get('animate-artwork-colors').disabled = (!artworkColors && !automaticArtwork(theme)) || oledCanvas(theme);
-    updateArtworkColors(playbackState);
-    applyPalette();
-    updateDeckVisibility();
-    renderFeature();
-    if (theme === 'plexify') renderDeck(playbackState);
-    try { localStorage.setItem('musicroom-theme', theme); } catch {}
-    renderHeaderWordmark();
+  const glassDefaults = {text:'#f2f7ff', accent:'#abe3ff'};
+  function chooseGlassColor(type, value) {
+    const custom = /^#[a-f0-9]{6}$/i.test(value ?? '') ? value.toLowerCase() : '';
+    const hex = custom || glassDefaults[type];
+    get('glass-' + type + '-color').value = hex;
+    get('glass-' + type + '-value').textContent = hex.toUpperCase();
+    get('glass-' + type + '-reset').disabled = !custom;
+    layout.toggleAttribute('data-custom-' + type, Boolean(custom));
+    if (custom) layout.style.setProperty('--' + type, custom);
+    else layout.style.removeProperty('--' + type);
+    if (type === 'accent' && custom) {
+      const [r,g,b] = hex.slice(1).match(/../g).map(channel => {
+        const srgb = parseInt(channel, 16) / 255;
+        return srgb <= .04045 ? srgb / 12.92 : ((srgb + .055) / 1.055) ** 2.4;
+      });
+      layout.style.setProperty('--accent-ink', .2126*r + .7152*g + .0722*b > .179 ? '#000' : '#fff');
+    } else if (type === 'accent') layout.style.removeProperty('--accent-ink');
+    try {
+      const key = 'musicroom-glass-' + type + '-color';
+      if (custom) localStorage.setItem(key, custom);
+      else localStorage.removeItem(key);
+    } catch {}
   }
   function chooseGlassTransparency(saved) {
     const value = saved === null ? NaN : Number(saved);
@@ -1182,16 +1135,6 @@
     if (select.selectedIndex < 0) select.value = 'automatic';
     window.clickWheel.setStyle(select.value);
     try { localStorage.setItem('musicroom-mini-player', select.value); } catch {}
-  }
-  function updateDeckVisibility() {
-    const plexify = selectedTheme === 'plexify';
-    const visible = plexify && deckOpen;
-    get('plexify-deck').hidden = !visible;
-    const toggle = get('plexify-deck-toggle');
-    toggle.hidden = !plexify;
-    toggle.setAttribute('aria-expanded', String(visible));
-    document.documentElement.dataset.plexifyDeck = visible ? 'open' : 'closed';
-    updateSidebar();
   }
   function cycleHeaderChoice(id, choose) {
     const select = get(id);
@@ -1222,7 +1165,7 @@
         canvas.dataset.color = spotify || darkY !== undefined ? 'original' : 'template';
         canvas.width = width;
         canvas.height = height;
-        canvas.getContext('2d').drawImage(sheet, x, ['classic', 'roseStudio'].includes(selectedTheme) ? y : (darkY ?? y), width, height, 0, 0, width, height);
+        canvas.getContext('2d').drawImage(sheet, x, darkY ?? y, width, height, 0, 0, width, height);
       }
       canvas.hidden = !showMusic;
       brand.querySelector('img.wordmark').hidden = showMusic || spotify || choice.value === 'none';
@@ -1285,7 +1228,10 @@
     player.eq(settings);
     try { localStorage.setItem('musicroom-eq', JSON.stringify(settings)); } catch {}
   }
-  get('theme').onchange = event => chooseTheme(event.target.value);
+  for (const type of Object.keys(glassDefaults)) {
+    get('glass-' + type + '-color').oninput = event => chooseGlassColor(type, event.target.value);
+    get('glass-' + type + '-reset').onclick = () => chooseGlassColor(type, '');
+  }
   get('glass-transparency').oninput = event => chooseGlassTransparency(event.target.value);
   get('artwork-colors').onchange = event => chooseArtworkColors(event.target.checked);
   get('animate-artwork-colors').onchange = event => chooseArtworkMotion(event.target.checked);
@@ -1298,7 +1244,6 @@
     else browse();
   };
   get('mini-player-style').onchange = event => chooseMiniPlayer(event.target.value);
-  get('plexify-deck-toggle').onclick = () => { deckOpen = !deckOpen; updateDeckVisibility(); };
   get('header-logo').onchange = event => chooseHeaderLogo(event.target.value);
   get('header-wordmark').onchange = event => chooseHeaderWordmark(event.target.value);
   wordmarkSheet.addEventListener('load', renderHeaderWordmark);
@@ -1359,7 +1304,9 @@
     selectArtworkSize(localStorage.getItem('musicroom-library-artwork-size'));
     useLibraryLayout(localStorage.getItem('musicroom-library-layout'));
     savedSidebarWidth = Number(localStorage.getItem('musicroom-sidebar-width')) || 0;
-    chooseTheme(localStorage.getItem('musicroom-theme'));
+    for (const type of Object.keys(glassDefaults))
+      chooseGlassColor(type, localStorage.getItem('musicroom-glass-' + type + '-color'));
+    renderHeaderWordmark();
     chooseGlassTransparency(localStorage.getItem('musicroom-glass-transparency'));
     chooseArtworkColors(localStorage.getItem('musicroom-artwork-colors') === '1');
     chooseArtworkMotion(localStorage.getItem('musicroom-animate-artwork-colors') !== '0');

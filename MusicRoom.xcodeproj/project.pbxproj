@@ -18,6 +18,7 @@
 		29CF984811D8CCAD74A6AB1F /* ClickWheelPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2DA695E5F978CFBEDD54C3D /* ClickWheelPlayer.swift */; };
 		2F7B05532D59401224593621 /* AudioAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED8702E61EE0F31C7677EC30 /* AudioAnalysis.swift */; };
 		302A4395B55B8B0627800F4D /* VideoLAN-SOURCE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 72754B9270BC4C0CFEE4A941 /* VideoLAN-SOURCE.txt */; };
+		30FB9912CFC98B40FC532C8F /* MacVideoPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF714F069BFA8BAE334EE31F /* MacVideoPresentation.swift */; };
 		37DBDBEFBCA7FA9300B97620 /* MusicSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81F02BA2B14ABC3859F379BD /* MusicSettings.swift */; };
 		3AF66C4880414EBC37880124 /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E789032BCF3A6169CFC2233 /* NowPlayingView.swift */; };
 		41BB757808343F6DE3116ACA /* AlbumCoverCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6581BBFF504F8BAA5B38470 /* AlbumCoverCache.swift */; };
@@ -28,6 +29,7 @@
 		45BD406408902A81EB0EE534 /* MusicRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EFA099A27452963E48DAEFD /* MusicRoomApp.swift */; };
 		4852498FF890C183BB536F7A /* MacAppUpdates.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9C2A0F694BD3960FADA938 /* MacAppUpdates.swift */; };
 		4F8F42D2AB91DCC695B06BD6 /* MacAppUpdates.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9C2A0F694BD3960FADA938 /* MacAppUpdates.swift */; };
+		50FD1E765EF3D610380E5C03 /* MacVideoPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF714F069BFA8BAE334EE31F /* MacVideoPresentation.swift */; };
 		523B49DEEF64BD699C9746FE /* HeaderMarks in Resources */ = {isa = PBXBuildFile; fileRef = DBB6ACEC51BC04DF53298E15 /* HeaderMarks */; };
 		553366239E97CB54D63B41BB /* PlexVideoManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFFD17F74980DC97E5F435E4 /* PlexVideoManifest.swift */; };
 		559F2534C6897DF20AAC1E02 /* Track.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8712B67A9D2431A2B0160DDC /* Track.swift */; };
@@ -131,6 +133,7 @@
 		E359008C174456F0E7E13E19 /* GlassBackgrounds */ = {isa = PBXFileReference; lastKnownFileType = folder; name = GlassBackgrounds; path = Assets/GlassBackgrounds; sourceTree = SOURCE_ROOT; };
 		ED8702E61EE0F31C7677EC30 /* AudioAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioAnalysis.swift; sourceTree = "<group>"; };
 		ED9C2A0F694BD3960FADA938 /* MacAppUpdates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacAppUpdates.swift; sourceTree = "<group>"; };
+		EF714F069BFA8BAE334EE31F /* MacVideoPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacVideoPresentation.swift; sourceTree = "<group>"; };
 		EF99A5BF8FAE5BAC92EC8A5B /* tvOS.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = tvOS.xcassets; sourceTree = "<group>"; };
 		F185419F294F55DB3C3CAE00 /* wordmark.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = wordmark.png; sourceTree = "<group>"; };
 		F28951F1D53D43A1D29492C2 /* MobileVLCKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = MobileVLCKit.xcframework; path = Dependencies/MobileVLCKit.xcframework; sourceTree = "<group>"; };
@@ -220,6 +223,7 @@
 				C69FD3E93908A0408008D345 /* LibraryModel.swift */,
 				ED9C2A0F694BD3960FADA938 /* MacAppUpdates.swift */,
 				AE3A4685EF46B49FB6B22D90 /* MacMiniPlayer.swift */,
+				EF714F069BFA8BAE334EE31F /* MacVideoPresentation.swift */,
 				C97A49FCD6AC086C13007CEB /* MobileMusicRoomApp.swift */,
 				A0B6189D5420E12F096AED5C /* MusicAppIconPicker.swift */,
 				A7C3DEA02512BD0C8E406A0F /* MusicGenreList.swift */,
@@ -358,6 +362,7 @@
 				66D831237EA3E508723100E1 /* LibraryModel.swift in Sources */,
 				4852498FF890C183BB536F7A /* MacAppUpdates.swift in Sources */,
 				614CA070E7014A7C66698623 /* MacMiniPlayer.swift in Sources */,
+				50FD1E765EF3D610380E5C03 /* MacVideoPresentation.swift in Sources */,
 				733CA465AF821A663909CC7B /* MobileMusicRoomApp.swift in Sources */,
 				42811EF14C7EB41CB2F0D3CD /* MusicAppIconPicker.swift in Sources */,
 				E301E1E7838B11175D01EF9A /* MusicGenreList.swift in Sources */,
@@ -387,6 +392,7 @@
 				C0F0713CDBB0212EBBDFA09D /* LibraryModel.swift in Sources */,
 				4F8F42D2AB91DCC695B06BD6 /* MacAppUpdates.swift in Sources */,
 				11F3BB75364189A5F0A3B672 /* MacMiniPlayer.swift in Sources */,
+				30FB9912CFC98B40FC532C8F /* MacVideoPresentation.swift in Sources */,
 				B7E443953550133C851BC0A2 /* MobileMusicRoomApp.swift in Sources */,
 				0D8B9B802C2B23D503C305AE /* MusicAppIconPicker.swift in Sources */,
 				CFCAD59E994057089D18A941 /* MusicGenreList.swift in Sources */,
@@ -418,6 +424,7 @@
 					"$(inherited)",
 					"\"Dependencies\"",
 				);
+				INFOPLIST_FILE = "Mobile/tvOS-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -464,7 +471,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 33;
+				CURRENT_PROJECT_VERSION = 34;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -479,7 +486,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
-				MARKETING_VERSION = 0.1.32;
+				MARKETING_VERSION = 0.1.33;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -569,7 +576,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 33;
+				CURRENT_PROJECT_VERSION = 34;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -590,7 +597,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
-				MARKETING_VERSION = 0.1.32;
+				MARKETING_VERSION = 0.1.33;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -611,6 +618,7 @@
 					"$(inherited)",
 					"\"Dependencies\"",
 				);
+				INFOPLIST_FILE = "Mobile/tvOS-Info.plist";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

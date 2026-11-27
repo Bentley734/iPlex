@@ -13,6 +13,9 @@ struct NativeVideoPlayer: View {
     let progress: (Double, Bool) -> Void
     let fallback: (Double) -> Void
 
+    #if os(macOS)
+    @Environment(\.macVideoPresentation) private var presentation
+    #endif
     @State private var player = VLCMediaPlayer(options: ["--quiet", "--no-interact"])
     @State private var current = 0.0
     @State private var duration = 0.0
@@ -25,7 +28,7 @@ struct NativeVideoPlayer: View {
 
     var body: some View {
         VStack(spacing: 8) {
-            VideoDrawable(player: player).frame(maxWidth: .infinity, maxHeight: .infinity)
+            drawable.frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay {
                     if !ready { ProgressView("Opening video…").allowsHitTesting(false) }
                 }
@@ -50,10 +53,15 @@ struct NativeVideoPlayer: View {
                 }.disabled(!seekable || duration <= 0)
                 #endif
                 Text(time(duration)).monospacedDigit()
+                #if !os(iOS)
                 Button("Use Compatibility Mode") { fallback(current) }
+                #endif
             }
             .font(.callout)
             .padding(.horizontal, 16).padding(.bottom, 10)
+            #if os(iOS)
+            Button("Use Compatibility Mode") { fallback(current) }.font(.footnote).padding(.bottom, 6)
+            #endif
         }
         #if os(tvOS)
         .onPlayPauseCommand(perform: toggle)
@@ -64,6 +72,22 @@ struct NativeVideoPlayer: View {
             player.stop()
             player.media = nil
         }
+    }
+
+    @ViewBuilder private var drawable: some View {
+        #if os(macOS)
+        if let presentation {
+            MacVideoSurface<VLCVideoView>(presentation: presentation, make: {
+                let view = VLCVideoView()
+                player.drawable = view
+                return view
+            }, release: { view in
+                if player.drawable as? NSView === view { player.drawable = nil }
+            }, togglePlayback: toggle)
+        }
+        #else
+        VideoDrawable(player: player)
+        #endif
     }
 
     private func play() async {
@@ -134,22 +158,8 @@ struct NativeVideoPlayer: View {
 }
 
 #if os(macOS)
-private struct VideoDrawable: NSViewRepresentable {
-    let player: VLCMediaPlayer
-
-    func makeNSView(context: Context) -> NSView {
-        let view = VLCVideoView()
-        player.drawable = view
-        return view
-    }
-
-    func updateNSView(_ view: NSView, context: Context) {}
-
-    func makeCoordinator() -> VLCMediaPlayer { player }
-
-    static func dismantleNSView(_ view: NSView, coordinator: VLCMediaPlayer) {
-        if coordinator.drawable as? NSView === view { coordinator.drawable = nil }
-    }
+extension EnvironmentValues {
+    @Entry var macVideoPresentation: MacVideoPresentation?
 }
 #else
 private struct VideoDrawable: UIViewRepresentable {

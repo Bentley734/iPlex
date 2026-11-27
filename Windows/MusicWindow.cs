@@ -17,6 +17,7 @@ namespace MusicRoom
         const string Page = "https://musicroom.invalid/index.html";
         readonly WebView2 view = new WebView2();
         readonly WindowsMediaService media;
+        readonly VideoWindowPresentation webVideo;
         readonly Dictionary<string, byte[]> assets = new Dictionary<string, byte[]>(StringComparer.Ordinal);
         Icon dockIcon;
         bool closing;
@@ -29,6 +30,7 @@ namespace MusicRoom
         public MusicWindow(string updateAcknowledgment = null)
         {
             this.updateAcknowledgment = updateAcknowledgment;
+            webVideo = new VideoWindowPresentation(this);
             Text = "iPlex";
             StartPosition = FormStartPosition.CenterScreen;
             ClientSize = new Size(1120, 750);
@@ -61,6 +63,12 @@ namespace MusicRoom
             Shown += async delegate { await StartWebView(); };
             FormClosing += (sender, args) =>
             {
+                if (args.CloseReason == CloseReason.UserClosing && webVideo.Mode != VideoWindowMode.Inline)
+                {
+                    args.Cancel = true;
+                    SetWebVideoMode(VideoWindowMode.Inline);
+                    return;
+                }
                 if (args.CloseReason == CloseReason.UserClosing && floatingPlayer)
                 {
                     args.Cancel = true;
@@ -69,11 +77,35 @@ namespace MusicRoom
                     return;
                 }
                 closing = true;
-                if (nativeVideo != null) nativeVideo.Close();
+                if (nativeVideo != null) nativeVideo.EndPlayback();
                 if (checkUpdate != null) checkUpdate.Cancel();
                 media.Dispose();
             };
             FormClosed += delegate { if (dockIcon != null) dockIcon.Dispose(); };
+        }
+
+        void SetWebVideoMode(VideoWindowMode mode)
+        {
+            if (closing || floatingPlayer || nativeVideo != null) return;
+            webVideo.SetMode(mode);
+            FitLibraryWebView();
+            Emit("plexVideoDisplay", mode.ToString().ToLowerInvariant());
+        }
+
+        protected override void WndProc(ref Message message)
+        {
+            if (webVideo != null && webVideo.HandleSystemCommand(message, () => SetWebVideoMode(VideoWindowMode.Inline))) return;
+            base.WndProc(ref message);
+        }
+
+        protected override bool ProcessCmdKey(ref Message message, Keys keyData)
+        {
+            if (keyData == Keys.Escape && webVideo.Mode != VideoWindowMode.Inline)
+            {
+                SetWebVideoMode(VideoWindowMode.Inline);
+                return true;
+            }
+            return base.ProcessCmdKey(ref message, keyData);
         }
 
         void FitLibraryWebView()
@@ -181,10 +213,26 @@ namespace MusicRoom
                 else if (action == "dragFloatingPlayer")
                     BeginInvoke(new Action(() => { if (!closing && floatingPlayer) DragFloatingPlayer(); }));
                 else if (action == "updateApp") await UpdateApp();
-                else if (action == "videoNative") OpenNativeVideo(request);
+                else if (action == "videoDisplay")
+                {
+                    string mode = WindowsMediaService.Str(request, "mode");
+                    if (mode == "fullscreen" || mode == "floating" || mode == "inline")
+                    {
+                        var display = mode == "fullscreen" ? VideoWindowMode.Fullscreen :
+                            mode == "floating" ? VideoWindowMode.Floating : VideoWindowMode.Inline;
+                        BeginInvoke(new Action(() => SetWebVideoMode(display)));
+                    }
+                }
+                else if (action == "videoNative")
+                {
+                    if (webVideo.Mode != VideoWindowMode.Inline) SetWebVideoMode(VideoWindowMode.Inline);
+                    OpenNativeVideo(request);
+                }
                 else if (action == "videoClose" || action == "videoPlay")
                 {
-                    if (nativeVideo != null) nativeVideo.Close();
+                    if (action == "videoClose" && webVideo.Mode != VideoWindowMode.Inline)
+                        SetWebVideoMode(VideoWindowMode.Inline);
+                    if (nativeVideo != null) nativeVideo.EndPlayback();
                     await media.Handle(request);
                 }
                 else await media.Handle(request);

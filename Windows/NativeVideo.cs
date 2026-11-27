@@ -130,6 +130,10 @@ namespace MusicRoom
         readonly double startAt;
         readonly bool advanceOnEnd;
         readonly NativeVideoRuntime vlc;
+        readonly VideoWindowPresentation presentation;
+        readonly FlowLayoutPanel controls = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 66, Padding = new Padding(8, 5, 8, 3) };
+        readonly Button fullscreen = new Button { Text = "Fullscreen", AutoSize = true };
+        readonly Button floating = new Button { Text = "Picture in Picture", AutoSize = true };
         readonly Panel surface = new Panel { BackColor = Color.Black, Dock = DockStyle.Fill };
         readonly Button toggle = new Button { Text = "Pause", Width = 85 };
         readonly TrackBar timeline = new TrackBar { Maximum = 1000, TickStyle = TickStyle.None, Width = 260, Enabled = false };
@@ -138,7 +142,7 @@ namespace MusicRoom
         IntPtr instance, player;
         DateTime deadline, nextReport;
         long position, duration;
-        bool ready, scrubbing, stopping, startedAtPosition, endedReported;
+        bool ready, scrubbing, stopping, startedAtPosition, endedReported, closeRequested;
         string result = "closed";
 
         internal NativeVideoWindow(Uri source, string title, double startAt, bool advanceOnEnd, bool hasVersions, Action<string, double> completion)
@@ -153,7 +157,7 @@ namespace MusicRoom
             Size = new Size(1024, 680);
             MinimumSize = new Size(640, 360);
             BackColor = Color.FromArgb(22, 22, 24);
-            var controls = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 52, Padding = new Padding(8, 5, 8, 3) };
+            presentation = new VideoWindowPresentation(this);
             var previous = new Button { Text = "−10 s", Width = 65 };
             var next = new Button { Text = "+10 s", Width = 65 };
             var fallback = new Button { Text = "Compatibility Mode", Width = 155 };
@@ -164,6 +168,12 @@ namespace MusicRoom
                 versions.Click += delegate { result = "versions"; Close(); };
                 controls.Controls.Add(versions);
             }
+            controls.Controls.Add(fullscreen);
+            controls.Controls.Add(floating);
+            fullscreen.Click += delegate {
+                SetPresentation(presentation.Mode == VideoWindowMode.Fullscreen ? VideoWindowMode.Inline : VideoWindowMode.Fullscreen);
+            };
+            floating.Click += delegate { SetPresentation(VideoWindowMode.Floating); };
             Controls.Add(surface);
             Controls.Add(controls);
             toggle.Click += delegate { TogglePlayback(); };
@@ -279,14 +289,51 @@ namespace MusicRoom
             if (timeline.Enabled) vlc.Seek(player, Math.Max(0, Math.Min(duration, value)));
         }
 
+        void SetPresentation(VideoWindowMode mode)
+        {
+            presentation.SetMode(mode);
+            controls.Visible = mode != VideoWindowMode.Floating;
+            fullscreen.Text = mode == VideoWindowMode.Fullscreen ? "Exit Fullscreen" : "Fullscreen";
+            if (mode == VideoWindowMode.Floating) ActiveControl = null;
+        }
+
+        internal void EndPlayback()
+        {
+            closeRequested = true;
+            Close();
+        }
+
+        protected override void WndProc(ref Message message)
+        {
+            if (presentation != null && presentation.HandleSystemCommand(message, () => SetPresentation(VideoWindowMode.Inline))) return;
+            base.WndProc(ref message);
+        }
+
         protected override bool ProcessCmdKey(ref Message message, Keys keyData)
         {
-            if (keyData == Keys.Escape) { Close(); return true; }
+            if (keyData == Keys.Escape)
+            {
+                if (presentation.Mode != VideoWindowMode.Inline) SetPresentation(VideoWindowMode.Inline);
+                else EndPlayback();
+                return true;
+            }
+            if (keyData == Keys.Space && presentation.Mode == VideoWindowMode.Floating)
+            {
+                TogglePlayback();
+                return true;
+            }
             return base.ProcessCmdKey(ref message, keyData);
         }
 
         protected override void OnFormClosing(FormClosingEventArgs args)
         {
+            if (!closeRequested && result == "closed" && args.CloseReason == CloseReason.UserClosing &&
+                presentation.Mode != VideoWindowMode.Inline)
+            {
+                args.Cancel = true;
+                SetPresentation(VideoWindowMode.Inline);
+                return;
+            }
             ReleasePlayback();
             base.OnFormClosing(args);
         }

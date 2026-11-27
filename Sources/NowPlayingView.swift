@@ -21,7 +21,7 @@ struct NowPlayingPopTransition: ViewModifier {
 struct NowPlayingView: View {
     @ObservedObject var library: LibraryModel
     @ObservedObject private var wallpaper = GlassWallpaper.shared
-    @AppStorage("MusicTheme") private var theme = MusicTheme.copper
+    @MusicAppearance private var theme
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @State private var showingQueue = false
     @State private var showingArtwork = false
@@ -31,7 +31,7 @@ struct NowPlayingView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let close: () -> Void
 
-    private var palette: ArtworkPalette? { artworkColors || theme.usesArtworkPlayback ? library.playingPalette : nil }
+    private var palette: ArtworkPalette? { artworkColors ? library.playingPalette : nil }
     private var accent: Color { theme.accent(using: artworkColors ? palette : nil) }
     private var duration: Double { max(0, library.state.duration) }
     private var elapsed: Double { min(duration, max(0, library.state.elapsed)) }
@@ -48,7 +48,7 @@ struct NowPlayingView: View {
                 header
                     .padding(.horizontal, min(60, geometry.size.width * 0.045))
                     .musicGlass(theme, radius: 20)
-                    .padding(theme.usesLiquidGlass ? 8 : 0)
+                    .padding(8)
                 HStack(spacing: 0) {
                     player
                     if showingQueue {
@@ -62,13 +62,11 @@ struct NowPlayingView: View {
         }
         .background {
             theme.backdrop(using: palette)
-                .animation(theme.isRoseStudio && !reduceMotion ? .easeInOut(duration: 0.8) : nil,
+                .animation(!reduceMotion ? .easeInOut(duration: 0.8) : nil,
                            value: palette?.wash(in: theme.scheme))
                 .overlay {
-                    if !theme.keepsBlackCanvas {
-                        RadialGradient(colors: [accent.opacity(0.17), .clear], center: .topLeading,
-                                       startRadius: 0, endRadius: 950)
-                    }
+                    RadialGradient(colors: [accent.opacity(0.17), .clear], center: .topLeading,
+                                   startRadius: 0, endRadius: 950)
                 }
                 .overlay { glassArtworkBackdrop }
                 .ignoresSafeArea()
@@ -84,6 +82,7 @@ struct NowPlayingView: View {
         .onChange(of: library.playingAlbum == nil) { _, ended in
             if ended { showingArtwork = false }
         }
+        .foregroundStyle(theme.text)
         .tint(accent)
         .sheet(isPresented: $showingLyrics) {
             NowPlayingLyrics(library: library, theme: theme).musicSheet(theme).preferredColorScheme(theme.scheme).tint(accent)
@@ -100,7 +99,7 @@ struct NowPlayingView: View {
     }
 
     @ViewBuilder private var glassArtworkBackdrop: some View {
-        if theme.supportsGlassWallpaper, !reduceTransparency, wallpaper.image == nil, let image = library.playingArtwork {
+        if !reduceTransparency, wallpaper.image == nil, let image = library.playingArtwork {
             GeometryReader { geometry in
                 #if os(macOS)
                 let artwork = Image(nsImage: image)
@@ -166,7 +165,7 @@ struct NowPlayingView: View {
                         .buttonStyle(.plain)
                         .accessibilityLabel("Enlarge album artwork")
                         playback(album, compact: compact)
-                            .padding(theme.usesLiquidGlass ? (compact ? 8 : 16) : 0)
+                            .padding(compact ? 8 : 16)
                             .musicGlass(theme, radius: 22)
                             .frame(maxWidth: 510, alignment: .leading)
                             .frame(maxWidth: .infinity)
@@ -204,12 +203,8 @@ struct NowPlayingView: View {
             }
         }
         .frame(maxHeight: .infinity)
-        .background(theme.usesLiquidGlass ? .clear : theme.surface(using: palette))
-        .overlay(alignment: .leading) {
-            if !theme.usesLiquidGlass { Divider().opacity(0.5) }
-        }
         .musicGlass(theme, radius: 20)
-        .padding(theme.usesLiquidGlass ? 8 : 0)
+        .padding(8)
         #if os(tvOS)
         .focusSection()
         #endif
@@ -219,8 +214,7 @@ struct NowPlayingView: View {
         Color.primary.opacity(0.08)
             .overlay { artworkImage(album, fit: false) }
             .clipShape(.rect(cornerRadius: 19))
-            .shadow(color: (theme.isRoseStudio ? accent : .black).opacity(0.27), radius: 15, y: 7)
-            .scaleEffect(theme.isRoseStudio && !library.state.playing && !reduceMotion ? 0.94 : 1)
+            .shadow(color: Color.black.opacity(0.27), radius: 15, y: 7)
             .animation(reduceMotion ? nil : .spring(response: 0.42, dampingFraction: 0.82), value: library.state.playing)
             .accessibilityHidden(true)
     }
@@ -252,7 +246,7 @@ struct NowPlayingView: View {
                             .font(.headline)
                             .foregroundStyle(.white)
                             .padding(13)
-                            .background(.black.opacity(theme.usesLiquidGlass ? 0.25 : 0.72), in: Circle())
+                            .background(.black.opacity(0.25), in: Circle())
                             .musicGlass(theme, radius: 24, interactive: true)
                             .padding(16)
                     }
@@ -303,8 +297,8 @@ struct NowPlayingView: View {
                 HStack {
                     Text(clock(elapsed))
                     Spacer()
-                    Text(theme.isRoseStudio && duration > 0 ? "−" + clock(duration - elapsed) : clock(duration))
-                        .accessibilityLabel(theme.isRoseStudio ? "Time remaining" : "Track duration")
+                    Text(clock(duration))
+                        .accessibilityLabel("Track duration")
                 }
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
@@ -437,14 +431,12 @@ struct NowPlayingView: View {
             #endif
         }
         .padding(compact ? 4 : 9)
-        .foregroundStyle(current ? accent : .primary)
-        .background(current ? accent.opacity(theme.usesLiquidGlass ? 0.25 : 0.16) : Color.primary.opacity(0.055),
+        .foregroundStyle(current ? accent : theme.text)
+        .background(current ? accent.opacity(0.25) : Color.primary.opacity(0.055),
                     in: RoundedRectangle(cornerRadius: 10))
         .overlay {
-            if theme.usesLiquidGlass {
-                RoundedRectangle(cornerRadius: 10).strokeBorder(.white.opacity(current ? 0.22 : 0.12))
-                    .allowsHitTesting(false)
-            }
+            RoundedRectangle(cornerRadius: 10).strokeBorder(.white.opacity(current ? 0.22 : 0.12))
+                .allowsHitTesting(false)
         }
         #if !os(tvOS)
         .dropDestination(for: String.self) { values, _ in
@@ -519,7 +511,7 @@ private struct NowPlayingLyrics: View {
                     .onChange(of: active, initial: true) { _, line in
                         if let line {
                             withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.24)) {
-                                scroll.scrollTo(line, anchor: theme.isRoseStudio ? UnitPoint(x: 0.5, y: 0.34) : .center)
+                                scroll.scrollTo(line, anchor: .center)
                             }
                         }
                     }
@@ -527,10 +519,6 @@ private struct NowPlayingLyrics: View {
             }
         }
         .padding(26)
-        .background {
-            if theme.isRoseStudio { theme.backdrop(using: library.playingPalette).opacity(0.7) }
-            if theme == .nightSignal { theme.surface(using: library.playingPalette) }
-        }
         #if os(macOS)
         .frame(minWidth: 460, minHeight: 450)
         #endif
@@ -554,16 +542,10 @@ private struct NowPlayingLyrics: View {
 
     private func lyric(_ line: MusicLyricLine) -> some View {
         Text(line.text.isEmpty ? "♪" : line.text)
-            .font(theme.usesArtworkPlayback ? .system(size: 29, weight: .semibold)
-                  : .title2.weight(active == line.id ? .bold : .medium))
-            .foregroundStyle(active == nil || active == line.id ? .primary : .secondary)
+            .font(.title2.weight(active == line.id ? .bold : .medium))
+            .foregroundStyle(active == nil ? theme.text : (active == line.id ? theme.accent : theme.text.opacity(0.68)))
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.leading, theme.isRoseStudio ? 11 : 0)
-            .overlay(alignment: .leading) {
-                if theme.isRoseStudio && active == line.id {
-                    Capsule().fill(theme.accent).frame(width: 3)
-                }
-            }
+
     }
 }
 

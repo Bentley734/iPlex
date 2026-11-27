@@ -274,11 +274,10 @@ struct HeaderBrand: View {
     let height: CGFloat
     var allowsCycling = true
 
-    private var ink: Color { theme.scheme == .light ? .black : .white }
+    private var ink: Color { theme.text }
     private var markHeight: CGFloat { height * markSize.fraction }
     private var markOutline: Color {
-        if mark == .black && theme.scheme == .dark { return .white.opacity(0.7) }
-        if mark == .white && theme.scheme == .light { return .black.opacity(0.6) }
+        if mark == .black { return .white.opacity(0.7) }
         return .clear
     }
 
@@ -297,7 +296,7 @@ struct HeaderBrand: View {
             }
             if wordmark != .none {
                 cycleControl(label: "Change header wordmark", selection: wordmark.label, advance: cycleWordmark) {
-                    if let image = MusicPlatform.wordmarkImage(wordmark, dark: theme.scheme == .dark) {
+                    if let image = MusicPlatform.wordmarkImage(wordmark, dark: true) {
                         image.renderingMode(wordmark.preservesColors ? .original : .template).resizable().scaledToFit()
                             .foregroundStyle(ink)
                     } else {
@@ -332,50 +331,6 @@ struct HeaderBrand: View {
         let choices = HeaderWordmark.allCases.filter { $0 != .none }
         let current = choices.firstIndex(of: wordmark) ?? -1
         wordmark = choices[(current + 1) % choices.count]
-    }
-}
-
-struct PlexifyFeature: View {
-    let item: MusicEntry
-    let library: LibraryModel
-    let open: () -> Void
-
-    var body: some View {
-        Button(action: open) {
-            HStack(spacing: 18) {
-                Color.white.opacity(0.10).overlay {
-                    PlexArtwork(item: item, library: library) {
-                        Image(systemName: item.kind == .albums ? "opticaldisc" : "person.crop.circle")
-                            .font(.title).foregroundStyle(MusicTheme.plexify.accent)
-                    }
-                }
-                .frame(width: 92, height: 92)
-                .clipShape(.rect(cornerRadius: 6))
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("From your library")
-                        .font(.caption.weight(.semibold)).foregroundStyle(MusicTheme.plexify.accent)
-                    Text(item.title).font(.title2.weight(.bold)).lineLimit(2)
-                    if !item.artist.isEmpty {
-                        Text(item.artist).font(.callout).foregroundStyle(.secondary).lineLimit(1)
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                Image(systemName: "arrow.up.right").accessibilityHidden(true)
-                    .foregroundStyle(MusicTheme.plexify.accent)
-            }
-            .padding(16)
-            .background {
-                LinearGradient(colors: [Color(red: 0.10, green: 0.25, blue: 0.30), MusicTheme.plexify.surface],
-                               startPoint: .bottomLeading, endPoint: .topTrailing)
-            }
-            .clipShape(.rect(cornerRadius: 12))
-            .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(.white.opacity(0.15)) }
-        }
-        #if os(tvOS)
-        .buttonStyle(.card)
-        #else
-        .buttonStyle(.plain)
-        #endif
     }
 }
 
@@ -469,7 +424,7 @@ struct LibraryAlternateLayout: View {
 private struct LibraryAlbumWithTracks: View {
     @ObservedObject var library: LibraryModel
     let entry: MusicEntry
-    @AppStorage("MusicTheme") private var theme = MusicTheme.copper
+    @MusicAppearance private var theme
     @AppStorage(LibraryArtworkSize.preferenceKey) private var artworkSize = LibraryArtworkSize.medium
     @State private var tracks: [LiveTrack] = []
     @State private var failed = false

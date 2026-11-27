@@ -12,7 +12,7 @@ struct MiniPlayerContent: View {
             DesktopMiniPlayer(library: library, close: close)
         } else {
             ClickWheelPlayer(library: library,
-                             theme: style == .video || style == .videoBlack ? .video : .classic,
+                             video: style == .video || style == .videoBlack,
                              blackShell: style == .classicBlack || style == .videoBlack, close: close)
         }
     }
@@ -142,10 +142,10 @@ private struct DesktopMiniPlayer: View {
 }
 
 private struct QueueMiniPlayer: View {
-    @AppStorage("MusicTheme") private var theme = MusicTheme.copper
+    @MusicAppearance private var theme
     @ObservedObject var library: LibraryModel
     let close: () -> Void
-    private let accent = Color(red: 0.35, green: 0.79, blue: 0.92)
+    private var accent: Color { theme.accent }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -216,16 +216,9 @@ private struct QueueMiniPlayer: View {
         }
         .padding(20)
         .frame(maxWidth: 520, maxHeight: 550)
-        .background {
-            if !theme.usesLiquidGlass {
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(.linearGradient(colors: [Color(red: 0.18, green: 0.22, blue: 0.27), Color(white: 0.09)],
-                                          startPoint: .topLeading, endPoint: .bottomTrailing))
-                    .overlay { RoundedRectangle(cornerRadius: 20).strokeBorder(.white.opacity(0.18)) }
-            }
-        }
         .musicGlass(theme, radius: 20)
         .preferredColorScheme(.dark)
+        .foregroundStyle(theme.text)
         .tint(accent)
         #if os(tvOS)
         .onExitCommand(perform: close)
@@ -236,7 +229,7 @@ private struct QueueMiniPlayer: View {
 
 struct ClickWheelPlayer: View {
     @ObservedObject var library: LibraryModel
-    let theme: MusicTheme
+    let video: Bool
     let blackShell: Bool
     let close: () -> Void
 
@@ -247,7 +240,6 @@ struct ClickWheelPlayer: View {
     @State private var previousAngle: Double?
     @State private var previewPosition: Double?
 
-    private var video: Bool { theme == .video }
     private var shellInk: Color { video || blackShell ? .white : Color(red: 0.17, green: 0.21, blue: 0.26) }
     private var shellColors: [Color] {
         if blackShell { return [Color(white: 0.20), Color(white: 0.075), .black] }
@@ -435,7 +427,7 @@ struct ClickWheelPlayer: View {
             }
             .frame(width: size * (center ? 0.40 : 0.235), height: size * (center ? 0.40 : 0.23))
             .contentShape(Circle())
-            .overlay { Circle().strokeBorder(active ? theme.accent : shellInk.opacity(center ? 0.22 : 0), lineWidth: active ? 3 : 1) }
+            .overlay { Circle().strokeBorder(active ? displayAccent : shellInk.opacity(center ? 0.22 : 0), lineWidth: active ? 3 : 1) }
             .opacity(disabled ? 0.36 : 1)
         }
         .buttonStyle(.plain)

@@ -268,9 +268,15 @@ struct PlexVideoBrowser: View {
                 retry += 1
             }
         }
-        .sheet(item: $presentation, onDismiss: refreshWatchState) { item in
-            PlexVideoSession(item: item, server: server, section: selection, service: service, pauseMusic: pauseMusic)
-        }
+        #if os(macOS)
+        .sheet(item: $presentation, onDismiss: refreshWatchState, content: videoSession)
+        #else
+        .fullScreenCover(item: $presentation, onDismiss: refreshWatchState, content: videoSession)
+        #endif
+    }
+
+    private func videoSession(_ item: PlexVideoItem) -> some View {
+        PlexVideoSession(item: item, server: server, section: selection, service: service, pauseMusic: pauseMusic)
     }
 
     private var continueWatching: some View {
@@ -558,6 +564,7 @@ private struct PlexVideoPlayback: View {
     let pauseMusic: () -> Void
     let advance: (PlexVideoItem) -> Void
     @Environment(\.dismiss) private var dismiss
+    @MusicAppearance private var appearance
     @State private var player = AVPlayer()
     @State private var relay: PlexVideoManifest?
     @State private var failure: String?
@@ -578,6 +585,11 @@ private struct PlexVideoPlayback: View {
     @State private var autoAdvance = true
     @State private var countdown = 5
     @State private var nextStatus: String?
+    #if os(macOS)
+    @State private var presentation = MacVideoPresentation()
+    #else
+    @State private var fullscreen = false
+    #endif
 
     private var playbackKey: [Int] { [selectedVersion, forceTranscode ? 1 : 0] }
 
@@ -588,6 +600,21 @@ private struct PlexVideoPlayback: View {
                     Text(title).font(.headline).lineLimit(1)
                     Spacer()
                     if !mode.isEmpty { Text(mode).font(.caption).foregroundStyle(.secondary) }
+                    #if os(macOS)
+                    if !pending && failure == nil {
+                        Button("Fullscreen", systemImage: "arrow.up.left.and.arrow.down.right") {
+                            presentation.show(.fullscreen, title: title)
+                        }
+                        Button("Picture in Picture", systemImage: "pip.enter") {
+                            presentation.show(.floating, title: title)
+                        }
+                    }
+                    #else
+                    if !pending && failure == nil {
+                        Button("Fullscreen", systemImage: "arrow.up.left.and.arrow.down.right") { fullscreen.toggle() }
+                            .labelStyle(.iconOnly)
+                    }
+                    #endif
                     Button("Done") { dismiss() }
                 }
                 if (source?.versions.count ?? 0) > 1 || mode == "Direct Play" {
@@ -596,7 +623,18 @@ private struct PlexVideoPlayback: View {
                         VStack(alignment: .leading) { versionControls }
                     }
                 }
-            }.padding(12)
+            }
+            .padding(12)
+            .musicGlass(appearance, radius: 16)
+            .padding(.horizontal, 8)
+            .padding(.top, 8)
+            #if !os(macOS)
+            .frame(height: fullscreen ? 0 : nil)
+            .clipped()
+            .opacity(fullscreen ? 0 : 1)
+            .accessibilityHidden(fullscreen)
+            .allowsHitTesting(!fullscreen)
+            #endif
             if let nextEpisode {
                 HStack {
                     VStack(alignment: .leading, spacing: 4) {
@@ -621,20 +659,52 @@ private struct PlexVideoPlayback: View {
                 NativeVideoPlayer(url: native, startAt: resumeAt.seconds, progress: saveProgress) { seconds in
                     resumeAt = CMTime(seconds: seconds >= 5 ? seconds : lastSaved, preferredTimescale: 1_000)
                     forceTranscode = true
-                }.id(native)
+                }
+                #if os(macOS)
+                .environment(\.macVideoPresentation, presentation)
+                #endif
+                .id(native)
             } else {
                 #if os(macOS)
-                MacVideoPlayerView(player: player).frame(maxWidth: .infinity, maxHeight: .infinity)
+                MacVideoSurface<AVPlayerView>(presentation: presentation, make: {
+                    let view = AVPlayerView()
+                    view.controlsStyle = .inline
+                    view.showsFullScreenToggleButton = false
+                    view.player = player
+                    return view
+                }, release: { $0.player = nil }, togglePlayback: {
+                    if player.rate == 0 { player.play() } else { player.pause() }
+                }).frame(maxWidth: .infinity, maxHeight: .infinity)
                 #else
-                VideoPlayer(player: player).frame(maxWidth: .infinity, maxHeight: .infinity)
+                SystemVideoPlayer(player: player).frame(maxWidth: .infinity, maxHeight: .infinity)
                 #endif
             }
         }
         #if os(macOS)
         .frame(minWidth: 680, minHeight: 450)
         #endif
+        #if !os(macOS)
+        .overlay(alignment: .topTrailing) {
+            if fullscreen {
+                Button("Exit Fullscreen", systemImage: "arrow.down.right.and.arrow.up.left") { fullscreen = false }
+                    .buttonStyle(.bordered).padding()
+            }
+        }
+        #endif
+        #if os(tvOS)
+        .onExitCommand {
+            if fullscreen { fullscreen = false } else { dismiss() }
+        }
+        #endif
         .background(.black)
+        .foregroundStyle(appearance.text)
+        .tint(appearance.accent)
         .environment(\.colorScheme, .dark)
+        #if os(macOS)
+        .onChange(of: failure) { _, message in
+            if message != nil { presentation.end() }
+        }
+        #endif
         .task(id: playbackKey) { await prepare() }
         .task(id: watched) { if watched { await queueNext() } }
         .task(id: nextEpisode?.id) { await runCountdown() }
@@ -653,6 +723,9 @@ private struct PlexVideoPlayback: View {
             saveProgress(0, true)
         }
         .onDisappear {
+            #if os(macOS)
+            presentation.end()
+            #endif
             if avReady { saveProgress(player.currentTime().seconds, false) }
             player.pause()
             player.replaceCurrentItem(with: nil)
@@ -755,6 +828,9 @@ private struct PlexVideoPlayback: View {
     }
 
     private func prepare() async {
+        #if !os(macOS)
+        fullscreen = false
+        #endif
         pending = true
         failure = nil
         avReady = false
@@ -821,6 +897,11 @@ private struct PlexVideoPlayback: View {
                 mode = "Plex Transcode"
             }
             pauseMusic()
+            #if !os(macOS)
+            let audioSession = AVAudioSession.sharedInstance()
+            try? audioSession.setCategory(.playback, mode: .moviePlayback)
+            try? audioSession.setActive(true)
+            #endif
             player.replaceCurrentItem(with: playback)
             pending = false
             let statuses = playback.publisher(for: \.status).values
@@ -844,23 +925,33 @@ private struct PlexVideoPlayback: View {
     }
 }
 
-#if os(macOS)
-struct MacVideoPlayerView: NSViewRepresentable {
+#if !os(macOS)
+private struct SystemVideoPlayer: UIViewControllerRepresentable {
     let player: AVPlayer
 
-    func makeNSView(context: Context) -> AVPlayerView {
-        let view = AVPlayerView()
-        view.controlsStyle = .inline
-        view.player = player
-        return view
+    func makeUIViewController(context: Context) -> AVPlayerViewController {
+        let controller = AVPlayerViewController()
+        controller.player = player
+        controller.allowsPictureInPicturePlayback = true
+        controller.delegate = context.coordinator
+        return controller
     }
 
-    func updateNSView(_ view: AVPlayerView, context: Context) {
-        if view.player !== player { view.player = player }
+    func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {
+        if controller.player !== player { controller.player = player }
     }
 
-    static func dismantleNSView(_ view: AVPlayerView, coordinator: ()) {
-        view.player = nil
+    static func dismantleUIViewController(_ controller: AVPlayerViewController, coordinator: Coordinator) {
+        controller.player = nil
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    final class Coordinator: NSObject, AVPlayerViewControllerDelegate {
+        func playerViewController(_ controller: AVPlayerViewController,
+                                  restoreUserInterfaceForPictureInPictureStopWithCompletionHandler completion: @escaping (Bool) -> Void) {
+            completion(controller.viewIfLoaded?.window != nil)
+        }
     }
 }
 #endif

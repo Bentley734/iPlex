@@ -1,126 +1,86 @@
 import SwiftUI
+#if os(macOS)
+import AppKit
+#else
+import UIKit
+#endif
 
-enum MusicTheme: String, CaseIterable, Identifiable {
-    case copper, classic, classicDark, classicOLED, video, plexify, liquidGlass, roseStudio, roseStudioDark, nightSignal, nightSignalOLED
-    #if os(macOS)
-    case graphite
+enum LiquidGlassColor {
+    static let textKey = "LiquidGlassTextColor"
+    static let accentKey = "LiquidGlassAccentColor"
+    static let defaultText = "#F2F7FF"
+    static let defaultAccent = "#ABE3FF"
+
+    static func hex(_ input: String) -> String? {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let digits = trimmed.hasPrefix("#") ? String(trimmed.dropFirst()) : trimmed
+        guard digits.utf8.count == 6,
+              digits.utf8.allSatisfy({ (48...57).contains($0) || (65...70).contains($0) || (97...102).contains($0) })
+        else { return nil }
+        return "#" + digits.uppercased()
+    }
+
+    static func color(_ saved: String) -> Color? {
+        guard let hex = hex(saved), let rgb = UInt32(hex.dropFirst(), radix: 16) else { return nil }
+        return Color(red: Double((rgb >> 16) & 255) / 255, green: Double((rgb >> 8) & 255) / 255,
+                     blue: Double(rgb & 255) / 255)
+    }
+
+    #if !os(tvOS)
+    static func hex(_ color: Color) -> String? {
+        #if os(macOS)
+        guard let resolved = NSColor(color).usingColorSpace(.sRGB) else { return nil }
+        let components = [resolved.redComponent, resolved.greenComponent, resolved.blueComponent]
+        #else
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        guard UIColor(color).getRed(&red, green: &green, blue: &blue, alpha: &alpha) else { return nil }
+        let components = [red, green, blue]
+        #endif
+        guard components.allSatisfy(\.isFinite) else { return nil }
+        let rgb = components.map { Int((min(1, max(0, $0)) * 255).rounded()) }
+        return String(format: "#%02X%02X%02X", rgb[0], rgb[1], rgb[2])
+    }
     #endif
+}
 
-    var id: String { rawValue }
-    var label: String {
-        switch self {
-        case .copper: "Copper Groove"
-        case .classic: "Classic iPod"
-        case .classicDark: "Classic iPod Dark"
-        case .classicOLED: "Classic iPod OLED"
-        case .video: "iPod Video"
-        case .plexify: "Plexify"
-        case .liquidGlass: "Liquid Glass"
-        case .roseStudio: "Rose Studio Light"
-        case .roseStudioDark: "Rose Studio Dark"
-        case .nightSignal: "Night Signal"
-        case .nightSignalOLED: "Night Signal OLED"
-        #if os(macOS)
-        case .graphite: "Graphite Studio"
-        #endif
-        }
-    }
-    var isRoseStudio: Bool { self == .roseStudio || self == .roseStudioDark }
-    var isNightSignal: Bool { self == .nightSignal || self == .nightSignalOLED }
-    var usesArtworkPlayback: Bool { isRoseStudio || self == .nightSignal }
-    var scheme: ColorScheme { self == .classic || self == .roseStudio ? .light : .dark }
-    var usesLiquidGlass: Bool { self == .liquidGlass || self == .classicDark || keepsBlackCanvas || isRoseStudio }
-    var keepsBlackCanvas: Bool { self == .classicOLED || self == .nightSignalOLED }
-    var supportsGlassWallpaper: Bool { usesLiquidGlass && !keepsBlackCanvas }
+@propertyWrapper
+struct MusicAppearance: DynamicProperty {
+    @AppStorage(LiquidGlassColor.textKey) private var text = ""
+    @AppStorage(LiquidGlassColor.accentKey) private var accent = ""
 
-    var accent: Color {
-        switch self {
-        case .copper: Color(red: 1, green: 0.64, blue: 0.44)
-        case .classic: Color(red: 0.04, green: 0.34, blue: 0.65)
-        case .classicDark: Color(red: 0.72, green: 0.82, blue: 0.95)
-        case .classicOLED: Color(red: 0.80, green: 0.87, blue: 0.96)
-        case .video: Color(red: 0.56, green: 0.80, blue: 1)
-        case .plexify: Color(red: 0.48, green: 0.90, blue: 0.88)
-        case .liquidGlass: Color(red: 0.67, green: 0.89, blue: 1)
-        case .roseStudio: Color(red: 0.62, green: 0.13, blue: 0.34)
-        case .roseStudioDark: Color(red: 1.0, green: 0.60, blue: 0.74)
-        case .nightSignal, .nightSignalOLED: Color(red: 0.52, green: 0.88, blue: 0.68)
-        #if os(macOS)
-        case .graphite: Color(red: 1, green: 0.75, blue: 0.45)
-        #endif
-        }
-    }
-    var surface: Color {
-        switch self {
-        case .copper: Color(red: 0.104, green: 0.102, blue: 0.119)
-        case .classic: Color(red: 0.84, green: 0.89, blue: 0.94)
-        case .classicDark: Color(red: 0.12, green: 0.13, blue: 0.15)
-        case .classicOLED, .nightSignalOLED: .black
-        case .video: Color(red: 0.09, green: 0.12, blue: 0.18)
-        case .plexify: Color(red: 0.075, green: 0.125, blue: 0.155)
-        case .liquidGlass: Color(red: 0.12, green: 0.17, blue: 0.28)
-        case .roseStudio: Color(red: 0.99, green: 0.95, blue: 0.96)
-        case .roseStudioDark: Color(red: 0.16, green: 0.11, blue: 0.17)
-        case .nightSignal: Color(red: 0.08, green: 0.12, blue: 0.12)
-        #if os(macOS)
-        case .graphite: Color(red: 0.09, green: 0.095, blue: 0.103)
-        #endif
-        }
-    }
-    @ViewBuilder var backdrop: some View {
-        if keepsBlackCanvas {
-            Color.black
-        } else if self == .liquidGlass {
-            ZStack {
-                LinearGradient(colors: [surface, Color(red: 0.04, green: 0.07, blue: 0.14)],
-                               startPoint: .topLeading, endPoint: .bottomTrailing)
-                RadialGradient(colors: [Color.indigo.opacity(0.82), .clear],
-                               center: .topTrailing, startRadius: 16, endRadius: 640)
-                RadialGradient(colors: [Color(red: 0.05, green: 0.53, blue: 0.72).opacity(0.52), .clear],
-                               center: .bottomLeading, startRadius: 12, endRadius: 580)
-                RadialGradient(colors: [Color(red: 0.23, green: 0.53, blue: 0.90).opacity(0.25), .clear],
-                               center: UnitPoint(x: 0.24, y: 0.16), startRadius: 16, endRadius: 390)
-            }
-        } else if isRoseStudio {
-            standardBackdrop.overlay {
-                RadialGradient(colors: [accent.opacity(scheme == .light ? 0.16 : 0.23), .clear],
-                               center: .bottomLeading, startRadius: 24, endRadius: 600)
-            }
-        } else {
-            standardBackdrop
+    var wrappedValue: MusicTheme { MusicTheme(customText: text, customAccent: accent) }
+}
+
+struct MusicTheme {
+    let customText: String
+    let customAccent: String
+    let scheme = ColorScheme.dark
+    let surface = Color(red: 0.12, green: 0.17, blue: 0.28)
+    var text: Color { LiquidGlassColor.color(customText) ?? Color(red: 242/255, green: 247/255, blue: 1) }
+    private var customAccentColor: Color? { LiquidGlassColor.color(customAccent) }
+    var accent: Color { customAccentColor ?? Color(red: 171/255, green: 227/255, blue: 1) }
+
+    var backdrop: some View {
+        ZStack {
+            LinearGradient(colors: [surface, Color(red: 0.04, green: 0.07, blue: 0.14)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+            RadialGradient(colors: [Color.indigo.opacity(0.82), .clear],
+                           center: .topTrailing, startRadius: 16, endRadius: 640)
+            RadialGradient(colors: [Color(red: 0.05, green: 0.53, blue: 0.72).opacity(0.52), .clear],
+                           center: .bottomLeading, startRadius: 12, endRadius: 580)
+            RadialGradient(colors: [Color(red: 0.23, green: 0.53, blue: 0.90).opacity(0.25), .clear],
+                           center: UnitPoint(x: 0.24, y: 0.16), startRadius: 16, endRadius: 390)
         }
     }
 
     func accent(using palette: ArtworkPalette?) -> Color {
-        palette?.accent(in: scheme) ?? accent
+        customAccentColor ?? palette?.accent(in: scheme) ?? accent
     }
 
-    func surface(using palette: ArtworkPalette?) -> Color {
-        keepsBlackCanvas ? surface : (palette?.wash(in: scheme) ?? surface)
-    }
+    func surface(using palette: ArtworkPalette?) -> Color { palette?.wash(in: scheme) ?? surface }
 
     func backdrop(using palette: ArtworkPalette?) -> some View {
         ThemeArtworkBackdrop(theme: self, palette: palette)
-    }
-
-    private var standardBackdrop: LinearGradient {
-        let end: Color
-        switch self {
-        case .copper: end = Color(red: 0.075, green: 0.073, blue: 0.085)
-        case .classic: end = Color(red: 0.96, green: 0.98, blue: 1)
-        case .classicDark: end = Color(red: 0.045, green: 0.05, blue: 0.065)
-        case .classicOLED, .nightSignalOLED: end = .black
-        case .video: end = Color(red: 0.025, green: 0.037, blue: 0.066)
-        case .plexify: end = Color(red: 0.035, green: 0.057, blue: 0.078)
-        case .liquidGlass: end = surface
-        case .roseStudio: end = Color(red: 0.95, green: 0.89, blue: 0.93)
-        case .roseStudioDark: end = Color(red: 0.08, green: 0.07, blue: 0.13)
-        case .nightSignal: end = Color(red: 0.035, green: 0.065, blue: 0.07)
-        #if os(macOS)
-        case .graphite: end = Color(red: 0.055, green: 0.059, blue: 0.068)
-        #endif
-        }
-        return LinearGradient(colors: [surface, end], startPoint: .topLeading, endPoint: .bottomTrailing)
     }
 }
 
@@ -132,9 +92,9 @@ private struct ThemeArtworkBackdrop: View {
 
     var body: some View {
         theme.backdrop.overlay {
-            if theme.supportsGlassWallpaper, !reduceTransparency, let image = wallpaper.image {
+            if !reduceTransparency, let image = wallpaper.image {
                 GlassWallpaperBackdrop(image: image, isPreset: wallpaper.background.isPreset)
-            } else if let palette, !theme.keepsBlackCanvas {
+            } else if let palette {
                 ArtworkColorWash(palette: palette, scheme: theme.scheme)
                     .allowsHitTesting(false)
                     .accessibilityHidden(true)
@@ -190,7 +150,7 @@ enum LiquidGlassTint: String, CaseIterable, Identifiable {
     var id: Self { self }
     var label: String {
         switch self {
-        case .themeDefault: "Theme Default"
+        case .themeDefault: "Match Accent"
         case .none: "No Tint"
         default: rawValue.capitalized
         }
@@ -222,30 +182,25 @@ private struct MusicGlassSurface: ViewModifier {
         let shape = RoundedRectangle(cornerRadius: radius)
         let color = tint.color(for: theme)
         let edgeColor = color ?? .white
-        let base = tint == .themeDefault || theme.keepsBlackCanvas || theme.isRoseStudio ? theme.surface : Color(white: 0.12)
-        let edge = theme.isRoseStudio ? 0.23 : 0.38 + (1 - density) * 0.28
-        let sheen = (theme.keepsBlackCanvas ? 0.045 : 0.12) * (1.2 - density * 0.45)
+        let base = tint == .themeDefault ? theme.surface : Color(white: 0.12)
+        let edge = 0.38 + (1 - density) * 0.28
+        let sheen = 0.12 * (1.2 - density * 0.45)
         content.background {
             ZStack {
                 if reduceTransparency {
-                    shape.fill(theme.keepsBlackCanvas ? Color(white: 0.075) : base)
-                } else if theme == .classicOLED {
-                    shape.fill(.ultraThinMaterial).opacity(0.10 + density * 0.32)
-                } else if theme.isRoseStudio {
-                    shape.fill(.regularMaterial).opacity(0.38 + density * 0.52)
+                    shape.fill(base)
                 } else if #available(macOS 26, iOS 26, tvOS 26, *) {
                     let variant: Glass = density > 0.65 ? .regular : .clear
                     let material = color.map { variant.tint($0.opacity(0.04 + density * 0.13)) } ?? variant
                     Color.clear.glassEffect(material.interactive(interactive), in: shape)
-                } else if theme.keepsBlackCanvas {
-                    shape.fill(.ultraThinMaterial).opacity(0.10 + density * 0.32)
+
                 } else {
                     shape.fill(.thinMaterial).opacity(0.42 + density * 0.50)
                 }
 
                 shape.fill(base.opacity(0.08 + density * 0.63))
-                if tint != .themeDefault || theme == .nightSignalOLED, let color, !reduceTransparency {
-                    shape.fill(color.opacity(theme.keepsBlackCanvas ? 0.045 + density * 0.035 : 0.08 + density * 0.10))
+                if let color, !reduceTransparency {
+                    shape.fill(color.opacity(0.04 + density * 0.06))
                 }
                 shape.fill(.linearGradient(
                     colors: [.white.opacity(sheen), edgeColor.opacity(sheen * 0.2), .clear],
@@ -263,7 +218,7 @@ private struct MusicGlassSurface: ViewModifier {
                     startPoint: .top, endPoint: .bottom
                 ), lineWidth: 1)
             }
-            .shadow(color: .black.opacity(theme.keepsBlackCanvas ? 0.18 : 0.26), radius: 12, y: 5)
+            .shadow(color: .black.opacity(0.26), radius: 12, y: 5)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
         }
@@ -271,21 +226,14 @@ private struct MusicGlassSurface: ViewModifier {
 }
 
 extension View {
-    @ViewBuilder func musicGlass(_ theme: MusicTheme, radius: CGFloat, interactive: Bool = false) -> some View {
-        if theme.usesLiquidGlass {
-            modifier(MusicGlassSurface(theme: theme, radius: radius, interactive: interactive))
-        } else {
-            self
-        }
+    func musicGlass(_ theme: MusicTheme, radius: CGFloat, interactive: Bool = false) -> some View {
+        modifier(MusicGlassSurface(theme: theme, radius: radius, interactive: interactive))
     }
 
-    @ViewBuilder func musicSheet(_ theme: MusicTheme) -> some View {
-        if theme.usesLiquidGlass {
-            musicGlass(theme, radius: 24)
-                .presentationBackground(.clear)
-        } else {
-            self
-        }
+    func musicSheet(_ theme: MusicTheme) -> some View {
+        foregroundStyle(theme.text)
+            .musicGlass(theme, radius: 24)
+            .presentationBackground(.clear)
     }
 }
 
@@ -306,13 +254,8 @@ enum MiniPlayerStyle: String, CaseIterable, Identifiable {
         }
     }
 
-    func resolve(for theme: MusicTheme) -> Self? {
-        guard self == .automatic else { return self }
-        if theme == .classic { return .classic }
-        if theme == .classicDark || theme == .classicOLED { return .classicBlack }
-        if theme == .video { return .video }
-        return nil
-    }
+    var resolved: Self { self == .automatic ? .queue : self }
+
 }
 
 enum LibraryLayout: String, CaseIterable, Identifiable {
@@ -356,7 +299,9 @@ enum LibraryArtworkSize: String, CaseIterable, Identifiable {
 
 struct MusicSettings: View {
     @ObservedObject var library: LibraryModel
-    @AppStorage("MusicTheme") private var theme = MusicTheme.copper
+    @MusicAppearance private var theme
+    @AppStorage(LiquidGlassColor.textKey) private var textColor = ""
+    @AppStorage(LiquidGlassColor.accentKey) private var accentColor = ""
     @AppStorage(LiquidGlassTint.preferenceKey) private var liquidTint = LiquidGlassTint.themeDefault
     @AppStorage(LiquidGlassAppearance.transparencyKey) private var glassTransparency = LiquidGlassAppearance.defaultTransparency
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
@@ -390,24 +335,24 @@ struct MusicSettings: View {
                         plexConnection
                         Divider()
                     }
-                    Picker("Theme", selection: $theme) {
-                        ForEach(MusicTheme.allCases) { option in
-                            Text(option.label).tag(option)
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("Liquid Glass").font(.headline)
+                        GlassColorControl(title: "Text Color", saved: $textColor, defaultHex: LiquidGlassColor.defaultText)
+                        GlassColorControl(title: "Accent Color", saved: $accentColor, defaultHex: LiquidGlassColor.defaultAccent)
+                    }
+                    .foregroundStyle(Color.primary)
+                    .tint(.blue)
+                    transparencyControl
+                    Picker("Liquid Glass Tint", selection: $liquidTint) {
+                        ForEach(LiquidGlassTint.allCases) { tint in
+                            Text(tint.label).tag(tint)
                         }
                     }
-                    if theme.usesLiquidGlass {
-                        transparencyControl
-                        Picker("Liquid Glass Tint", selection: $liquidTint) {
-                            ForEach(LiquidGlassTint.allCases) { tint in
-                                Text(tint.label).tag(tint)
-                            }
-                        }
-                    }
-                    if theme.supportsGlassWallpaper { GlassWallpaperSettings() }
+                    GlassWallpaperSettings()
                     Toggle("Artwork Colors", isOn: $artworkColors)
                         .help("Match the interface to the artwork for the current track.")
                     Toggle("Animate Artwork Colors", isOn: $animateArtworkColors)
-                        .disabled((!artworkColors && !theme.usesArtworkPlayback) || theme.keepsBlackCanvas)
+                        .disabled(!artworkColors)
                         .help("Let the album colors drift slowly across the background.")
                     Picker("Mini-player", selection: $miniPlayerStyle) {
                         ForEach(MiniPlayerStyle.allCases) { style in
@@ -531,9 +476,6 @@ struct MusicSettings: View {
         .sheet(isPresented: $showAppIcons) { MusicAppIconPicker() }
         #endif
         .musicSheet(theme)
-        .background {
-            if !theme.usesLiquidGlass { theme.backdrop(using: palette) }
-        }
         .tint(theme.accent(using: palette))
         .preferredColorScheme(theme.scheme)
     }
@@ -618,5 +560,65 @@ struct MusicSettings: View {
         var settings = library.equalizer
         settings[keyPath: key] = value
         library.updateEqualizer(settings)
+    }
+}
+
+
+private struct GlassColorControl: View {
+    let title: String
+    @Binding var saved: String
+    let defaultHex: String
+    @State private var input = ""
+    @State private var invalid = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ViewThatFits(in: .horizontal) {
+                HStack { picker; Spacer(minLength: 8); controls }
+                VStack(alignment: .leading, spacing: 8) { picker; controls }
+            }
+            if invalid { Text("Enter a six-digit hex color, such as " + defaultHex + ".").font(.caption) }
+        }
+        .font(.callout)
+        .onChange(of: saved, initial: true) { _, value in input = value; invalid = false }
+    }
+
+    @ViewBuilder private var picker: some View {
+        let color = LiquidGlassColor.color(saved) ?? LiquidGlassColor.color(defaultHex) ?? .white
+        #if os(tvOS)
+        HStack {
+            Text(title)
+            Circle().fill(color).frame(width: 24, height: 24).accessibilityHidden(true)
+        }
+        #else
+        ColorPicker(title, selection: Binding(get: { color }, set: {
+            if let hex = LiquidGlassColor.hex($0) { saved = hex }
+        }), supportsOpacity: false)
+        #endif
+    }
+
+    private var controls: some View {
+        HStack {
+            TextField(defaultHex, text: $input)
+                .accessibilityLabel(title + " hex value")
+                .font(.body.monospaced())
+                #if !os(tvOS)
+                .frame(width: 92)
+                #endif
+                .onSubmit(apply)
+            Button("Apply", action: apply)
+                .accessibilityLabel("Apply " + title)
+                .disabled(input.isEmpty)
+            Button("Reset") { saved = ""; input = ""; invalid = false }
+                .accessibilityLabel("Reset " + title)
+                .disabled(saved.isEmpty && input.isEmpty)
+        }
+    }
+
+    private func apply() {
+        guard let hex = LiquidGlassColor.hex(input) else { invalid = true; return }
+        saved = hex
+        input = hex
+        invalid = false
     }
 }

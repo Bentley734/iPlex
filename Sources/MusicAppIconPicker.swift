@@ -111,7 +111,7 @@ struct MacAppIconGrid: View {
 import UIKit
 
 struct MusicAppIconPicker: View {
-    @AppStorage("MusicTheme") private var theme = MusicTheme.copper
+    @MusicAppearance private var theme
     @Environment(\.dismiss) private var dismiss
     @State private var currentIcon = UIApplication.shared.alternateIconName
     @State private var changingIcon = false
@@ -145,6 +145,7 @@ struct MusicAppIconPicker: View {
         }
         .padding(24)
         .musicSheet(theme)
+        .foregroundStyle(theme.text)
         .tint(theme.accent)
     }
 

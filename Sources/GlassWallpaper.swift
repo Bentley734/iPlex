@@ -11,7 +11,7 @@ enum GlassBackground: String, CaseIterable, Identifiable {
     var id: Self { self }
     var label: String {
         switch self {
-        case .themeDefault: "Theme Default"
+        case .themeDefault: "Default Background"
         case .prismTide: "Prism Tide"
         case .emberFold: "Ember Fold"
         case .violetOrbit: "Violet Orbit"

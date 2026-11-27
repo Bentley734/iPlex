@@ -7,7 +7,7 @@ struct MusicRoomApp: App {
     @NSApplicationDelegateAdaptor(MusicAppDelegate.self) private var appDelegate
     @StateObject private var model = LibraryModel()
     @StateObject private var updates = MacAppUpdates()
-    @AppStorage("MusicTheme") private var theme = MusicTheme.copper
+    @MusicAppearance private var theme
     @AppStorage(AppIconChoice.preferenceKey) private var iconStyle = AppIconChoice.defaultChoice.rawValue
 
     init() { MacAppUpdates.recordLaunchingProcess() }
@@ -29,11 +29,6 @@ struct MusicRoomApp: App {
         .defaultSize(width: 1120, height: 750)
         .commands {
             CommandMenu("Appearance") {
-                Picker("Theme", selection: $theme) {
-                    ForEach(MusicTheme.allCases) { option in
-                        Text(option.label).tag(option)
-                    }
-                }
                 Picker("App Icon", selection: $iconStyle) {
                     ForEach(AppIconChoice.allCases) { choice in
                         Text(choice.label).tag(choice.rawValue)
@@ -64,7 +59,7 @@ private final class MusicAppDelegate: NSObject, NSApplicationDelegate {
 private struct MusicWindow: View {
     @ObservedObject var model: LibraryModel
     @State private var searchTask: Task<Void, Never>?
-    @AppStorage("MusicTheme") private var theme = MusicTheme.copper
+    @MusicAppearance private var theme
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @AppStorage(LibraryLayout.preferenceKey) private var libraryLayout = LibraryLayout.grid
     @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
@@ -75,14 +70,9 @@ private struct MusicWindow: View {
     @State private var showSettings = false
     @State private var showNowPlaying = false
     @State private var showVolume = false
-    @State private var showPlexifyDeck = true
-    @State private var showCompactDeck = false
     @State private var miniPlayer = MacMiniPlayer()
     private var palette: ArtworkPalette? { artworkColors ? model.playingPalette : nil }
     private var copper: Color { theme.accent(using: palette) }
-    private var slate: Color { theme.surface(using: palette) }
-    private var graphite: Bool { theme == .graphite }
-    private var plexify: Bool { theme == .plexify }
 
     var body: some View {
         ZStack {
@@ -101,6 +91,7 @@ private struct MusicWindow: View {
         .toolbarBackground(.visible, for: .windowToolbar)
         .sheet(isPresented: $showSettings) { MusicSettings(library: model) }
         .sheet(item: $model.playlistEdit) { edit in PlexPlaylistEditor(library: model, edit: edit) }
+        .foregroundStyle(theme.text)
         .tint(copper)
         .onChange(of: model.visibleVideoKinds) { _, enabled in
             if let videoSection, !enabled.contains(videoSection) { self.videoSection = nil }
@@ -116,31 +107,14 @@ private struct MusicWindow: View {
 
     private var libraryContent: some View {
         GeometryReader { geometry in
-            let width = geometry.size.width
-            if plexify {
-                plexifyWorkspace
-            } else if graphite {
+            VStack(spacing: 0) {
                 HStack(spacing: 0) {
-                    resizableSidebar(availableWidth: width, defaultWidth: 206)
-                    VStack(spacing: 0) {
-                        mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
-                        graphiteTransport
-                            .padding(.horizontal, 23).padding(.bottom, 17).padding(.top, 7)
-                    }
+                    resizableSidebar(availableWidth: geometry.size.width, defaultWidth: 216)
+                    mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .musicGlass(theme, radius: 22)
+                        .padding(7)
                 }
-            } else {
-                VStack(spacing: 0) {
-                    HStack(spacing: 0) {
-                        resizableSidebar(availableWidth: width, defaultWidth: theme.isRoseStudio ? 238 : 216)
-                        mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
-                            .background(theme == .nightSignal ? slate.opacity(0.85) : .clear,
-                                        in: .rect(cornerRadius: 17))
-                            .musicGlass(theme, radius: 22)
-                            .padding(theme.usesLiquidGlass || theme == .nightSignal ? 7 : 0)
-                    }
-                    if !theme.isNightSignal { Rectangle().fill(Color.primary.opacity(0.12)).frame(height: 1) }
-                    transport
-                }
+                transport
             }
         }
     }
@@ -191,71 +165,12 @@ private struct MusicWindow: View {
         }
     }
 
-    private var plexifyWorkspace: some View {
-        GeometryReader { geometry in
-            let wide = geometry.size.width >= 1040
-            VStack(spacing: 1) {
-                HStack(spacing: 20) {
-                    HeaderBrand(theme: theme, width: 155, height: 42)
-                    Spacer(minLength: 4)
-                    Button {
-                        if wide { showPlexifyDeck.toggle() }
-                        else { showCompactDeck.toggle() }
-                    } label: { Label("Playing Sidebar", systemImage: "rectangle.trailingthird.inset.filled") }
-                    .popover(isPresented: $showCompactDeck) {
-                        plexifyDeck.frame(width: 250, height: 370)
-                    }
-                    if videoSection == nil { librarySearch.frame(width: 230).disabled(model.libraryID.isEmpty) }
-                }
-                .padding(.horizontal, 18).padding(.vertical, 8)
-                .background(slate)
-                HStack(spacing: 1) {
-                    resizableSidebar(availableWidth: geometry.size.width - (wide && showPlexifyDeck ? 224 : 0),
-                                     defaultWidth: 178)
-                    mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
-                    if wide && showPlexifyDeck { plexifyDeck.frame(width: 224) }
-                }
-                graphiteTransport
-                    .padding(.horizontal, 12).padding(.vertical, 6)
-            }
-            .background(.black.opacity(0.23))
-        }
-    }
-
-    private var plexifyDeck: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 14) {
-                Label("Now Playing", systemImage: "waveform")
-                    .font(.headline).foregroundStyle(copper)
-                if let album = model.playingAlbum {
-                    CoverArt(item: album, model: model).aspectRatio(1, contentMode: .fit)
-                    Text(model.state.title.isEmpty ? album.title : model.state.title)
-                        .font(.title2.bold()).lineLimit(3)
-                    if !album.artist.isEmpty {
-                        Text(album.artist).foregroundStyle(.secondary)
-                    }
-                    Text(album.title).font(.caption).foregroundStyle(.secondary)
-                    if let next = model.state.nextTitle {
-                        Divider()
-                        Text("Up Next").font(.caption.weight(.semibold)).foregroundStyle(copper)
-                        Text(next).font(.callout).lineLimit(2)
-                    }
-                } else {
-                    Text("Nothing playing").foregroundStyle(.secondary)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(18)
-        }
-        .background(slate)
-    }
-
     private func sidebar(width: CGFloat) -> some View {
-        let padding: CGFloat = graphite || plexify ? 16 : 24
+        let padding: CGFloat = 24
         return VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    if !plexify { HeaderBrand(theme: theme, width: min(155, width - padding * 2), height: 46) }
+                    HeaderBrand(theme: theme, width: min(155, width - padding * 2), height: 46)
                     VStack(alignment: .leading, spacing: 6) {
                         sidebarButton("Music", icon: "music.note", selected: videoSection == nil) { videoSection = nil }
                         ForEach(model.visibleVideoKinds) { videoTab($0) }
@@ -280,9 +195,8 @@ private struct MusicWindow: View {
             .padding(.top, 10)
             .padding(.bottom, padding)
         }
-        .background(theme.usesLiquidGlass ? .clear : slate)
         .musicGlass(theme, radius: 20)
-        .padding(theme.usesLiquidGlass ? 7 : 0)
+        .padding(7)
     }
 
     private var settingsButton: some View {
@@ -299,8 +213,6 @@ private struct MusicWindow: View {
                 .textFieldStyle(.plain)
         }
         .padding(9)
-        .background(theme.usesLiquidGlass ? .clear : graphite || plexify ? .white.opacity(0.06) : slate,
-                    in: RoundedRectangle(cornerRadius: 8))
         .musicGlass(theme, radius: 12)
     }
 
@@ -314,13 +226,8 @@ private struct MusicWindow: View {
             .font(.headline)
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 11).padding(.vertical, 10)
-            .foregroundStyle(selected ? copper : .primary)
+            .foregroundStyle(selected ? copper : theme.text)
             .background(selected ? copper.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 8))
-            .overlay(alignment: .leading) {
-                if (theme.isRoseStudio || theme.isNightSignal) && selected {
-                    Capsule().fill(copper).frame(width: 3, height: 17).padding(.leading, 3)
-                }
-            }
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
@@ -358,16 +265,13 @@ private struct MusicWindow: View {
                         .accessibilityLabel("Back")
                     }
                     Text(model.selectedDetail?.title ?? model.selectedGroup?.title ?? model.kind.rawValue)
-                        .font(.system(size: graphite ? 38 : (theme.isRoseStudio ? 34 : 31), weight: .bold,
-                                      design: graphite ? .rounded : .default))
-                        .tracking(theme.isRoseStudio ? -0.75 : 0)
-                        .lineLimit(1)
+                        .font(.system(size: 31, weight: .bold)).lineLimit(1)
                     if model.kind == .playlists && model.selectedDetail == nil && model.selectedGroup == nil {
                         Button("New Playlist", systemImage: "plus") { model.editPlaylist() }
                             .disabled(!model.canEditPlaylists)
                     }
                     Spacer()
-                    if !plexify && (graphite || (model.selectedDetail == nil && model.selectedGroup == nil)) {
+                    if model.selectedDetail == nil && model.selectedGroup == nil {
                         librarySearch.frame(width: 205)
                     }
                 }
@@ -391,33 +295,6 @@ private struct MusicWindow: View {
     }
 
     private var welcome: some View {
-        Group {
-            if graphite {
-                HStack(spacing: 0) {
-                    VStack(alignment: .leading, spacing: 15) {
-                        Text(model.connected ? "Choose a music library" : "Your Plex library")
-                            .font(.system(size: 40, weight: .bold, design: .rounded))
-                        Text(model.connected ? "Choose a server and library in Settings." :
-                             "Connect to Plex to play music from your collection.")
-                            .foregroundStyle(.secondary)
-                        connectionControls
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    studioDisc.frame(width: 152, height: 152)
-                        .padding(.leading, 20)
-                        .accessibilityHidden(true)
-                }
-                .padding(32)
-                .background(studioCard)
-                .padding(28)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else {
-                standardWelcome
-            }
-        }
-    }
-
-    private var standardWelcome: some View {
         VStack(alignment: .leading, spacing: 18) {
             Image(systemName: "record.circle")
                 .font(.system(size: 60, weight: .light))
@@ -449,64 +326,11 @@ private struct MusicWindow: View {
         }
     }
 
-    private var studioCard: some View {
-        RoundedRectangle(cornerRadius: 21)
-            .fill(LinearGradient(colors: [copper.opacity(0.13), slate, .black.opacity(0.21)],
-                                 startPoint: .topTrailing, endPoint: .bottomLeading))
-            .overlay {
-                RoundedRectangle(cornerRadius: 21).strokeBorder(.white.opacity(0.11))
-            }
-    }
-
-    private var studioDisc: some View {
-        ZStack {
-            Circle().fill(LinearGradient(colors: [slate, .black], startPoint: .top, endPoint: .bottom))
-            ForEach([24.0, 40, 56, 69], id: \.self) { inset in
-                Circle().strokeBorder(copper.opacity(0.22)).padding(inset / 2)
-            }
-            Circle().fill(copper).frame(width: 35, height: 35)
-            Circle().fill(slate).frame(width: 7, height: 7)
-        }
-        .overlay { Circle().strokeBorder(.white.opacity(0.15)) }
-        .shadow(color: .black.opacity(0.50), radius: 15, y: 8)
-    }
-
-    private func studioFeature(_ album: MusicEntry) -> some View {
-        HStack(spacing: 23) {
-            VStack(alignment: .leading, spacing: 9) {
-                Label("From your library", systemImage: "opticaldisc")
-                    .font(.caption.weight(.semibold)).foregroundStyle(copper)
-                Text(album.title).font(.system(size: 27, weight: .bold, design: .rounded)).lineLimit(2)
-                if !album.artist.isEmpty {
-                    Text(album.artist).foregroundStyle(.secondary).lineLimit(1)
-                }
-                Button("View album", systemImage: "arrow.up.right") { model.open(album) }
-                    .buttonStyle(.bordered).padding(.top, 4)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            CoverArt(item: album, model: model).frame(width: 146, height: 146)
-                .shadow(color: .black.opacity(0.5), radius: 13, y: 6)
-        }
-        .padding(22)
-        .background(studioCard)
-    }
-
     private var grid: some View {
         ScrollView {
             if model.selectedGroup == nil && model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 PinnedMusicShelf(library: model) { searchTask?.cancel(); model.open($0) }
                     .padding(.horizontal, 28).padding(.bottom, model.pins.isEmpty ? 0 : 14)
-            }
-            if plexify && model.selectedGroup == nil && [.albums, .artists].contains(model.kind) && model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-               let entry = model.entries.first {
-                PlexifyFeature(item: entry, library: model) { model.open(entry) }
-                    .padding(.horizontal, 28).padding(.bottom, 15)
-            }
-            if graphite && model.kind == .albums && model.selectedGroup == nil &&
-                model.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-               let album = model.entries.first {
-                studioFeature(album)
-                    .padding(.horizontal, 28).padding(.bottom, 19)
             }
             if !model.busy && model.entries.isEmpty {
                 Text("No matches in this library.").foregroundStyle(.secondary).padding(26)
@@ -520,7 +344,7 @@ private struct MusicWindow: View {
             } else {
                 let trackList = model.kind == .tracks && model.selectedGroup == nil
                 let scale = libraryArtworkSize.scale
-                let artwork = GridItem.Size.adaptive(minimum: ((graphite ? 133 : 145) * scale).rounded(),
+                let artwork = GridItem.Size.adaptive(minimum: (145 * scale).rounded(),
                                                      maximum: (190 * scale).rounded())
                 LazyVGrid(columns: [GridItem(trackList ? .flexible() : artwork, spacing: 21)],
                           alignment: .leading, spacing: trackList ? 8 : 24) {
@@ -611,7 +435,7 @@ private struct MusicWindow: View {
                     }.buttonStyle(.plain)
                         .contextMenu { LibraryQueueActions(library: model, entry: album, track: track) }
                         .modifier(PlaylistTrackEditing(library: model, track: track))
-                    if !theme.isNightSignal { Divider() }
+                    Divider()
                 }
             }
             .frame(maxWidth: 860, alignment: .leading)
@@ -628,48 +452,28 @@ private struct MusicWindow: View {
             transportButtons
             seekControl.frame(width: 130)
             Text(clock(model.state.elapsed)).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 40)
+            Button { showVolume.toggle() } label: { Image(systemName: "speaker.wave.2") }
+                .buttonStyle(.borderless).accessibilityLabel("Volume")
+                .popover(isPresented: $showVolume) {
+                    Slider(value: Binding(get: { model.playbackVolume }, set: model.changePlaybackVolume), in: 0...1) {
+                        Text("Playback volume")
+                    }
+                    .frame(width: 185).padding(16)
+                }
         }
         .padding(.horizontal, 22).frame(height: 69)
-        .background(theme.usesLiquidGlass ? .clear : slate,
-                    in: RoundedRectangle(cornerRadius: theme == .nightSignal ? 17 : 0))
         .musicGlass(theme, radius: 24)
-        .padding(theme.usesLiquidGlass || theme == .nightSignal ? 8 : 0)
+        .padding(8)
     }
 
     @ViewBuilder private var miniPlayerButton: some View {
-        if let style = miniPlayerStyle.resolve(for: theme), model.playingAlbum != nil {
+        if model.playingAlbum != nil {
             Button("Mini-player", systemImage: "macwindow.on.rectangle") {
                 if let window = NSApp.keyWindow {
-                    miniPlayer.show(library: model, style: style, hiding: window)
+                    miniPlayer.show(library: model, style: miniPlayerStyle.resolved, hiding: window)
                 }
             }
         }
-    }
-
-    private var graphiteTransport: some View {
-        HStack(spacing: 14) {
-            transportMetadata.frame(maxWidth: .infinity, alignment: .leading)
-            miniPlayerButton
-            transportButtons
-            HStack(spacing: 9) {
-                seekControl
-                Text(clock(model.state.elapsed))
-                    .font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                Button { showVolume.toggle() } label: { Image(systemName: "speaker.wave.2") }
-                    .buttonStyle(.borderless).accessibilityLabel("Volume")
-                    .popover(isPresented: $showVolume) {
-                        Slider(value: Binding(get: { model.playbackVolume }, set: model.changePlaybackVolume), in: 0...1) {
-                            Text("Playback volume")
-                        }
-                        .frame(width: 185).padding(16)
-                    }
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
-        }
-        .padding(.horizontal, 16).frame(height: 65)
-        .background(.gray.opacity(0.16), in: RoundedRectangle(cornerRadius: 17))
-        .overlay { RoundedRectangle(cornerRadius: 17).strokeBorder(.white.opacity(0.12)) }
-        .shadow(color: .black.opacity(0.22), radius: 8, y: 3)
     }
 
     @ViewBuilder private var transportMetadata: some View {
@@ -710,9 +514,7 @@ private struct MusicWindow: View {
                 .disabled(!model.state.previous).accessibilityLabel("Previous")
             Button { model.player.toggle() } label: {
                 Image(systemName: model.state.playing ? "pause.fill" : "play.fill").font(.title3)
-                    .frame(width: graphite ? 37 : nil, height: graphite ? 37 : nil)
-                    .background(graphite ? copper.opacity(0.14) : .clear, in: Circle())
-                    .foregroundStyle(graphite ? copper : .primary)
+                    .foregroundStyle(theme.text)
             }
             .disabled(model.playingAlbum == nil).accessibilityLabel(model.state.playing ? "Pause" : "Play")
             Button { model.player.next() } label: { Image(systemName: "forward.fill") }

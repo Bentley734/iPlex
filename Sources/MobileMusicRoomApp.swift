@@ -3,7 +3,7 @@ import SwiftUI
 
 @main
 struct MobileMusicRoomApp: App {
-    @AppStorage("MusicTheme") private var theme = MusicTheme.copper
+    @MusicAppearance private var theme
     @StateObject private var library = LibraryModel()
 
     var body: some Scene {
@@ -21,7 +21,7 @@ struct MobileMusicRoomApp: App {
 
 private struct MusicLibraryScreen: View {
     @ObservedObject var library: LibraryModel
-    @AppStorage("MusicTheme") private var theme = MusicTheme.copper
+    @MusicAppearance private var theme
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @State private var videoSection: PlexVideoKind?
     @State private var showSettings = false
@@ -35,7 +35,6 @@ private struct MusicLibraryScreen: View {
 
     private var palette: ArtworkPalette? { artworkColors ? library.playingPalette : nil }
     private var accent: Color { theme.accent(using: palette) }
-    private var selectedMiniPlayer: MiniPlayerStyle? { miniPlayerStyle.resolve(for: theme) }
 
     private var columnWidth: CGFloat {
         #if os(tvOS)
@@ -62,12 +61,13 @@ private struct MusicLibraryScreen: View {
                 NowPlayingView(library: library) { showPlayer = false }
                     .modifier(NowPlayingPopTransition())
             }
-            if showMiniPlayer, let style = selectedMiniPlayer {
+            if showMiniPlayer {
                 Color.black.ignoresSafeArea()
-                MiniPlayerContent(library: library, style: style) { showMiniPlayer = false }
+                MiniPlayerContent(library: library, style: miniPlayerStyle.resolved) { showMiniPlayer = false }
             }
         }
         .modifier(NowPlayingPresentation(showing: showPlayer))
+        .foregroundStyle(theme.text)
         .tint(accent)
         #if os(iOS)
         .statusBarHidden(showMiniPlayer)
@@ -101,7 +101,7 @@ private struct MusicLibraryScreen: View {
             }
             .padding(.horizontal, 20)
             .musicGlass(theme, radius: 20)
-            .padding(.horizontal, theme.usesLiquidGlass ? 12 : 0)
+            .padding(.horizontal, 12)
             #if os(tvOS)
             .focusSection()
             #endif
@@ -134,11 +134,11 @@ private struct MusicLibraryScreen: View {
                 connection
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .musicGlass(theme, radius: 22)
-                    .padding(.horizontal, theme.usesLiquidGlass ? 12 : 0)
+                    .padding(.horizontal, 12)
             } else {
                 browser
                     .musicGlass(theme, radius: 22)
-                    .padding(.horizontal, theme.usesLiquidGlass ? 12 : 0)
+                    .padding(.horizontal, 12)
                 if let album = library.playingAlbum {
                     HStack(spacing: 8) {
                         Button { showPlayer = true } label: {
@@ -165,11 +165,9 @@ private struct MusicLibraryScreen: View {
                         .accessibilityLabel("Open Now Playing")
                         .buttonStyle(.bordered)
                         .musicGlass(theme, radius: 20, interactive: true)
-                        if selectedMiniPlayer != nil {
-                            Button("Mini-player", systemImage: "ipod") { showMiniPlayer = true }
-                                .labelStyle(.iconOnly)
-                                .buttonStyle(.bordered)
-                        }
+                        Button("Mini-player", systemImage: "ipod") { showMiniPlayer = true }
+                            .labelStyle(.iconOnly)
+                            .buttonStyle(.bordered)
                     }
                     .padding(.horizontal, 16)
                 }
@@ -221,8 +219,6 @@ private struct MusicLibraryScreen: View {
                     .textFieldStyle(.plain)
                     .submitLabel(.search)
                     .padding(10)
-                    .background(theme.usesLiquidGlass ? .clear : Color.primary.opacity(0.08),
-                                in: RoundedRectangle(cornerRadius: 9))
                     .musicGlass(theme, radius: 13)
             } else {
                 Button {
@@ -246,12 +242,6 @@ private struct MusicLibraryScreen: View {
                 else {
                     if library.selectedGroup == nil && library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         PinnedMusicShelf(library: library) { search?.cancel(); library.open($0) }
-                    }
-                    if theme == .plexify && library.selectedGroup == nil && [.albums, .artists].contains(library.kind)
-                        && library.query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                       let entry = library.entries.first {
-                        PlexifyFeature(item: entry, library: library) { library.open(entry) }
-                            .padding(.bottom, 13)
                     }
                     if let artist = library.selectedGroup {
                         Text(artist.title).font(.largeTitle.bold()).padding(.bottom, 16)

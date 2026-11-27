@@ -7,7 +7,7 @@ window.clickWheel = (() => {
   const dialog = byId('wheel-player');
   const opener = byId('open-wheel');
   const ring = byId('wheel-ring');
-  let state = {}, item = null, theme = 'copper';
+  let state = {}, item = null;
   let preference = 'automatic', style = '';
   let volume = 1, scrubbing = false, preview = null, drag = null, suppressClick = false;
   let artworkKey, desktopArtworkKey, coverFactory;
@@ -62,7 +62,7 @@ window.clickWheel = (() => {
     item = currentAlbum;
     state = currentState;
     coverFactory = makeCover;
-    updateTheme(theme);
+    applyStyle();
     if (!item) return;
     const key = JSON.stringify([item.id, item.artwork]);
     if (artworkKey !== key) {
@@ -82,10 +82,8 @@ window.clickWheel = (() => {
     drawProgress();
   }
 
-  function updateTheme(choice) {
-    theme = choice;
-    const automaticStyles = {classic:'classic', classicDark:'classicBlack', classicOLED:'classicBlack', video:'video'};
-    style = preference === 'automatic' ? (automaticStyles[theme] || '') : preference;
+  function applyStyle() {
+    style = preference === 'automatic' ? 'queue' : preference;
     root.dataset.miniPlayer = style;
     byId('mini-queue').hidden = style !== 'queue';
     byId('mini-desktop98').hidden = style !== 'desktop98';
@@ -99,7 +97,7 @@ window.clickWheel = (() => {
 
   function setStyle(choice) {
     preference = choice;
-    updateTheme(theme);
+    applyStyle();
   }
 
   function drawDesktop(makeCover) {
@@ -279,5 +277,5 @@ window.clickWheel = (() => {
     event.preventDefault();
     adjust(event.key === 'ArrowRight' ? 1 : -1);
   });
-  return {update, updateTheme, setStyle};
+  return {update, setStyle};
 })();

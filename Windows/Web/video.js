@@ -11,6 +11,9 @@
   const retry = get('video-retry');
   const dialog = get('video-dialog');
   const video = get('video-player');
+  const fullscreen = get('video-fullscreen');
+  const pip = get('video-pip');
+  const restore = get('video-restore');
   const mode = get('video-mode');
   const error = get('video-error');
   const watchToggle = get('video-watch-toggle');
@@ -432,6 +435,42 @@
     requestPlayback();
   }
 
+  function setDisplayControls(available) {
+    fullscreen.disabled = pip.disabled = !available;
+  }
+
+  function requestDisplay(mode) {
+    host({action:'videoDisplay', mode});
+  }
+
+  window.plexVideoDisplay = display => {
+    if (!dialog.open) return;
+    if (display === 'inline') delete dialog.dataset.display;
+    else dialog.dataset.display = display;
+    video.controls = display !== 'floating';
+    restore.hidden = display !== 'fullscreen';
+    if (display === 'fullscreen') restore.focus();
+    else if (display === 'floating') video.focus();
+    else if (!fullscreen.disabled) fullscreen.focus();
+  };
+
+  fullscreen.onclick = () => requestDisplay('fullscreen');
+  pip.onclick = () => requestDisplay('floating');
+  restore.onclick = () => requestDisplay('inline');
+  dialog.addEventListener('cancel', event => {
+    if (!dialog.dataset.display) return;
+    event.preventDefault();
+    requestDisplay('inline');
+  });
+  dialog.addEventListener('keydown', event => {
+    if (dialog.dataset.display !== 'floating' || event.code !== 'Space') return;
+    event.preventDefault();
+    if (!event.repeat) {
+      if (video.paused) video.play().catch(() => {});
+      else video.pause();
+    }
+  });
+
   function requestPlayback() {
     clearNext();
     source = null;
@@ -450,6 +489,7 @@
     versionPlay.hidden = true;
     versionPicker.disabled = true;
     video.hidden = true;
+    setDisplayControls(false);
     video.pause();
     if (hls) { hls.destroy(); hls = null; }
     video.removeAttribute('src');
@@ -528,6 +568,7 @@
       video.removeAttribute('src');
       video.load();
       video.hidden = true;
+      setDisplayControls(false);
       mode.textContent = 'Direct Play · VLC';
       alternate.hidden = true;
       window.windowsPlayback.action({action:'pause'});
@@ -540,6 +581,7 @@
     alternate.hidden = false;
     video.src = candidate.url;
     video.hidden = false;
+    setDisplayControls(true);
     video.play().catch(() => {});
   }
 
@@ -556,6 +598,7 @@
     video.removeAttribute('src');
     video.load();
     video.hidden = false;
+    setDisplayControls(true);
     if (window.Hls?.isSupported()) {
       hls = new window.Hls({enableWorker:false});
       hls.on(window.Hls.Events.ERROR, (_, data) => {
@@ -619,6 +662,10 @@
   dialog.addEventListener('close', () => {
     if (!nativeActive && !awaitingSeek && !failed) saveWatch(video.currentTime);
     clearNext();
+    delete dialog.dataset.display;
+    video.controls = true;
+    restore.hidden = true;
+    setDisplayControls(false);
     activeItem = activeScope = null;
     ++pending;
     video.pause();
@@ -632,6 +679,8 @@
 
   function showError(message) {
     failed = true;
+    setDisplayControls(false);
+    if (dialog.dataset.display) requestDisplay('inline');
     if (hls) { hls.destroy(); hls = null; }
     video.pause();
     video.removeAttribute('src');

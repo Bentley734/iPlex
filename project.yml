@@ -3,8 +3,8 @@ options:
   createIntermediateGroups: true
 settings:
   SWIFT_VERSION: 5.0
-  MARKETING_VERSION: 0.1.32
-  CURRENT_PROJECT_VERSION: 33
+  MARKETING_VERSION: 0.1.33
+  CURRENT_PROJECT_VERSION: 34
   GENERATE_INFOPLIST_FILE: YES
   INFOPLIST_KEY_CFBundleDisplayName: iPlex
   INFOPLIST_KEY_NSLocalNetworkUsageDescription: iPlex connects to your Plex Media Server.
@@ -78,6 +78,11 @@ targets:
     dependencies:
       - framework: Dependencies/TVVLCKit.xcframework
         embed: true
+    info:
+      path: Mobile/tvOS-Info.plist
+      properties:
+        CFBundleDisplayName: iPlex
+        UIBackgroundModes: [audio]
     settings:
       PRODUCT_NAME: iPlex
       PRODUCT_BUNDLE_IDENTIFIER: net.bentley734.musicroom.tvos
