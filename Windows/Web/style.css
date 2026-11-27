@@ -75,7 +75,7 @@ header { padding:25px 29px 20px; display:flex; align-items:center; gap:12px; }
 .library-browse-controls select { width:160px; min-width:0; text-overflow:ellipsis; }
 .library-browse-controls input { width:205px; min-width:0; }
 #back { line-height:1; font-size:21px; padding:5px 13px 9px; }
-.content { overflow:auto; padding:3px 30px 25px; }
+.content { overflow:auto; padding:11px 30px 25px; }
 #message { color:var(--accent); }
 .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--artwork-min)),1fr)); gap:20px; }
 .grid:not(.track-list) > .library-tile { width:100%; max-width:var(--artwork-max); }

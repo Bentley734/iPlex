@@ -393,6 +393,7 @@ private struct MusicWindow: View {
                 Button("Retry", action: model.loadMore).padding(.bottom, 24)
             }
         }
+        .libraryScrollTopInset()
     }
 
     private func albumDetail(_ album: MusicEntry) -> some View {
@@ -450,6 +451,7 @@ private struct MusicWindow: View {
             .padding(.horizontal, 28).padding(.bottom, 24)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .libraryScrollTopInset()
     }
 
     private var transport: some View {

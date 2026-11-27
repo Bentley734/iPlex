@@ -350,6 +350,12 @@ struct PlexLibrarySwitcher: View {
     }
 }
 
+extension ScrollView {
+    func libraryScrollTopInset() -> some View {
+        contentMargins(.top, 8, for: .scrollContent)
+    }
+}
+
 struct LibraryBrowseControls<Selector: View>: View {
     let placeholder: String
     let query: Binding<String>?

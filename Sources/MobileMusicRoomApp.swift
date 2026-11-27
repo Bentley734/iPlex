@@ -315,7 +315,9 @@ private struct MusicLibraryScreen: View {
                 if library.more && !library.busy && library.selectedDetail == nil && library.message != nil {
                     Button("Retry", action: library.loadMore).padding()
                 }
-            }.contentMargins(.horizontal, 8, for: .scrollContent)
+            }
+            .libraryScrollTopInset()
+            .contentMargins(.horizontal, 8, for: .scrollContent)
         }.padding(14)
     }
 

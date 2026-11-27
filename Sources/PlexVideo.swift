@@ -242,6 +242,7 @@ struct PlexVideoBrowser: View {
                             .disabled(busy)
                     }
                 }
+                .libraryScrollTopInset()
             }
             .pageTransition(on: [selection, parent?.id ?? ""])
             .clipped()
