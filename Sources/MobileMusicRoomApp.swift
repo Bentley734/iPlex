@@ -337,6 +337,15 @@ private struct MusicLibraryScreen: View {
                 }
                 Spacer(minLength: 0)
             }
+            if album.kind == .playlists {
+                if library.savingPlaylistTrack { ProgressView("Saving playlist…") }
+                if let message = library.playlistTrackMessage {
+                    Text(message).foregroundStyle(.secondary)
+                }
+                if library.tracks.isEmpty && !library.busy && !library.savingPlaylistTrack && library.message == nil {
+                    Text("This playlist is empty.").foregroundStyle(.secondary)
+                }
+            }
             let popular = library.popularTrackIDs
             ForEach(Array(library.tracks.enumerated()), id: \.offset) { index, track in
                 Button { library.play(at: index) } label: {
@@ -349,6 +358,7 @@ private struct MusicLibraryScreen: View {
                     }.frame(maxWidth: .infinity).padding(.vertical, 6)
                 }.buttonStyle(.bordered)
                     .contextMenu { LibraryQueueActions(library: library, entry: album, track: track) }
+                    .modifier(PlaylistTrackEditing(library: library, track: track))
             }
         }.frame(maxWidth: 1000, alignment: .leading)
     }

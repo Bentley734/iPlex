@@ -46,6 +46,8 @@ final class LibraryModel: ObservableObject {
     @Published private(set) var visibleVideoKinds = PlexVideoKind.allCases
     @Published var query = ""
     @Published var playlistEdit: PlexPlaylistEdit?
+    @Published private(set) var savingPlaylistTrack = false
+    @Published private(set) var playlistTrackMessage: String?
 
     let service = PlexService(version: "0.1")
     let player = PlayerController()
@@ -429,6 +431,7 @@ final class LibraryModel: ObservableObject {
     }
 
     private func loadSelection(_ entry: MusicEntry) async throws {
+        playlistTrackMessage = nil
         if entry.kind.isGroup {
             selectedGroup = entry
             selectedDetail = nil
@@ -485,8 +488,56 @@ final class LibraryModel: ObservableObject {
             service.status.selectedServerID == serverID
     }
 
+    func playlistTrackEditable(_ track: LiveTrack) -> Bool {
+        selectedDetail?.kind == .playlists && track.playlistItemID != nil && canEditPlaylists
+    }
+
+    @discardableResult
+    func changePlaylistTrack(_ id: UUID, to target: UUID? = nil) -> Bool {
+        guard !savingPlaylistTrack, !busy, let playlist = selectedDetail,
+              let source = tracks.firstIndex(where: { $0.id == id }), playlistTrackEditable(tracks[source]),
+              let item = tracks[source].playlistItemID else { return false }
+        let change: PlexService.PlaylistItemChange
+        if let target {
+            guard let destination = tracks.firstIndex(where: { $0.id == target }), destination != source else { return false }
+            let predecessor = source < destination ? destination : destination - 1
+            let after = predecessor < 0 ? nil : tracks[predecessor].playlistItemID
+            guard predecessor < 0 || after != nil else { return false }
+            change = .move(after: after)
+        } else {
+            change = .remove
+        }
+
+        let server = serverID, library = libraryID
+        savingPlaylistTrack = true
+        playlistTrackMessage = nil
+        Task {
+            defer { savingPlaylistTrack = false }
+            do {
+                try await service.changeMusicPlaylistItem(server: server, playlist: playlist.id, item: item, change: change)
+            } catch {
+                if serverID == server, libraryID == library, selectedDetail?.id == playlist.id {
+                    playlistTrackMessage = error.localizedDescription
+                }
+                return
+            }
+            guard serverID == server, libraryID == library, selectedDetail?.id == playlist.id else { return }
+            do {
+                let updated = try await request { service.musicTracks(entry: playlist, inBackground: true, completion: $0) }
+                if serverID == server, libraryID == library, selectedDetail?.id == playlist.id {
+                    tracks = updated
+                }
+            } catch {
+                if serverID == server, libraryID == library, selectedDetail?.id == playlist.id {
+                    playlistTrackMessage = "Saved to Plex. Reopen this playlist to refresh its tracks."
+                }
+            }
+        }
+        return true
+    }
+
     func editPlaylist(track: String? = nil, trackTitle: String = "") {
-        guard canEditPlaylists else { return }
+        guard canEditPlaylists, !savingPlaylistTrack else { return }
         playlistEdit = PlexPlaylistEdit(server: serverID, library: libraryID, track: track, trackTitle: trackTitle)
     }
 

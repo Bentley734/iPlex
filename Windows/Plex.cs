@@ -773,7 +773,7 @@ namespace MusicRoom
                 tracks.OrderByDescending(track => track.ratingCount).Take(Math.Min(3, Math.Max(1, tracks.Count / 4)))
                     .Where(track => track.ratingCount >= highest * 0.25)) : new HashSet<MediaTrack>();
             Send(preview ? "musicAlbumPreview" : "musicAlbum", new { id, tracks = tracks.Select(track => new
-                { track.number, track.title, track.durationSeconds, track.plexID, popular = popular.Contains(track) }).ToArray() });
+                { track.number, track.title, track.durationSeconds, track.plexID, track.playlistItemID, popular = popular.Contains(track) }).ToArray() });
         }
 
         async Task<List<MediaTrack>> LoadAlbumTracks(Server server, string section, string key, string kind, CancellationToken token)
@@ -814,12 +814,14 @@ namespace MusicRoom
                             long duration = Num(row, "duration");
                             var audio = Rows(Get(part, "Stream")).FirstOrDefault(stream => Num(stream, "streamType") == 2)
                                 ?? new Dictionary<string, object>();
+                            string playlistItem = Str(row, "playlistItemID");
                             found.Add(new MediaTrack { number = found.Count + 1, title = Str(row, "title"),
                                 durationSeconds = duration > 0 ? (double?)duration / 1000 : null,
                                 artwork = ArtworkPath(row, "parentThumb", "thumb"),
                                 artist = Str(row, "grandparentTitle"), album = Str(row, "parentTitle"),
                                 ratingCount = Math.Max(0, Num(row, "ratingCount")),
-                                plexID = trackKey, codec = Str(audio, "codec") == "" ? Str(media, "audioCodec") : Str(audio, "codec"),
+                                plexID = trackKey, playlistItemID = playlist && ItemID.IsMatch(playlistItem) ? playlistItem : null,
+                                codec = Str(audio, "codec") == "" ? Str(media, "audioCodec") : Str(audio, "codec"),
                                 container = Str(media, "container"),
                                 sampleRate = Math.Max(Num(audio, "samplingRate"), Num(audio, "sampleRate")),
                                 bitDepth = Num(audio, "bitDepth"), bitrate = Math.Max(Num(audio, "bitrate"), Num(media, "bitrate")),
@@ -943,13 +945,14 @@ namespace MusicRoom
         async Task EditPlaylist(Dictionary<string, object> request, string action, long id)
         {
             var token = shutdown.Token;
-            bool writing = action == "saveMusicPlaylist";
+            bool changingTrack = action == "removePlaylistTrack" || action == "movePlaylistTrack";
+            bool writing = changingTrack || action == "saveMusicPlaylist";
+            string callback = changingTrack ? "musicPlaylistTrackSaved" : writing ? "musicPlaylistSaved" : "musicEditablePlaylists";
             if (writing && !playlistWrites.Wait(0))
             {
-                Send("musicPlaylistSaved", new { id, error = "Another playlist change is still saving." });
+                Send(callback, new { id, error = "Another playlist change is still saving." });
                 return;
             }
-            string callback = writing ? "musicPlaylistSaved" : "musicEditablePlaylists";
             try
             {
                 Server server;
@@ -958,7 +961,7 @@ namespace MusicRoom
                     throw Problem("Reconnect to your music library before editing playlists.");
                 int generation = musicGeneration;
                 string track = Str(request, "track"), playlist = Str(request, "playlist"), title = Str(request, "title").Trim();
-                if (writing && ((track.Length > 0 && !ItemID.IsMatch(track)) ||
+                if (writing && !changingTrack && ((track.Length > 0 && !ItemID.IsMatch(track)) ||
                     (playlist.Length > 0 && (!ItemID.IsMatch(playlist) || track.Length == 0)) ||
                     (playlist.Length == 0 && (title.Length == 0 || title.Length > 120 || title.Any(Char.IsControl)))))
                     throw Problem("Enter a playlist name or choose a playlist to add this track to.");
@@ -978,6 +981,23 @@ namespace MusicRoom
                 }
                 var target = choices.FirstOrDefault(row => row.key == playlist);
                 if (playlist.Length != 0 && target == null) throw Problem("This playlist is no longer available for editing.");
+                if (changingTrack)
+                {
+                    string occurrence = Str(request, "occurrence"), after = Str(request, "after");
+                    bool removing = action == "removePlaylistTrack";
+                    if (playlist != albumID || !ItemID.IsMatch(playlist) || !ItemID.IsMatch(occurrence) ||
+                        !albumTracks.Any(row => row.playlistItemID == occurrence) ||
+                        (!removing && after.Length != 0 && (after == occurrence || !ItemID.IsMatch(after) ||
+                            !albumTracks.Any(row => row.playlistItemID == after))))
+                        throw Problem("Reopen the playlist before editing its tracks.");
+                    string itemPath = "/playlists/" + playlist + "/items/" + occurrence;
+                    if (!removing) itemPath += "/move" + (after.Length == 0 ? "" : "?after=" + after);
+                    await WritePlaylist(listing.Base, itemPath, removing ? HttpMethod.Delete : HttpMethod.Put, server, token);
+                    if (generation == musicGeneration)
+                        Send(callback, new { id, message = removing ? "Removed from playlist." : "Playlist order saved." });
+                    return;
+                }
+
                 bool create = target == null;
                 string endpoint = create ? "/playlists?type=audio&smart=0&title=" + Uri.EscapeDataString(title) :
                     "/playlists/" + playlist + "/items";
@@ -986,17 +1006,7 @@ namespace MusicRoom
                     string contents = "server://" + server.Id + "/com.plexapp.plugins.library/library/metadata/" + track;
                     endpoint += (create ? "&" : "?") + "uri=" + Uri.EscapeDataString(contents);
                 }
-                try
-                {
-                    await FetchBytes(PlexRequest(create ? HttpMethod.Post : HttpMethod.Put,
-                        new Uri(listing.Base, endpoint), server.Token), 2 * 1024 * 1024, token, 12);
-                }
-                catch (Exception error)
-                {
-                    if (error is InvalidDataException && error.Message.StartsWith("The service returned HTTP 4", StringComparison.Ordinal))
-                        throw Problem("Plex rejected the playlist change. " + error.Message);
-                    throw Problem("Plex didn’t confirm the change. Check the playlist before retrying.");
-                }
+                await WritePlaylist(listing.Base, endpoint, create ? HttpMethod.Post : HttpMethod.Put, server, token);
                 if (generation == musicGeneration)
                     Send(callback, new { id, message = create ? "Playlist created." : "Added to " + target.title + "." });
             }
@@ -1008,6 +1018,20 @@ namespace MusicRoom
             finally
             {
                 if (writing) playlistWrites.Release();
+            }
+        }
+
+        async Task WritePlaylist(Uri serverBase, string endpoint, HttpMethod method, Server server, CancellationToken token)
+        {
+            try
+            {
+                await FetchBytes(PlexRequest(method, new Uri(serverBase, endpoint), server.Token), 2 * 1024 * 1024, token, 12);
+            }
+            catch (Exception error)
+            {
+                if (error is InvalidDataException && error.Message.StartsWith("The service returned HTTP 4", StringComparison.Ordinal))
+                    throw Problem("Plex rejected the playlist change. " + error.Message);
+                throw Problem("Plex didn’t confirm the change. Check the playlist before retrying.");
             }
         }
 
@@ -1044,7 +1068,8 @@ namespace MusicRoom
             bool first = !initialized;
             InitPlex();
             if (action == "status" && !(first && account.Length > 0)) { PlexState(); return; }
-            if (action == "editableMusicPlaylists" || action == "saveMusicPlaylist")
+            if (action == "editableMusicPlaylists" || action == "saveMusicPlaylist" ||
+                action == "removePlaylistTrack" || action == "movePlaylistTrack")
             { await EditPlaylist(body, action, id); return; }
             if (action == "togglePin")
             {

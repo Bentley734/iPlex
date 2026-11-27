@@ -210,7 +210,7 @@
     menu.append(summary, commands);
     return menu;
   }
-  function libraryQueueActions(item, track, trackTitle, trackID) {
+  function libraryQueueActions(item, track, trackTitle, trackID, playlistCommands = []) {
     const commands = [];
     if (track !== undefined || item.kind !== 'artist') {
       commands.push(['Play Next', () => enqueueItem(item, true, track)],
@@ -222,7 +222,8 @@
       commands.push([pins.some(pin => pin.id === item.id) ? 'Unpin' : 'Pin',
         () => host({action:'togglePin', item:item.id})]);
     }
-    return actions('Actions for ' + (track === undefined ? item.title : trackTitle || tracks[track]?.title || 'track'), commands);
+    return actions('Actions for ' + (track === undefined ? item.title : trackTitle || tracks[track]?.title || 'track'),
+      commands.concat(playlistCommands));
   }
   const playlistDialog = get('playlist-editor');
   const playlistChoices = get('playlist-editor-choices');
@@ -300,6 +301,72 @@
     if (album?.kind === 'playlist' && album.id === playlistEdit.target) open(album);
     else if (kind === 'playlists' && !album) browse();
   };
+
+  let playlistTrackSequence = 0;
+  let pendingPlaylistTrack = null;
+  let draggedPlaylistTrack = null;
+
+  function changePlaylistTrack(occurrence, target) {
+    if (pendingPlaylistTrack || busy || !album || album.kind !== 'playlist' || !occurrence) return;
+    const source = tracks.findIndex(track => track.playlistItemID === occurrence);
+    if (source < 0) return;
+    let after;
+    if (target !== undefined) {
+      const destination = tracks.findIndex(track => track.playlistItemID === target);
+      if (destination < 0 || destination === source) return;
+      const predecessor = source < destination ? destination : destination - 1;
+      after = tracks[predecessor]?.playlistItemID;
+      if (predecessor >= 0 && !after) return;
+    }
+    pendingPlaylistTrack = {id:++playlistTrackSequence, server, library, playlist:album.id};
+    status('Saving playlist…');
+    host({action:target === undefined ? 'removePlaylistTrack' : 'movePlaylistTrack',
+      ...pendingPlaylistTrack, occurrence, after});
+  }
+
+  window.musicPlaylistTrackSaved = reply => {
+    if (reply.id !== pendingPlaylistTrack?.id) return;
+    const saved = pendingPlaylistTrack;
+    pendingPlaylistTrack = null;
+    if (saved.server !== server || saved.library !== library || saved.playlist !== album?.id) return;
+    if (reply.error) status(reply.error);
+    else {
+      busy = true;
+      status('Refreshing playlist…');
+      host({action:'album', id:++request, album:album.id});
+    }
+  };
+
+  function playlistTrackHandle(row, occurrence) {
+    const handle = node('span', '☰', 'now-drag-handle');
+    handle.draggable = true;
+    handle.title = 'Drag to reorder';
+    handle.setAttribute('aria-hidden', 'true');
+    handle.addEventListener('dragstart', event => {
+      if (pendingPlaylistTrack || busy) { event.preventDefault(); return; }
+      draggedPlaylistTrack = occurrence;
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('text/plain', occurrence);
+    });
+    handle.addEventListener('dragend', () => { draggedPlaylistTrack = null; });
+    row.addEventListener('dragover', event => {
+      if (!draggedPlaylistTrack || draggedPlaylistTrack === occurrence) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'move';
+      row.classList.add('playlist-drop-target');
+    });
+    row.addEventListener('dragleave', event => {
+      if (!row.contains(event.relatedTarget)) row.classList.remove('playlist-drop-target');
+    });
+    row.addEventListener('drop', event => {
+      if (!draggedPlaylistTrack) return;
+      event.preventDefault();
+      row.classList.remove('playlist-drop-target');
+      changePlaylistTrack(draggedPlaylistTrack, occurrence);
+      draggedPlaylistTrack = null;
+    });
+    return handle;
+  }
 
   function renderPins() {
     get('pinned-shelf').hidden = !pins.length || Boolean(album || group || get('search').value.trim());
@@ -490,7 +557,18 @@
       }
       row.append(node('span', String(track.number), 'number'), title, node('small', time(track.durationSeconds)));
       const entry = node('div', '', 'library-track');
-      entry.append(row, libraryQueueActions(album, index, track.title, track.plexID));
+      const commands = [];
+      const occurrence = album.kind === 'playlist' && track.playlistItemID;
+      if (occurrence) {
+        entry.classList.add('playlist-track-editable');
+        entry.append(playlistTrackHandle(entry, occurrence));
+        const before = tracks[index - 1]?.playlistItemID;
+        const after = tracks[index + 1]?.playlistItemID;
+        if (before) commands.push(['Move Up', () => changePlaylistTrack(occurrence, before)]);
+        if (after) commands.push(['Move Down', () => changePlaylistTrack(occurrence, after)]);
+        commands.push(['Remove from Playlist', () => changePlaylistTrack(occurrence)]);
+      }
+      entry.append(row, libraryQueueActions(album, index, track.title, track.plexID, commands));
       list.append(entry);
     });
     get('details').replaceChildren(heading, list);
@@ -554,7 +632,8 @@
     if (reply.id !== request || !album) return;
     tracks = reply.tracks;
     busy = false;
-    status(tracks.length ? '' : 'This item has no directly playable tracks.');
+    status(tracks.length ? '' : album.kind === 'playlist' ? 'This playlist has no playable tracks.' :
+      'This item has no directly playable tracks.');
     render();
   };
   window.musicError = reply => {
@@ -612,6 +691,7 @@
       library = state.libraryId;
       window.musicCoverCache({running:false, message:''});
       if (playlistDialog.open) playlistDialog.close();
+      pendingPlaylistTrack = draggedPlaylistTrack = null;
       ++request;
       playing = album = group = pendingAlbum = null;
       nowQueue = [];
@@ -646,12 +726,16 @@
   }
   function applyPalette() {
     const root = document.documentElement;
-    root.toggleAttribute('data-artwork-colors', Boolean(palette));
-    if (!palette) return;
-    const light = selectedTheme === 'classic';
+    root.toggleAttribute('data-artwork-colors', artworkColors && Boolean(palette));
+    if (!palette) {
+      root.style.removeProperty('--rose-artwork-wash');
+      return;
+    }
+    const light = selectedTheme === 'classic' || selectedTheme === 'roseStudio';
     const blend = (gray, amount) => `rgb(${palette.map(value => Math.round(value * (1 - amount) + gray * amount)).join(' ')})`;
     root.style.setProperty('--artwork-accent', blend(light ? 0 : 255, 0.55));
     root.style.setProperty('--artwork-wash', blend(light ? 255 : 20, light ? 0.72 : 0.67));
+    root.style.setProperty('--rose-artwork-wash', blend(light ? 245 : 20, light ? 0.45 : 0.54));
   }
   function pickPalette(image) {
     const canvas = document.createElement('canvas');
@@ -675,7 +759,7 @@
     return best.weight > 0 ? best.totals.map(value => value / best.weight) : null;
   }
   function updateArtworkColors(state) {
-    const path = artworkColors ? playingCover(state) : '';
+    const path = artworkColors || selectedTheme.startsWith('roseStudio') ? playingCover(state) : '';
     const source = artworkPattern.test(path) ? path : '';
     if (source === paletteSource) return;
     paletteSource = source;
@@ -694,9 +778,10 @@
   function chooseArtworkColors(enabled) {
     artworkColors = enabled;
     get('artwork-colors').checked = enabled;
-    get('animate-artwork-colors').disabled = !enabled || selectedTheme === 'classicOLED';
+    get('animate-artwork-colors').disabled = (!enabled && !selectedTheme.startsWith('roseStudio')) || selectedTheme === 'classicOLED';
     try { localStorage.setItem('musicroom-artwork-colors', enabled ? '1' : '0'); } catch {}
     updateArtworkColors(playbackState);
+    applyPalette();
   }
   function chooseArtworkMotion(enabled) {
     layout.toggleAttribute('data-artwork-motion', enabled);
@@ -766,6 +851,7 @@
       else get('now-playing').style.removeProperty('--glass-artwork');
       if (expandedArtwork.open) refreshExpandedArtwork();
     }
+    get('now-playing').toggleAttribute('data-track-paused', state.status !== 'playing');
     get('signal-path-button').textContent = signalBadge(track.format);
     get('now-title').textContent = track.title || state.title || playing.title;
     get('now-artist').textContent = track.artist || playing.artist || '';
@@ -778,7 +864,10 @@
     seek.disabled = !state.duration;
     if (document.activeElement !== seek) seek.value = state.elapsed || 0;
     get('now-elapsed').textContent = time(state.elapsed);
-    get('now-duration').textContent = time(state.duration);
+    const remaining = selectedTheme.startsWith('roseStudio') && state.duration > 0;
+    get('now-duration').textContent = remaining ? '−' + time(state.duration - (state.elapsed || 0)) : time(state.duration);
+    get('now-duration').setAttribute('aria-label', remaining ? 'Time remaining' : 'Track duration');
+    seek.style.setProperty('--seek-percent', 100 * Math.min(1, Math.max(0, Number(seek.value) / Number(seek.max))) + '%');
     const active = state.status === 'playing';
     get('now-play').textContent = active ? '⏸' : '▶';
     get('now-play').setAttribute('aria-label', active ? 'Pause' : 'Play');
@@ -1051,15 +1140,16 @@
     get('app-update').disabled = Boolean(state.disabled);
   };
   function chooseTheme(value) {
-    const theme = ['classic', 'classicDark', 'classicOLED', 'video', 'plexify', 'liquidGlass'].includes(value) ? value : 'copper';
+    const theme = ['classic', 'classicDark', 'classicOLED', 'video', 'plexify', 'liquidGlass', 'roseStudio', 'roseStudioDark'].includes(value) ? value : 'copper';
     selectedTheme = theme;
     document.documentElement.dataset.theme = theme;
     window.clickWheel.updateTheme(theme);
     get('theme').value = theme;
-    const usesGlass = ['liquidGlass', 'classicDark', 'classicOLED'].includes(theme);
+    const usesGlass = ['liquidGlass', 'classicDark', 'classicOLED', 'roseStudio', 'roseStudioDark'].includes(theme);
     layout.toggleAttribute('data-glass', usesGlass);
     get('glass-transparency-setting').hidden = !usesGlass;
-    get('animate-artwork-colors').disabled = !get('artwork-colors').checked || theme === 'classicOLED';
+    get('animate-artwork-colors').disabled = (!artworkColors && !theme.startsWith('roseStudio')) || theme === 'classicOLED';
+    updateArtworkColors(playbackState);
     applyPalette();
     updateDeckVisibility();
     renderFeature();

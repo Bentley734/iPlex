@@ -131,7 +131,7 @@ private struct MusicWindow: View {
             } else {
                 VStack(spacing: 0) {
                     HStack(spacing: 0) {
-                        resizableSidebar(availableWidth: width, defaultWidth: 216)
+                        resizableSidebar(availableWidth: width, defaultWidth: theme.isRoseStudio ? 238 : 216)
                         mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
                             .musicGlass(theme, radius: 22)
                             .padding(theme.usesLiquidGlass ? 7 : 0)
@@ -314,6 +314,11 @@ private struct MusicWindow: View {
             .padding(.horizontal, 11).padding(.vertical, 10)
             .foregroundStyle(selected ? copper : .primary)
             .background(selected ? copper.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 8))
+            .overlay(alignment: .leading) {
+                if theme.isRoseStudio && selected {
+                    Capsule().fill(copper).frame(width: 3, height: 17).padding(.leading, 3)
+                }
+            }
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? [.isSelected] : [])
@@ -351,7 +356,9 @@ private struct MusicWindow: View {
                         .accessibilityLabel("Back")
                     }
                     Text(model.selectedDetail?.title ?? model.selectedGroup?.title ?? model.kind.rawValue)
-                        .font(.system(size: graphite ? 38 : 31, weight: .bold, design: graphite ? .rounded : .default))
+                        .font(.system(size: graphite ? 38 : (theme.isRoseStudio ? 34 : 31), weight: .bold,
+                                      design: graphite ? .rounded : .default))
+                        .tracking(theme.isRoseStudio ? -0.75 : 0)
                         .lineLimit(1)
                     if model.kind == .playlists && model.selectedDetail == nil && model.selectedGroup == nil {
                         Button("New Playlist", systemImage: "plus") { model.editPlaylist() }
@@ -574,6 +581,15 @@ private struct MusicWindow: View {
                 if let message = model.message, model.tracks.isEmpty {
                     Button("Retry") { model.open(album) }.help(message)
                 }
+                if album.kind == .playlists {
+                    if model.savingPlaylistTrack { ProgressView("Saving playlist…") }
+                    if let message = model.playlistTrackMessage {
+                        Text(message).foregroundStyle(.secondary)
+                    }
+                    if model.tracks.isEmpty && !model.busy && !model.savingPlaylistTrack && model.message == nil {
+                        Text("This playlist is empty.").foregroundStyle(.secondary)
+                    }
+                }
                 let popular = model.popularTrackIDs
                 ForEach(Array(model.tracks.enumerated()), id: \.offset) { index, track in
                     Button { model.play(at: index) } label: {
@@ -592,6 +608,7 @@ private struct MusicWindow: View {
                         .padding(.vertical, 8).contentShape(Rectangle())
                     }.buttonStyle(.plain)
                         .contextMenu { LibraryQueueActions(library: model, entry: album, track: track) }
+                        .modifier(PlaylistTrackEditing(library: model, track: track))
                     Divider()
                 }
             }

@@ -514,7 +514,8 @@ enum PlexParser {
             // Preserve the original, already authenticated URL. UI callbacks use LiveTrack.summary, which omits it.
             return LiveTrack(number: track.number, title: title, duration: track.duration, url: track.url,
                              artworkPath: track.artworkPath, artist: track.artist, album: track.album,
-                             ratingCount: track.ratingCount, id: track.id, plexID: track.plexID, format: track.format)
+                             ratingCount: track.ratingCount, id: track.id, plexID: track.plexID,
+                             playlistItemID: track.playlistItemID, format: track.format)
         }
     }
 
@@ -957,7 +958,7 @@ final class PlexRequestOperation: NSObject, URLSessionDataDelegate, URLSessionTa
             return
         }
         let method = dataTask.originalRequest?.httpMethod
-        let write = method == "POST" || method == "PUT"
+        let write = method == "POST" || method == "PUT" || method == "DELETE"
         guard http.statusCode == 200 || (write && [201, 204].contains(http.statusCode)) else {
             error = PlexServiceError("Plex returned HTTP \(http.statusCode).", retryOtherConnection: true,
                                      httpStatus: http.statusCode)
@@ -1607,6 +1608,10 @@ extension PlexParser {
 
     static let musicPlaylistLimit = 10_000
 
+    static func validPlaylistID(_ id: String) -> Bool {
+        id.range(of: #"^[1-9][0-9]{0,19}$"#, options: .regularExpression) != nil
+    }
+
     static func musicTrackPage(_ data: Data, entry: MusicEntry, section: String, base: URL, token: String, offset: Int = 0)
         throws -> (tracks: [LiveTrack], rawCount: Int, totalSize: Int?) {
         let container = try metadataContainer(data)
@@ -1639,10 +1644,12 @@ extension PlexParser {
             }.first
             guard let (url, format) = playable else { continue }
             let artwork = musicArtworkPath(row["parentThumb"] as? String) ?? musicArtworkPath(row["thumb"] as? String)
+            let playlistItem = entry.kind == .playlists ? numericIdentifier(row["playlistItemID"]) : nil
             let track = LiveTrack(number: 0, title: title, duration: milliseconds(row["duration"]), url: url,
                                   artworkPath: artwork, artist: string(row["grandparentTitle"], maximum: 300),
                                   album: string(row["parentTitle"], maximum: 300),
-                                  ratingCount: max(0, integer(row["ratingCount"]) ?? 0), plexID: id, format: format)
+                                  ratingCount: max(0, integer(row["ratingCount"]) ?? 0), plexID: id,
+                                  playlistItemID: playlistItem.flatMap { validPlaylistID($0) ? $0 : nil }, format: format)
             tracks.append((integer(row["parentIndex"]) ?? 1, integer(row["index"]) ?? (position + 1), track))
         }
         if entry.kind == .albums {
@@ -1654,7 +1661,8 @@ extension PlexParser {
             let track = row.track
             return LiveTrack(number: offset + index + 1, title: track.title, duration: track.duration, url: track.url,
                              artworkPath: track.artworkPath, artist: track.artist, album: track.album,
-                             ratingCount: track.ratingCount, id: track.id, plexID: track.plexID, format: track.format)
+                             ratingCount: track.ratingCount, id: track.id, plexID: track.plexID,
+                             playlistItemID: track.playlistItemID, format: track.format)
         }, rows.count, integer(container["totalSize"]))
     }
 }
@@ -1710,8 +1718,7 @@ extension PlexService {
 
     func saveMusicPlaylist(server: String, track: String?, playlist: String?, title: String) async throws {
         let name = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        func validID(_ id: String) -> Bool { id.range(of: #"^[1-9][0-9]{0,19}$"#, options: .regularExpression) != nil }
-        guard track.map(validID) != false, playlist.map(validID) != false else {
+        guard track.map(PlexParser.validPlaylistID) != false, playlist.map(PlexParser.validPlaylistID) != false else {
             throw PlexServiceError("Plex returned an invalid track or playlist identifier.")
         }
         guard playlist == nil ? (!name.isEmpty && name.count <= 120 &&
@@ -1719,13 +1726,7 @@ extension PlexService {
             throw PlexServiceError("Enter a playlist name or choose a playlist to add this track to.")
         }
         try await serverOperation(server: server) { record, base, operation in
-            let list = try self.serverRequest(base: base, path: "/playlists", query: Self.audioPlaylistQuery, token: record.token)
-            let current = try operation.fetch(list, limit: 8 * 1024 * 1024, timeout: 8)
-            if let playlist {
-                guard try PlexParser.editablePlaylists(current).contains(where: { $0.id == playlist }) else {
-                    throw PlexServiceError("This playlist is no longer available for editing.")
-                }
-            }
+            try self.checkEditablePlaylist(playlist, record: record, base: base, operation: operation)
             var query: [URLQueryItem] = playlist == nil ? [
                 .init(name: "type", value: "audio"), .init(name: "smart", value: "0"), .init(name: "title", value: name)
             ] : []
@@ -1739,18 +1740,63 @@ extension PlexService {
                 components.percentEncodedQuery = components.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
                 request.url = components.url
             }
-            guard self.status.selectedServerID == server else {
-                throw PlexServiceError("The selected Plex server changed. Try again.")
+            try self.writePlaylist(request, server: server, operation: operation)
+        }
+    }
+
+    enum PlaylistItemChange {
+        case remove
+        case move(after: String?)
+    }
+
+    func changeMusicPlaylistItem(server: String, playlist: String, item: String, change: PlaylistItemChange) async throws {
+        guard PlexParser.validPlaylistID(playlist), PlexParser.validPlaylistID(item) else {
+            throw PlexServiceError("Plex returned an invalid playlist item identifier.")
+        }
+        var path = "/playlists/\(playlist)/items/\(item)"
+        var query = [URLQueryItem]()
+        let method: String
+        switch change {
+        case .remove:
+            method = "DELETE"
+        case .move(let after):
+            guard after.map(PlexParser.validPlaylistID) != false, after != item else {
+                throw PlexServiceError("Choose a different playlist position.")
             }
-            do {
-                _ = try operation.fetch(request, limit: 2 * 1024 * 1024, timeout: 12)
-            } catch let error as PlexServiceError {
-                if error.isCancellation { throw error }
-                if let status = error.httpStatus, (400..<500).contains(status) {
-                    throw PlexServiceError("Plex rejected the playlist change (HTTP \(status)).")
-                }
-                throw PlexServiceError("Plex didn’t confirm the change. Check the playlist before retrying.")
+            method = "PUT"
+            path += "/move"
+            if let after { query.append(.init(name: "after", value: after)) }
+        }
+        let endpoint = path, parameters = query
+        try await serverOperation(server: server) { record, base, operation in
+            try self.checkEditablePlaylist(playlist, record: record, base: base, operation: operation)
+            var request = try self.serverRequest(base: base, path: endpoint, query: parameters, token: record.token)
+            request.httpMethod = method
+            try self.writePlaylist(request, server: server, operation: operation)
+        }
+    }
+
+    private func checkEditablePlaylist(_ playlist: String?, record: PlexServerRecord, base: URL,
+                                       operation: PlexRequestOperation) throws {
+        let list = try serverRequest(base: base, path: "/playlists", query: Self.audioPlaylistQuery, token: record.token)
+        let current = try operation.fetch(list, limit: 8 * 1024 * 1024, timeout: 8)
+        if let playlist, try !PlexParser.editablePlaylists(current).contains(where: { $0.id == playlist }) {
+            throw PlexServiceError("This playlist is no longer available for editing.")
+        }
+    }
+
+    private func writePlaylist(_ request: URLRequest, server: String, operation: PlexRequestOperation) throws {
+        guard status.selectedServerID == server else {
+            throw PlexServiceError("The selected Plex server changed. Try again.")
+        }
+        do {
+            _ = try operation.fetch(request, limit: 2 * 1024 * 1024, timeout: 12)
+        } catch let error as PlexServiceError {
+            if error.isCancellation { throw error }
+            if let status = error.httpStatus, (400..<500).contains(status) {
+                throw PlexServiceError("Plex rejected the playlist change (HTTP \(status)).")
             }
+            throw PlexServiceError("Plex didn’t confirm the change. Check the playlist before retrying.")
         }
     }
 
@@ -1784,6 +1830,7 @@ extension PlexService {
                     throw PlexServiceError("This playlist exceeds the 10,000-track playback limit.")
                 }
             } while hasMore
+            if playlist, start == 0 { return [] }
             guard !tracks.isEmpty else { throw PlexServiceError("This item has no tracks the player can stream directly.") }
             return try PlexParser.validatedPlaybackTracks(tracks, maximum: playlist ? PlexParser.musicPlaylistLimit : 250)
         }

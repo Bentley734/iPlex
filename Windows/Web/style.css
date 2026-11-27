@@ -431,6 +431,8 @@ button:hover:enabled { border-color:var(--copper); }
 .library-track, .now-queue-row { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:4px; min-width:0; }
 .now-queue-row { grid-template-columns:auto minmax(0,1fr) auto; }
 .now-queue-row.drop-target { outline:2px solid var(--copper); border-radius:8px; }
+.playlist-track-editable { grid-template-columns:auto minmax(0,1fr) auto; }
+.playlist-drop-target { background:color-mix(in srgb, var(--copper) 18%, transparent); border-radius:8px; }
 .now-drag-handle { padding:4px; cursor:grab; color:var(--muted); font-size:.82rem; }
 #now-queue-list .now-queue-play { grid-template-columns:minmax(0,1fr) auto; padding-inline:7px; }
 .queue-actions { display:inline-block; position:relative; vertical-align:middle; margin-inline:3px; }
@@ -720,3 +722,89 @@ button:hover:enabled { border-color:var(--copper); }
   #video-dialog header { flex-wrap:wrap; }
   #video-dialog header > div { flex-basis:100%; }
 }
+
+/* Rose Studio shares the glass controls while using its own warmer surfaces. */
+:root[data-theme="roseStudio"] {
+  color-scheme:light;
+  --ink:#fff6f7; --surface-end:#ecdce7; --panel:#fbf0f3; --raised:#fff9fb;
+  --text:#302331; --muted:#6c5363; --copper:#9e2157; --line:#70415d38; --accent-ink:#fff;
+  --glass-top-rgb:255 251 253; --glass-bottom-rgb:248 228 238;
+  --rose-edge:#9848664f; --rose-highlight:#fff9; --rose-shadow:#66405d29;
+}
+:root[data-theme="roseStudioDark"] {
+  --ink:#171221; --surface-end:#342037; --panel:#2b1d2e; --raised:#3e293f;
+  --text:#fff3f8; --muted:#d5aec4; --copper:#ff99bd; --line:#ecc4db38; --accent-ink:#281622;
+  --glass-top-rgb:108 65 104; --glass-bottom-rgb:42 26 45;
+  --rose-edge:#eab0d247; --rose-highlight:#ffe5f338; --rose-shadow:#13091062;
+}
+:root[data-theme^="roseStudio"] {
+  --sidebar-default:238px;
+  --glass-border:var(--rose-edge);
+  --glass-sheen:var(--rose-highlight);
+  --glass-bevel:inset 0 1px 0 var(--rose-highlight);
+  --glass-control:color-mix(in srgb,var(--panel) 68%,transparent);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;
+}
+:root[data-theme^="roseStudio"] body {
+  background:radial-gradient(ellipse at 14% 88%,color-mix(in srgb,var(--copper) 22%,transparent),transparent 62%),
+             linear-gradient(155deg,var(--ink),var(--surface-end));
+}
+:root[data-theme="roseStudio"] .wordmark:not([data-color="original"]) { filter:brightness(0); }
+:root[data-theme^="roseStudio"] nav button[aria-pressed=true] {
+  position:relative;
+  border-color:transparent;
+  background:color-mix(in srgb,var(--copper) 12%,transparent);
+}
+:root[data-theme^="roseStudio"] nav button[aria-pressed=true]::before {
+  content:""; position:absolute; left:3px; top:29%; bottom:29%; width:3px;
+  border-radius:3px; background:var(--copper);
+}
+:root[data-theme^="roseStudio"] #browser > header h1 { font-size:34px; letter-spacing:-.025em; }
+:root[data-theme^="roseStudio"] .tile .cover {
+  box-shadow:inset 0 0 0 1px var(--rose-edge),0 6px 17px var(--rose-shadow);
+}
+:root[data-theme^="roseStudio"] :is(.track, .track-columns, #elapsed, #now-elapsed, #now-duration) {
+  font-variant-numeric:tabular-nums;
+}
+:root[data-theme^="roseStudio"] #lyrics-lines button {
+  font-size:clamp(1.18rem,3.4vw,1.8rem); font-weight:650; padding-left:13px;
+  border:0; border-left:3px solid transparent; border-radius:0 8px 8px 0;
+}
+:root[data-theme^="roseStudio"] #lyrics-lines button[aria-current=true] {
+  border-left-color:var(--copper); background:color-mix(in srgb,var(--copper) 13%,transparent);
+}
+@property --rose-live-wash {
+  syntax:"<color>"; inherits:false; initial-value:transparent;
+}
+:root[data-theme^="roseStudio"] #now-playing[open] {
+  --rose-live-wash:var(--rose-artwork-wash,transparent);
+  background:radial-gradient(ellipse at 38% 35%,var(--rose-live-wash),transparent 67%),
+             radial-gradient(ellipse at 74% 76%,var(--surface-end),transparent 70%),var(--ink);
+  background-size:140% 140%, 150% 150%, 100% 100%;
+}
+:root[data-theme^="roseStudio"] #lyrics-sheet {
+  background:linear-gradient(135deg,color-mix(in srgb,var(--rose-artwork-wash,var(--ink)) 30%,var(--panel)),var(--panel));
+}
+:root[data-theme^="roseStudio"] #signal-path-button { font-size:.75rem; font-weight:650; border-radius:8px; }
+@media (prefers-reduced-motion:no-preference) {
+  :root[data-theme^="roseStudio"] #now-playing[open] { transition:--rose-live-wash 800ms ease-in-out; }
+  :root[data-theme^="roseStudio"][data-artwork-motion] #now-playing[open] {
+    animation:artwork-color-drift 38s ease-in-out infinite alternate;
+  }
+  :root[data-theme^="roseStudio"] #now-art { transition:transform 400ms cubic-bezier(.22,1,.36,1); }
+  :root[data-theme^="roseStudio"] #now-playing[data-track-paused] #now-art { transform:scale(.94); }
+}
+
+:root[data-theme^="roseStudio"] #now-seek {
+  --seek-height:4px; appearance:none; height:22px; padding:0; background:transparent;
+}
+:root[data-theme^="roseStudio"] #now-seek:is(:hover,:focus-visible,:active) { --seek-height:7px; }
+:root[data-theme^="roseStudio"] #now-seek::-webkit-slider-runnable-track {
+  height:var(--seek-height); border-radius:8px;
+  background:linear-gradient(to right,var(--copper) 0 var(--seek-percent,0%),var(--line) var(--seek-percent,0%) 100%);
+}
+:root[data-theme^="roseStudio"] #now-seek::-webkit-slider-thumb {
+  appearance:none; width:13px; height:13px; margin-top:calc((var(--seek-height) - 13px) / 2);
+  border-radius:50%; background:var(--copper); opacity:0;
+}
+:root[data-theme^="roseStudio"] #now-seek:is(:hover,:focus-visible,:active)::-webkit-slider-thumb { opacity:1; }

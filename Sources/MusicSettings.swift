@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum MusicTheme: String, CaseIterable, Identifiable {
-    case copper, classic, classicDark, classicOLED, video, plexify, liquidGlass
+    case copper, classic, classicDark, classicOLED, video, plexify, liquidGlass, roseStudio, roseStudioDark
     #if os(macOS)
     case graphite
     #endif
@@ -16,13 +16,16 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         case .video: "iPod Video"
         case .plexify: "Plexify"
         case .liquidGlass: "Liquid Glass"
+        case .roseStudio: "Rose Studio Light"
+        case .roseStudioDark: "Rose Studio Dark"
         #if os(macOS)
         case .graphite: "Graphite Studio"
         #endif
         }
     }
-    var scheme: ColorScheme { self == .classic ? .light : .dark }
-    var usesLiquidGlass: Bool { self == .liquidGlass || self == .classicDark || self == .classicOLED }
+    var isRoseStudio: Bool { self == .roseStudio || self == .roseStudioDark }
+    var scheme: ColorScheme { self == .classic || self == .roseStudio ? .light : .dark }
+    var usesLiquidGlass: Bool { self == .liquidGlass || self == .classicDark || self == .classicOLED || isRoseStudio }
     var keepsBlackCanvas: Bool { self == .classicOLED }
     var supportsGlassWallpaper: Bool { usesLiquidGlass && !keepsBlackCanvas }
 
@@ -35,6 +38,8 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         case .video: Color(red: 0.56, green: 0.80, blue: 1)
         case .plexify: Color(red: 0.48, green: 0.90, blue: 0.88)
         case .liquidGlass: Color(red: 0.67, green: 0.89, blue: 1)
+        case .roseStudio: Color(red: 0.62, green: 0.13, blue: 0.34)
+        case .roseStudioDark: Color(red: 1.0, green: 0.60, blue: 0.74)
         #if os(macOS)
         case .graphite: Color(red: 1, green: 0.75, blue: 0.45)
         #endif
@@ -49,6 +54,8 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         case .video: Color(red: 0.09, green: 0.12, blue: 0.18)
         case .plexify: Color(red: 0.075, green: 0.125, blue: 0.155)
         case .liquidGlass: Color(red: 0.12, green: 0.17, blue: 0.28)
+        case .roseStudio: Color(red: 0.99, green: 0.95, blue: 0.96)
+        case .roseStudioDark: Color(red: 0.16, green: 0.11, blue: 0.17)
         #if os(macOS)
         case .graphite: Color(red: 0.09, green: 0.095, blue: 0.103)
         #endif
@@ -67,6 +74,11 @@ enum MusicTheme: String, CaseIterable, Identifiable {
                                center: .bottomLeading, startRadius: 12, endRadius: 580)
                 RadialGradient(colors: [Color(red: 0.23, green: 0.53, blue: 0.90).opacity(0.25), .clear],
                                center: UnitPoint(x: 0.24, y: 0.16), startRadius: 16, endRadius: 390)
+            }
+        } else if isRoseStudio {
+            standardBackdrop.overlay {
+                RadialGradient(colors: [accent.opacity(scheme == .light ? 0.16 : 0.23), .clear],
+                               center: .bottomLeading, startRadius: 24, endRadius: 600)
             }
         } else {
             standardBackdrop
@@ -95,6 +107,8 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         case .video: end = Color(red: 0.025, green: 0.037, blue: 0.066)
         case .plexify: end = Color(red: 0.035, green: 0.057, blue: 0.078)
         case .liquidGlass: end = surface
+        case .roseStudio: end = Color(red: 0.95, green: 0.89, blue: 0.93)
+        case .roseStudioDark: end = Color(red: 0.08, green: 0.07, blue: 0.13)
         #if os(macOS)
         case .graphite: end = Color(red: 0.055, green: 0.059, blue: 0.068)
         #endif
@@ -201,8 +215,8 @@ private struct MusicGlassSurface: ViewModifier {
         let shape = RoundedRectangle(cornerRadius: radius)
         let color = tint.color(for: theme)
         let edgeColor = color ?? .white
-        let base = tint == .themeDefault || theme.keepsBlackCanvas ? theme.surface : Color(white: 0.12)
-        let edge = 0.38 + (1 - density) * 0.28
+        let base = tint == .themeDefault || theme.keepsBlackCanvas || theme.isRoseStudio ? theme.surface : Color(white: 0.12)
+        let edge = theme.isRoseStudio ? 0.23 : 0.38 + (1 - density) * 0.28
         let sheen = (theme.keepsBlackCanvas ? 0.045 : 0.12) * (1.2 - density * 0.45)
         content.background {
             ZStack {
@@ -210,6 +224,8 @@ private struct MusicGlassSurface: ViewModifier {
                     shape.fill(theme.keepsBlackCanvas ? Color(white: 0.075) : base)
                 } else if theme.keepsBlackCanvas {
                     shape.fill(.ultraThinMaterial).opacity(0.10 + density * 0.32)
+                } else if theme.isRoseStudio {
+                    shape.fill(.regularMaterial).opacity(0.38 + density * 0.52)
                 } else if #available(macOS 26, iOS 26, tvOS 26, *) {
                     let variant: Glass = density > 0.65 ? .regular : .clear
                     let material = color.map { variant.tint($0.opacity(0.04 + density * 0.13)) } ?? variant
@@ -381,7 +397,7 @@ struct MusicSettings: View {
                     Toggle("Artwork Colors", isOn: $artworkColors)
                         .help("Match the interface to the artwork for the current track.")
                     Toggle("Animate Artwork Colors", isOn: $animateArtworkColors)
-                        .disabled(!artworkColors || theme.keepsBlackCanvas)
+                        .disabled((!artworkColors && !theme.isRoseStudio) || theme.keepsBlackCanvas)
                         .help("Let the album colors drift slowly across the background.")
                     Picker("Mini-player", selection: $miniPlayerStyle) {
                         ForEach(MiniPlayerStyle.allCases) { style in

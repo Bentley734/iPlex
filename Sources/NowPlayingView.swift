@@ -31,8 +31,8 @@ struct NowPlayingView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let close: () -> Void
 
-    private var palette: ArtworkPalette? { artworkColors ? library.playingPalette : nil }
-    private var accent: Color { theme.accent(using: palette) }
+    private var palette: ArtworkPalette? { artworkColors || theme.isRoseStudio ? library.playingPalette : nil }
+    private var accent: Color { theme.accent(using: artworkColors ? palette : nil) }
     private var duration: Double { max(0, library.state.duration) }
     private var elapsed: Double { min(duration, max(0, library.state.elapsed)) }
 
@@ -62,6 +62,8 @@ struct NowPlayingView: View {
         }
         .background {
             theme.backdrop(using: palette)
+                .animation(theme.isRoseStudio && !reduceMotion ? .easeInOut(duration: 0.8) : nil,
+                           value: palette?.wash(in: theme.scheme))
                 .overlay {
                     if !theme.keepsBlackCanvas {
                         RadialGradient(colors: [accent.opacity(0.17), .clear], center: .topLeading,
@@ -84,7 +86,7 @@ struct NowPlayingView: View {
         }
         .tint(accent)
         .sheet(isPresented: $showingLyrics) {
-            NowPlayingLyrics(library: library).musicSheet(theme).preferredColorScheme(theme.scheme).tint(accent)
+            NowPlayingLyrics(library: library, theme: theme).musicSheet(theme).preferredColorScheme(theme.scheme).tint(accent)
         }
         .sheet(isPresented: $showingSignalPath) {
             signalPath.musicSheet(theme)
@@ -217,7 +219,9 @@ struct NowPlayingView: View {
         Color.primary.opacity(0.08)
             .overlay { artworkImage(album, fit: false) }
             .clipShape(.rect(cornerRadius: 19))
-            .shadow(color: .black.opacity(0.3), radius: 15, y: 7)
+            .shadow(color: (theme.isRoseStudio ? accent : .black).opacity(0.27), radius: 15, y: 7)
+            .scaleEffect(theme.isRoseStudio && !library.state.playing && !reduceMotion ? 0.94 : 1)
+            .animation(reduceMotion ? nil : .spring(response: 0.42, dampingFraction: 0.82), value: library.state.playing)
             .accessibilityHidden(true)
     }
 
@@ -299,7 +303,8 @@ struct NowPlayingView: View {
                 HStack {
                     Text(clock(elapsed))
                     Spacer()
-                    Text(clock(duration))
+                    Text(theme.isRoseStudio && duration > 0 ? "−" + clock(duration - elapsed) : clock(duration))
+                        .accessibilityLabel(theme.isRoseStudio ? "Time remaining" : "Track duration")
                 }
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
@@ -466,6 +471,7 @@ struct NowPlayingView: View {
 
 private struct NowPlayingLyrics: View {
     @ObservedObject var library: LibraryModel
+    let theme: MusicTheme
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var lines: [MusicLyricLine] = []
@@ -513,7 +519,7 @@ private struct NowPlayingLyrics: View {
                     .onChange(of: active, initial: true) { _, line in
                         if let line {
                             withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.24)) {
-                                scroll.scrollTo(line, anchor: .center)
+                                scroll.scrollTo(line, anchor: theme.isRoseStudio ? UnitPoint(x: 0.5, y: 0.34) : .center)
                             }
                         }
                     }
@@ -521,6 +527,9 @@ private struct NowPlayingLyrics: View {
             }
         }
         .padding(26)
+        .background {
+            if theme.isRoseStudio { theme.backdrop(using: library.playingPalette).opacity(0.7) }
+        }
         #if os(macOS)
         .frame(minWidth: 460, minHeight: 450)
         #endif
@@ -544,9 +553,16 @@ private struct NowPlayingLyrics: View {
 
     private func lyric(_ line: MusicLyricLine) -> some View {
         Text(line.text.isEmpty ? "♪" : line.text)
-            .font(.title2.weight(active == line.id ? .bold : .medium))
+            .font(theme.isRoseStudio ? .system(size: 29, weight: .semibold)
+                  : .title2.weight(active == line.id ? .bold : .medium))
             .foregroundStyle(active == nil || active == line.id ? .primary : .secondary)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.leading, theme.isRoseStudio ? 11 : 0)
+            .overlay(alignment: .leading) {
+                if theme.isRoseStudio && active == line.id {
+                    Capsule().fill(theme.accent).frame(width: 3)
+                }
+            }
     }
 }
 
@@ -568,6 +584,66 @@ struct LibraryQueueActions: View {
             }.disabled(!library.canEditPlaylists)
         }
     }
+}
+
+struct PlaylistTrackEditing: ViewModifier {
+    @ObservedObject var library: LibraryModel
+    let track: LiveTrack
+    @State private var dropTarget = false
+
+    @ViewBuilder func body(content: Content) -> some View {
+        if library.playlistTrackEditable(track) {
+            HStack(spacing: 8) {
+                #if !os(tvOS)
+                Image(systemName: "line.3.horizontal")
+                    .foregroundStyle(.secondary)
+                    .frame(width: 25, height: 32)
+                    .contentShape(Rectangle())
+                    .draggable(track.id.uuidString)
+                    .allowsHitTesting(!library.savingPlaylistTrack)
+                    .accessibilityHidden(true)
+                #endif
+                content.frame(maxWidth: .infinity, alignment: .leading)
+                Menu {
+                    if let index = library.tracks.firstIndex(where: { $0.id == track.id }) {
+                        if index > 0 {
+                            Button("Move Up", systemImage: "arrow.up") {
+                                move(by: -1)
+                            }
+                        }
+                        if index + 1 < library.tracks.count {
+                            Button("Move Down", systemImage: "arrow.down") {
+                                move(by: 1)
+                            }
+                        }
+                    }
+                    Button("Remove from Playlist", systemImage: "trash", role: .destructive) {
+                        library.changePlaylistTrack(track.id)
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                }
+                .accessibilityLabel("Playlist actions for " + track.title)
+                .disabled(library.savingPlaylistTrack || library.busy)
+            }
+            #if !os(tvOS)
+            .contentShape(Rectangle())
+            .background(dropTarget ? Color.accentColor.opacity(0.15) : .clear, in: RoundedRectangle(cornerRadius: 8))
+            .dropDestination(for: String.self) { values, _ in
+                guard let first = values.first, let source = UUID(uuidString: first) else { return false }
+                return library.changePlaylistTrack(source, to: track.id)
+            } isTargeted: { dropTarget = $0 }
+            #endif
+        } else {
+            content
+        }
+    }
+    private func move(by offset: Int) {
+        guard let index = library.tracks.firstIndex(where: { $0.id == track.id }),
+              library.tracks.indices.contains(index + offset) else { return }
+        library.changePlaylistTrack(track.id, to: library.tracks[index + offset].id)
+    }
+
 }
 
 struct PlexPlaylistChoice: Identifiable {

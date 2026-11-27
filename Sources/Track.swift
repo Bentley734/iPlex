@@ -11,11 +11,12 @@ struct LiveTrack {
     let album: String?
     let ratingCount: Int
     let plexID: String?
+    let playlistItemID: String?
     let format: MusicTrackFormat
 
     init(number: Int, title: String, duration: TimeInterval?, url: URL, artworkPath: String? = nil,
          artist: String? = nil, album: String? = nil, ratingCount: Int = 0, id: UUID = UUID(),
-         plexID: String? = nil, format: MusicTrackFormat = MusicTrackFormat()) {
+         plexID: String? = nil, playlistItemID: String? = nil, format: MusicTrackFormat = MusicTrackFormat()) {
         self.id = id
         self.number = number
         self.title = title
@@ -26,6 +27,7 @@ struct LiveTrack {
         self.album = album
         self.ratingCount = ratingCount
         self.plexID = plexID
+        self.playlistItemID = playlistItemID
         self.format = format
     }
 
