@@ -44,6 +44,7 @@ final class LibraryModel: ObservableObject {
     @Published private(set) var kind: MusicKind = .albums
     @Published private(set) var visibleKinds = MusicKind.allCases
     @Published private(set) var visibleVideoKinds = PlexVideoKind.allCases
+    @Published private var lastVideoSection: PlexVideoKind?
     @Published var query = ""
     @Published var playlistEdit: PlexPlaylistEdit?
     @Published private(set) var savingPlaylistTrack = false
@@ -54,6 +55,10 @@ final class LibraryModel: ObservableObject {
     private var operation: Task<Void, Never>?
     private var launchSnapshot: LibrarySnapshot?
     private static let snapshotKey = "LastMusicLibrary"
+    private static let musicSectionKey = "LastMusicSection"
+    private static let videoSectionKey = "LastVideoSection"
+
+    var videoSection: PlexVideoKind? { serverID.isEmpty ? nil : lastVideoSection }
 
     private struct LibrarySnapshot: Codable {
         var server: String
@@ -107,8 +112,16 @@ final class LibraryModel: ObservableObject {
                 kind = first
             }
         }
+        if let saved = defaults.string(forKey: Self.musicSectionKey).flatMap(MusicKind.init(rawValue:)),
+           visibleKinds.contains(saved) {
+            kind = saved
+        }
         if let saved = defaults.stringArray(forKey: "VisibleVideoSections") {
             visibleVideoKinds = PlexVideoKind.allCases.filter { saved.contains($0.rawValue) }
+        }
+        if let saved = defaults.string(forKey: Self.videoSectionKey).flatMap(PlexVideoKind.init(rawValue:)),
+           visibleVideoKinds.contains(saved) {
+            lastVideoSection = saved
         }
         serverID = service.rememberedServerID ?? ""
         if let saved = service.rememberedMusicSelection {
@@ -297,6 +310,7 @@ final class LibraryModel: ObservableObject {
             libraries = []
             serverID = ""
             libraryID = ""
+            selectVideoSection(nil)
             resetLibrary()
         } catch { message = error.localizedDescription }
     }
@@ -338,8 +352,15 @@ final class LibraryModel: ObservableObject {
         guard visibleKinds.contains(section) else { return }
         pendingCachedOpen = nil
         kind = section
+        UserDefaults.standard.set(section.rawValue, forKey: Self.musicSectionKey)
         if reconnecting { entries = launchSnapshot?.listings[kind] ?? [] }
         else { browse() }
+    }
+
+    func selectVideoSection(_ section: PlexVideoKind?) {
+        if let section, !visibleVideoKinds.contains(section) || serverID.isEmpty { return }
+        lastVideoSection = section
+        UserDefaults.standard.set(section?.rawValue, forKey: Self.videoSectionKey)
     }
 
     func setVisibility(_ section: MusicKind, visible: Bool) {
@@ -359,6 +380,7 @@ final class LibraryModel: ObservableObject {
         guard enabled != visibleVideoKinds else { return }
         visibleVideoKinds = enabled
         UserDefaults.standard.set(enabled.map(\.rawValue), forKey: "VisibleVideoSections")
+        if let lastVideoSection, !enabled.contains(lastVideoSection) { selectVideoSection(nil) }
     }
 
     func browse() {

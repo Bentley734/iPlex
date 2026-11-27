@@ -23,7 +23,6 @@ private struct MusicLibraryScreen: View {
     @ObservedObject var library: LibraryModel
     @MusicAppearance private var theme
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
-    @State private var videoSection: PlexVideoKind?
     @State private var showSettings = false
     @AppStorage(LibraryLayout.preferenceKey) private var libraryLayout = LibraryLayout.grid
     @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
@@ -35,6 +34,7 @@ private struct MusicLibraryScreen: View {
 
     private var palette: ArtworkPalette? { artworkColors ? library.playingPalette : nil }
     private var accent: Color { theme.accent(using: palette) }
+    private var videoSection: PlexVideoKind? { library.videoSection }
 
     private var columnWidth: CGFloat {
         #if os(tvOS)
@@ -75,9 +75,6 @@ private struct MusicLibraryScreen: View {
         .sheet(isPresented: $showSettings) { MusicSettings(library: library) }
         .sheet(item: $library.playlistEdit) { edit in PlexPlaylistEditor(library: library, edit: edit) }
         .sheet(isPresented: $showAppIcons) { MusicAppIconPicker() }
-        .onChange(of: library.visibleVideoKinds) { _, enabled in
-            if let videoSection, !enabled.contains(videoSection) { self.videoSection = nil }
-        }
         .onChange(of: library.query) { _, _ in
             search?.cancel()
             search = Task {
@@ -114,16 +111,16 @@ private struct MusicLibraryScreen: View {
             #endif
             if !library.serverID.isEmpty && !library.visibleVideoKinds.isEmpty {
                 HStack {
-                    Button("Music", systemImage: "music.note") { videoSection = nil }
-                        .tint(videoSection == nil ? accent : .primary)
-                        .accessibilityAddTraits(videoSection == nil ? [.isSelected] : [])
-                        .glassHover()
                     ForEach(library.visibleVideoKinds) { kind in
-                        Button(kind.title, systemImage: kind.icon) { videoSection = kind }
+                        Button(kind.title, systemImage: kind.icon) { library.selectVideoSection(kind) }
                             .tint(videoSection == kind ? accent : .primary)
                             .accessibilityAddTraits(videoSection == kind ? [.isSelected] : [])
                             .glassHover()
                     }
+                    Button("Music", systemImage: "music.note") { library.selectVideoSection(nil) }
+                        .tint(videoSection == nil ? accent : .primary)
+                        .accessibilityAddTraits(videoSection == nil ? [.isSelected] : [])
+                        .glassHover()
                     Spacer()
                 }
                 .buttonStyle(.bordered)

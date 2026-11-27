@@ -6,6 +6,7 @@
   const sectionNames = ['albums', 'artists', 'genres', 'tracks', 'playlists'];
   const sectionLabel = name => name[0].toUpperCase() + name.slice(1);
   const sectionPreference = 'musicroom-visible-sections';
+  const lastSectionPreference = 'musicroom-last-music-section';
   let visibleSections = sectionNames;
   let server = '', library = '', kind = 'albums', group = null, album = null, playing = null;
   let tracks = [], entries = [], request = 0, playRequest = 0, offset = 0, busy = false, timer;
@@ -1315,7 +1316,10 @@
     get('cover-cache-status').textContent = state.message;
   };
   get('cache-covers').onclick = () => host({action:caching ? 'stopCoverCache' : 'cacheCovers', ...window.plexVideoCacheSelection()});
-  get('disconnect').onclick = () => host({action:'disconnect'});
+  get('disconnect').onclick = () => {
+    window.plexVideoExit();
+    host({action:'disconnect'});
+  };
   get('cancel').onclick = () => host({action:'cancel'});
   get('server').onchange = event => { if (event.target.value) host({action:'selectServer', server:event.target.value}); };
   get('quick-library').onchange = get('library').onchange = event => { if (event.target.value) host({action:'selectLibrary', library:event.target.value}); };
@@ -1347,6 +1351,8 @@
   }
   setVisibleSections(sectionNames);
   try {
+    const last = localStorage.getItem(lastSectionPreference);
+    if (sectionNames.includes(last)) kind = last;
     const saved = JSON.parse(localStorage.getItem(sectionPreference));
     if (Array.isArray(saved)) setVisibleSections(saved);
   } catch {}
@@ -1388,6 +1394,7 @@
     clearTimeout(timer);
     queuedOpen = null;
     kind = section;
+    try { localStorage.setItem(lastSectionPreference, section); } catch {}
     group = null;
     if (launchPreview) {
       renderLaunchPreview();

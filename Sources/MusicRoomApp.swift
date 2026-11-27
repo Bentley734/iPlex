@@ -64,7 +64,6 @@ private struct MusicWindow: View {
     @AppStorage(LibraryLayout.preferenceKey) private var libraryLayout = LibraryLayout.grid
     @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
     @AppStorage("LibrarySidebarWidth") private var sidebarPreference = 0
-    @State private var videoSection: PlexVideoKind?
     @GestureState private var sidebarDrag: CGFloat = 0
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @State private var showSettings = false
@@ -73,6 +72,7 @@ private struct MusicWindow: View {
     @State private var miniPlayer = MacMiniPlayer()
     private var palette: ArtworkPalette? { artworkColors ? model.playingPalette : nil }
     private var copper: Color { theme.accent(using: palette) }
+    private var videoSection: PlexVideoKind? { model.videoSection }
 
     var body: some View {
         ZStack {
@@ -93,9 +93,6 @@ private struct MusicWindow: View {
         .sheet(item: $model.playlistEdit) { edit in PlexPlaylistEditor(library: model, edit: edit) }
         .foregroundStyle(theme.text)
         .tint(copper)
-        .onChange(of: model.visibleVideoKinds) { _, enabled in
-            if let videoSection, !enabled.contains(videoSection) { self.videoSection = nil }
-        }
         .onChange(of: model.query) { _, _ in
             searchTask?.cancel()
             searchTask = Task {
@@ -180,8 +177,10 @@ private struct MusicWindow: View {
                     SectionHeaderBrand(section: HeaderBrandSection(video: videoSection),
                                        theme: theme, width: min(155, width - padding * 2), height: 46)
                     VStack(alignment: .leading, spacing: 6) {
-                        sidebarButton("Music", icon: "music.note", selected: videoSection == nil) { videoSection = nil }
                         ForEach(model.visibleVideoKinds) { videoTab($0) }
+                        sidebarButton("Music", icon: "music.note", selected: videoSection == nil) {
+                            model.selectVideoSection(nil)
+                        }
                     }
                     if videoSection == nil {
                         VStack(alignment: .leading, spacing: 4) {
@@ -241,7 +240,7 @@ private struct MusicWindow: View {
 
     private func videoTab(_ kind: PlexVideoKind) -> some View {
         sidebarButton(kind.title, icon: kind.icon, selected: videoSection == kind) {
-            videoSection = kind
+            model.selectVideoSection(kind)
         }.disabled(model.serverID.isEmpty)
     }
 

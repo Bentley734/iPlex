@@ -50,10 +50,14 @@
   const titles = {movie:'Movies', show:'TV Shows'};
   const sectionToggles = new Map([['movie', get('show-movies-section')], ['show', get('show-tv-section')]]);
   const sectionPreference = 'musicroom-visible-video-sections';
+  const lastSectionPreference = 'musicroom-last-video-section';
   let visibleSections = [...tabs.keys()];
+  let preferredKind = '';
   try {
     const saved = JSON.parse(localStorage.getItem(sectionPreference));
     if (Array.isArray(saved)) visibleSections = visibleSections.filter(section => saved.includes(section));
+    const last = localStorage.getItem(lastSectionPreference);
+    if (visibleSections.includes(last)) preferredKind = last;
   } catch {}
   const validSource = /^https:\/\/media\.musicroom\.invalid\/video\/[a-f0-9]{32}$/;
   let state, kind = '', library = '', libraryReady = false, pending = 0, parent = [], next = null, busy = false, timer;
@@ -247,7 +251,15 @@
   window.plexVideoState = value => {
     const previous = state;
     state = value;
-    if (kind && !videoServer()) window.plexVideoExit();
+    if (!videoServer()) {
+      showMusic();
+      syncTabs();
+      return;
+    }
+    if (!kind && preferredKind) {
+      openSection(preferredKind);
+      return;
+    }
     syncTabs();
     if (!kind) return;
     const changedServer = videoServer(previous || {}) !== videoServer();
@@ -273,7 +285,7 @@
     syncTabs();
   }
 
-  window.plexVideoExit = () => {
+  function showMusic() {
     if (!kind) return;
     kind = '';
     if (matchDialog.open) matchDialog.close();
@@ -285,6 +297,19 @@
     else host({action:'videoClose'});
     present();
     window.renderMusicPage?.();
+  }
+
+  function rememberSection(section) {
+    preferredKind = section;
+    try {
+      if (section) localStorage.setItem(lastSectionPreference, section);
+      else localStorage.removeItem(lastSectionPreference);
+    } catch {}
+  }
+
+  window.plexVideoExit = () => {
+    rememberSection('');
+    showMusic();
   };
 
   get('music').onclick = () => window.plexVideoExit();
@@ -292,20 +317,25 @@
   for (const input of sectionToggles.values()) input.onchange = () => {
     visibleSections = [...sectionToggles].filter(([, toggle]) => toggle.checked).map(([type]) => type);
     try { localStorage.setItem(sectionPreference, JSON.stringify(visibleSections)); } catch {}
-    if (kind && !visibleSections.includes(kind)) window.plexVideoExit();
+    if (preferredKind && !visibleSections.includes(preferredKind)) window.plexVideoExit();
     else syncTabs();
   };
   syncTabs();
 
   for (const [type, tab] of tabs) tab.onclick = () => {
     if (!visibleSections.includes(type) || !videoServer() || kind === type) return;
+    rememberSection(type);
+    openSection(type);
+  };
+
+  function openSection(type) {
     kind = type;
     watchRecords.clear();
     parent = [];
     search.value = '';
     present();
     configure();
-  };
+  }
 
   function browse(offset = 0) {
     clearTimeout(timer);
