@@ -182,6 +182,7 @@ struct PlexVideoBrowser: View {
                                         Image(systemName: watchedItems.contains(item.id) ? "checkmark.circle.fill" : "play.circle")
                                     }.frame(maxWidth: .infinity, alignment: .leading)
                                 }.buttonStyle(.bordered)
+                                    .glassHover(lift: true)
                                     .contextMenu { watchActions(item) }
                             }
                         }
@@ -201,7 +202,10 @@ struct PlexVideoBrowser: View {
                                             }
                                         }
                                     }
-                                }.disabled(!ready).contextMenu {
+                                }
+                                .glassHover(lift: true)
+                                .disabled(!ready)
+                                .contextMenu {
                                     if ready && item.type == "movie" { watchActions(item) }
                                     if ready && item.type == kind.rawValue {
                                         Button("Fix Match", systemImage: "magnifyingglass") { matching = item }
@@ -239,6 +243,8 @@ struct PlexVideoBrowser: View {
                     }
                 }
             }
+            .pageTransition(on: [selection, parent?.id ?? ""])
+            .clipped()
             #if os(macOS)
             .padding(.horizontal, 28)
             #endif
@@ -324,7 +330,8 @@ struct PlexVideoBrowser: View {
                                 Text("Resume at " + videoTime(record.seconds))
                                     .font(.caption).foregroundStyle(.secondary)
                             }.frame(width: 150, alignment: .leading)
-                        }.disabled(!ready).contextMenu { if ready { watchActions(record.item) } }
+                        }.glassHover(lift: true)
+                        .disabled(!ready).contextMenu { if ready { watchActions(record.item) } }
                     }
                 }
             }
@@ -598,6 +605,7 @@ private struct PlexVideoPlayback: View {
     @Environment(\.dismiss) private var dismiss
     @MusicAppearance private var appearance
     @State private var player = AVPlayer()
+    @AppStorage(VideoSubtitleMode.preferenceKey) private var subtitleMode = VideoSubtitleMode.off
     @State private var relay: PlexVideoManifest?
     @State private var failure: String?
     @State private var mode = ""
@@ -688,7 +696,7 @@ private struct PlexVideoPlayback: View {
             } else if pending {
                 ProgressView("Preparing video…").frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let native {
-                NativeVideoPlayer(url: native, startAt: resumeAt.seconds, progress: saveProgress) { seconds in
+                NativeVideoPlayer(url: native, startAt: resumeAt.seconds, subtitleMode: subtitleMode, progress: saveProgress) { seconds in
                     resumeAt = CMTime(seconds: seconds >= 5 ? seconds : lastSaved, preferredTimescale: 1_000)
                     forceTranscode = true
                 }
@@ -880,7 +888,8 @@ private struct PlexVideoPlayback: View {
             let resolved: PlexVideoSource
             if let source { resolved = source }
             else {
-                resolved = try await service.videoSource(server: server, section: section, item: item)
+                resolved = try await service.videoSource(server: server, section: section, item: item,
+                                                         subtitleMode: subtitleMode)
                 try Task.checkCancellation()
                 source = resolved
             }
@@ -941,6 +950,11 @@ private struct PlexVideoPlayback: View {
                 guard !Task.isCancelled, playback === player.currentItem else { return }
                 if status == .failed { playbackFailed(); return }
                 if status == .readyToPlay {
+                    if subtitleMode == .off, !forceTranscode, mode == "Direct Play",
+                       let group = try? await playback.asset.loadMediaSelectionGroup(for: .legible) {
+                        guard !Task.isCancelled, playback === player.currentItem else { return }
+                        playback.select(nil, in: group)
+                    }
                     if resumeAt.isNumeric, resumeAt.seconds > 0 {
                         let position = resumeAt
                         resumeAt = .zero

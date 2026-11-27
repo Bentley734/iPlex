@@ -14,6 +14,24 @@
   const fullscreen = get('video-fullscreen');
   const pip = get('video-pip');
   const restore = get('video-restore');
+  const subtitleDefault = get('subtitle-default');
+  let subtitleMode = 'off';
+  const initializedSubtitleTracks = new WeakSet();
+  try {
+    if (localStorage.getItem('musicroom-video-subtitles') === 'automatic') subtitleDefault.value = 'automatic';
+  } catch {}
+  subtitleDefault.onchange = () => {
+    try { localStorage.setItem('musicroom-video-subtitles', subtitleDefault.value); } catch {}
+  };
+
+  function initializeSubtitle(track) {
+    if (subtitleMode !== 'off' || !['subtitles', 'captions'].includes(track.kind) ||
+        initializedSubtitleTracks.has(track)) return;
+    initializedSubtitleTracks.add(track);
+    track.mode = 'disabled';
+  }
+
+  video.textTracks.addEventListener('addtrack', event => initializeSubtitle(event.track));
   const mode = get('video-mode');
   const error = get('video-error');
   const watchToggle = get('video-watch-toggle');
@@ -265,6 +283,7 @@
     if (dialog.open) dialog.close();
     else host({action:'videoClose'});
     present();
+    window.renderMusicPage?.();
   };
 
   get('music').onclick = () => window.plexVideoExit();
@@ -298,6 +317,7 @@
       rendered.clear();
     }
     const current = parent.at(-1);
+    window.interfaceMotion.show(browser, ['video', kind, library, current?.key]);
     get('video-title').textContent = current?.title || titles[kind];
     search.placeholder = 'Search ' + titles[kind].toLowerCase();
     search.setAttribute('aria-label', search.placeholder);
@@ -446,13 +466,28 @@
     host({action:'videoDisplay', mode});
   }
 
+  let hideExitTimer;
+  function revealFullscreenExit() {
+    clearTimeout(hideExitTimer);
+    restore.hidden = false;
+    hideExitTimer = setTimeout(() => { restore.hidden = true; }, 3000);
+  }
+
+  dialog.addEventListener('pointermove', event => {
+    if (dialog.dataset.display === 'fullscreen' && event.pointerType !== 'touch') revealFullscreenExit();
+  });
+
   window.plexVideoDisplay = display => {
     if (!dialog.open) return;
     if (display === 'inline') delete dialog.dataset.display;
     else dialog.dataset.display = display;
     video.controls = display !== 'floating';
+    clearTimeout(hideExitTimer);
     restore.hidden = display !== 'fullscreen';
-    if (display === 'fullscreen') restore.focus();
+    if (display === 'fullscreen') {
+      revealFullscreenExit();
+      video.focus();
+    }
     else if (display === 'floating') video.focus();
     else if (!fullscreen.disabled) fullscreen.focus();
   };
@@ -476,6 +511,7 @@
 
   function requestPlayback() {
     clearNext();
+    subtitleMode = subtitleDefault.value === 'automatic' ? 'automatic' : 'off';
     source = null;
     candidates = [];
     failed = false;
@@ -498,7 +534,7 @@
     video.removeAttribute('src');
     video.load();
     host({action:'videoPlay', ...activeScope, id:++pending, item:activeItem.key,
-      type:activeItem.type, version:selectedVersion});
+      type:activeItem.type, version:selectedVersion, subtitles:subtitleMode});
   }
 
   function onEnded() {
@@ -576,7 +612,7 @@
       alternate.hidden = true;
       window.windowsPlayback.action({action:'pause'});
       host({action:'videoNative', id:pending, url:candidate.url, title:get('video-playing-title').textContent, resume:lastSaved,
-        advance:Boolean(source.canAdvance), versions:(source.versions || []).length > 1});
+        advance:Boolean(source.canAdvance), versions:(source.versions || []).length > 1, subtitles:subtitleMode});
       return;
     }
     nativeActive = false;
@@ -642,6 +678,8 @@
     }
   };
   video.addEventListener('loadedmetadata', () => {
+    for (let index = 0; index < video.textTracks.length; index++)
+      initializeSubtitle(video.textTracks[index]);
     if (awaitingSeek && resumeAt < video.duration) video.currentTime = resumeAt;
     else awaitingSeek = false;
   });
@@ -666,6 +704,7 @@
     if (!nativeActive && !awaitingSeek && !failed) saveWatch(video.currentTime);
     clearNext();
     delete dialog.dataset.display;
+    clearTimeout(hideExitTimer);
     video.controls = true;
     restore.hidden = true;
     setDisplayControls(false);

@@ -2319,7 +2319,8 @@ extension PlexService {
         }
     }
 
-    func videoSource(server: String, section: String, item: PlexVideoItem) async throws -> PlexVideoSource {
+    func videoSource(server: String, section: String, item: PlexVideoItem,
+                     subtitleMode: VideoSubtitleMode = .off) async throws -> PlexVideoSource {
         try await serverOperation(server: server) { record, base, operation in
             let path = "/library/metadata/\(item.id)"
             let request = try self.serverRequest(base: base, path: path, query: [], token: record.token)
@@ -2327,7 +2328,8 @@ extension PlexService {
                                                         section: section, item: item, base: base, token: record.token)
             let params = ["path": path, "protocol": "hls", "directPlay": "0", "directStream": "0",
                           "videoQuality": "100",
-                          "videoResolution": "1920x1080", "maxVideoBitrate": "20000", "subtitles": "burn",
+                          "videoResolution": "1920x1080", "maxVideoBitrate": "20000",
+                          "subtitles": subtitleMode == .off ? "none" : "burn",
                           "X-Plex-Client-Identifier": self.clientIdentifier, "X-Plex-Token": record.token,
                           "X-Plex-Product": "iPlex", "X-Plex-Platform": "iOS", "X-Plex-Client-Profile-Name": "iOS",
                           "X-Plex-Client-Profile-Extra": PlexVideoManifest.compatibilityProfile]

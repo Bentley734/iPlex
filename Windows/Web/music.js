@@ -80,7 +80,6 @@
   const layout = document.documentElement;
   const separator = get('sidebar-resize');
   const sidebarWidth = () => Math.round(separator.getBoundingClientRect().left - document.body.getBoundingClientRect().left);
-  const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
   let sidebarDrag = null;
   let savedSidebarWidth = 0;
 
@@ -503,7 +502,15 @@
     get('grid').replaceChildren();
     render();
   }
+  function renderMusicPage() {
+    if (layout.hasAttribute('data-video-open')) return;
+    const panel = get('browser');
+    if (panel.hidden) window.interfaceMotion.show(get('welcome'), ['welcome']);
+    else window.interfaceMotion.show(panel, ['music', launchPreview?.library || library, kind, group?.id, album?.id]);
+  }
+  window.renderMusicPage = renderMusicPage;
   function render() {
+    renderMusicPage();
     get('title').textContent = album?.title || group?.title || sectionLabel(kind);
     get('new-playlist').hidden = kind !== 'playlists' || Boolean(album || group);
     get('new-playlist').disabled = Boolean(launchPreview) || !library;
@@ -664,6 +671,7 @@
     launchPreview = state.preview || null;
     get('browser').hidden = !state.libraryId && !launchPreview;
     get('welcome').hidden = !get('browser').hidden;
+    if (get('browser').hidden) renderMusicPage();
     for (const tab of sectionNames) get(tab).disabled = get('browser').hidden;
     get('search').disabled = Boolean(launchPreview);
     get('retry-library').hidden = !launchPreview || launchPreview.waiting;
@@ -1035,20 +1043,19 @@
   let closingNowPlaying = false;
   let nowPlayingCloseTimer;
   function animateNowPlaying(closing) {
-    const current = getComputedStyle(nowPlaying);
-    const open = reduceMotion.matches ? {opacity:current.opacity} : {opacity:current.opacity, transform:current.transform};
-    const closed = reduceMotion.matches ? {opacity:0} : {opacity:0, transform:'scale(0.92)'};
+    const animation = window.interfaceMotion.play(nowPlaying, {closing, expanded:true});
     nowPlayingAnimation?.cancel();
-    nowPlayingAnimation = nowPlaying.animate(closing ? [open, closed] : [closed, open], {
-      duration:reduceMotion.matches ? 150 : closing ? 230 : 360,
-      easing:closing ? 'ease-in' : 'cubic-bezier(.16,1,.3,1)', fill:closing ? 'forwards' : 'none'
-    });
+    nowPlayingAnimation = animation;
     return nowPlayingAnimation;
   }
   function dismissNowPlaying() {
     if (closingNowPlaying || !nowPlaying.open) return;
     closingNowPlaying = true;
     const animation = animateNowPlaying(true);
+    if (!animation) {
+      nowPlaying.close();
+      return;
+    }
     const finish = () => {
       if (nowPlayingAnimation !== animation) return;
       clearTimeout(nowPlayingCloseTimer);

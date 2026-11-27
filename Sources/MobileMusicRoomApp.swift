@@ -87,6 +87,11 @@ private struct MusicLibraryScreen: View {
         }
     }
 
+    private var browseRoute: [String] {
+        if let videoSection { return [videoSection.rawValue] }
+        return ["music", library.libraryID, library.kind.rawValue, library.selectedGroup?.id ?? "", library.selectedDetail?.id ?? ""]
+    }
+
     private var libraryScreen: some View {
         VStack(spacing: 0) {
             HStack {
@@ -94,8 +99,10 @@ private struct MusicLibraryScreen: View {
                 Spacer()
                 Button { showAppIcons = true } label: { Image(systemName: "app.dashed") }
                     .accessibilityLabel("App Icon")
+                    .glassHover()
                 Button { showSettings = true } label: { Image(systemName: "gearshape") }
                     .accessibilityLabel("Settings")
+                    .glassHover()
 
             }
             .padding(.horizontal, 20)
@@ -109,10 +116,12 @@ private struct MusicLibraryScreen: View {
                     Button("Music", systemImage: "music.note") { videoSection = nil }
                         .tint(videoSection == nil ? accent : .primary)
                         .accessibilityAddTraits(videoSection == nil ? [.isSelected] : [])
+                        .glassHover()
                     ForEach(library.visibleVideoKinds) { kind in
                         Button(kind.title, systemImage: kind.icon) { videoSection = kind }
                             .tint(videoSection == kind ? accent : .primary)
                             .accessibilityAddTraits(videoSection == kind ? [.isSelected] : [])
+                            .glassHover()
                     }
                     Spacer()
                 }
@@ -122,58 +131,62 @@ private struct MusicLibraryScreen: View {
                 .focusSection()
                 #endif
             }
-            if let videoSection, !library.serverID.isEmpty {
-                PlexVideoBrowser(kind: videoSection, server: library.serverID, service: library.service,
-                                 serverReady: library.videoServerReady, connectionError: library.busy ? nil : library.message,
-                                 retryConnection: library.retryLibrary, pauseMusic: library.player.pause)
-                    .id(library.serverID + videoSection.rawValue)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .musicGlass(theme, radius: 22)
-                    .padding(.horizontal, 12)
-            } else if library.libraryID.isEmpty {
-                VStack {
-                    if !library.libraries.isEmpty { musicBrowseControls.padding(14) }
-                    connection.frame(maxWidth: .infinity, maxHeight: .infinity)
-                }
-                    .musicGlass(theme, radius: 22)
-                    .padding(.horizontal, 12)
-            } else {
-                browser
-                    .musicGlass(theme, radius: 22)
-                    .padding(.horizontal, 12)
-                if let album = library.playingAlbum {
-                    HStack(spacing: 8) {
-                        Button { showPlayer = true } label: {
-                            HStack(spacing: 14) {
-                                Group {
-                                    if let image = library.playingArtwork {
-                                        Image(uiImage: image).resizable().scaledToFill()
-                                    } else {
-                                        MusicArtwork(item: album, library: library)
-                                    }
-                                }
-                                .frame(width: 43, height: 43)
-                                .clipShape(.rect(cornerRadius: 7))
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(library.state.title.isEmpty ? album.title : library.state.title).font(.headline)
-                                    Text([library.currentTrack?.artist ?? album.artist, library.currentTrack?.album ?? album.title]
-                                        .filter { !$0.isEmpty }.joined(separator: " · "))
-                                        .font(.caption).foregroundStyle(.secondary)
-                                }.lineLimit(1)
-                                Spacer()
-                                Image(systemName: "chevron.up").accessibilityHidden(true)
-                            }.padding(.horizontal, 14).padding(.vertical, 8)
-                        }
-                        .accessibilityLabel("Open Now Playing")
-                        .buttonStyle(.bordered)
-                        .musicGlass(theme, radius: 20, interactive: true)
-                        Button("Mini-player", systemImage: "ipod") { showMiniPlayer = true }
-                            .labelStyle(.iconOnly)
-                            .buttonStyle(.bordered)
+            VStack(spacing: 0) {
+                if let videoSection, !library.serverID.isEmpty {
+                    PlexVideoBrowser(kind: videoSection, server: library.serverID, service: library.service,
+                                     serverReady: library.videoServerReady, connectionError: library.busy ? nil : library.message,
+                                     retryConnection: library.retryLibrary, pauseMusic: library.player.pause)
+                        .id(library.serverID + videoSection.rawValue)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .musicGlass(theme, radius: 22)
+                        .padding(.horizontal, 12)
+                } else if library.libraryID.isEmpty {
+                    VStack {
+                        if !library.libraries.isEmpty { musicBrowseControls.padding(14) }
+                        connection.frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                    .padding(.horizontal, 16)
+                        .musicGlass(theme, radius: 22)
+                        .padding(.horizontal, 12)
+                } else {
+                    browser
+                        .musicGlass(theme, radius: 22)
+                        .padding(.horizontal, 12)
+                    if let album = library.playingAlbum {
+                        HStack(spacing: 8) {
+                            Button { showPlayer = true } label: {
+                                HStack(spacing: 14) {
+                                    Group {
+                                        if let image = library.playingArtwork {
+                                            Image(uiImage: image).resizable().scaledToFill()
+                                        } else {
+                                            MusicArtwork(item: album, library: library)
+                                        }
+                                    }
+                                    .frame(width: 43, height: 43)
+                                    .clipShape(.rect(cornerRadius: 7))
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(library.state.title.isEmpty ? album.title : library.state.title).font(.headline)
+                                        Text([library.currentTrack?.artist ?? album.artist, library.currentTrack?.album ?? album.title]
+                                            .filter { !$0.isEmpty }.joined(separator: " · "))
+                                            .font(.caption).foregroundStyle(.secondary)
+                                    }.lineLimit(1)
+                                    Spacer()
+                                    Image(systemName: "chevron.up").accessibilityHidden(true)
+                                }.padding(.horizontal, 14).padding(.vertical, 8)
+                            }
+                            .accessibilityLabel("Open Now Playing")
+                            .buttonStyle(.bordered)
+                            .musicGlass(theme, radius: 20, interactive: true)
+                            Button("Mini-player", systemImage: "ipod") { showMiniPlayer = true }
+                                .labelStyle(.iconOnly)
+                                .buttonStyle(.bordered)
+                        }
+                        .padding(.horizontal, 16)
+                    }
                 }
             }
+            .pageTransition(on: browseRoute)
+            .clipped()
         }
         .background(theme.backdrop(using: palette).ignoresSafeArea())
     }
@@ -283,6 +296,7 @@ private struct MusicLibraryScreen: View {
                                 #else
                                 .buttonStyle(.plain)
                                 #endif
+                                .glassHover(lift: !trackList)
                                 .contextMenu {
                                     if !entry.kind.isGroup { LibraryQueueActions(library: library, entry: entry) }
                                     PlexPinButton(library: library, entry: entry)

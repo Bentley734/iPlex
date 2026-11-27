@@ -174,7 +174,8 @@ namespace MusicRoom
                 if (Double.IsNaN(resume) || resume < 0 || resume > 2592000) resume = 0;
                 bool advance = Object.Equals(request.ContainsKey("advance") ? request["advance"] : null, true);
                 bool versions = Object.Equals(request.ContainsKey("versions") ? request["versions"] : null, true);
-                nativeVideo = new NativeVideoWindow(url, title, resume, advance, versions, (result, seconds) => {
+                bool automaticSubtitles = WindowsMediaService.Str(request, "subtitles") == "automatic";
+                nativeVideo = new NativeVideoWindow(url, title, resume, advance, versions, automaticSubtitles, (result, seconds) => {
                     if (result != "progress" && (result != "ended" || advance)) nativeVideo = null;
                     Emit("plexNativeVideo", new { id, result, seconds });
                 });

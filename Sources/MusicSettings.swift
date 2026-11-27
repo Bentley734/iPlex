@@ -228,6 +228,7 @@ private struct MusicGlassSurface: ViewModifier {
 extension View {
     func musicGlass(_ theme: MusicTheme, radius: CGFloat, interactive: Bool = false) -> some View {
         modifier(MusicGlassSurface(theme: theme, radius: radius, interactive: interactive))
+            .glassHover(radius: radius, when: interactive)
     }
 
     func musicSheet(_ theme: MusicTheme) -> some View {
@@ -297,6 +298,14 @@ enum LibraryArtworkSize: String, CaseIterable, Identifiable {
     }
 }
 
+enum VideoSubtitleMode: String, CaseIterable, Identifiable {
+    static let preferenceKey = "VideoSubtitleMode"
+    case off, automatic
+
+    var id: Self { self }
+    var label: String { self == .off ? "Off" : "Automatic" }
+}
+
 struct MusicSettings: View {
     @ObservedObject var library: LibraryModel
     @MusicAppearance private var theme
@@ -304,6 +313,10 @@ struct MusicSettings: View {
     @AppStorage(LiquidGlassColor.accentKey) private var accentColor = ""
     @AppStorage(LiquidGlassTint.preferenceKey) private var liquidTint = LiquidGlassTint.themeDefault
     @AppStorage(LiquidGlassAppearance.transparencyKey) private var glassTransparency = LiquidGlassAppearance.defaultTransparency
+    @AppStorage(PageTransitionStyle.preferenceKey) private var pageTransitionStyle = PageTransitionStyle.zoom
+    #if !os(tvOS)
+    @AppStorage(glassHoverPreferenceKey) private var glassHoverEffects = true
+    #endif
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @AppStorage(ArtworkColorWash.motionPreference) private var animateArtworkColors = true
     @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
@@ -312,6 +325,7 @@ struct MusicSettings: View {
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @AppStorage(LibraryLayout.preferenceKey) private var libraryLayout = LibraryLayout.grid
     @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
+    @AppStorage(VideoSubtitleMode.preferenceKey) private var subtitleMode = VideoSubtitleMode.off
     @AppStorage(LibraryPageSize.preferenceKey) private var pageSize = LibraryPageSize.standard
     @Environment(\.dismiss) private var dismiss
     #if os(macOS)
@@ -349,6 +363,12 @@ struct MusicSettings: View {
                         }
                     }
                     GlassWallpaperSettings()
+                    Picker("Page Transition", selection: $pageTransitionStyle) {
+                        ForEach(PageTransitionStyle.allCases) { effect in Text(effect.label).tag(effect) }
+                    }
+                    #if !os(tvOS)
+                    Toggle("Liquid Glass Hover Effects", isOn: $glassHoverEffects)
+                    #endif
                     Toggle("Artwork Colors", isOn: $artworkColors)
                         .help("Match the interface to the artwork for the current track.")
                     Toggle("Animate Artwork Colors", isOn: $animateArtworkColors)
@@ -418,6 +438,15 @@ struct MusicSettings: View {
                                 set: { library.setVisibility(kind, visible: $0) }
                             ))
                         }
+                    }
+                    Divider()
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Subtitles").font(.headline)
+                        Picker("Default Subtitles", selection: $subtitleMode) {
+                            ForEach(VideoSubtitleMode.allCases) { mode in Text(mode.label).tag(mode) }
+                        }
+                        Text("Applies when you start a video. Change available tracks in the player.")
+                            .font(.caption).foregroundStyle(.secondary)
                     }
                     Divider()
                     VStack(alignment: .leading, spacing: 10) {

@@ -373,7 +373,7 @@ struct LibraryBrowseControls<Selector: View>: View {
 
     private func row(searchWidth: CGFloat?) -> some View {
         HStack(spacing: 12) {
-            selector()
+            selector().glassHover()
                 #if os(iOS)
                 .frame(width: 120)
                 #else
@@ -390,6 +390,7 @@ struct LibraryBrowseControls<Selector: View>: View {
                 }
                 .padding(9)
                 .musicGlass(appearance, radius: 12)
+                .glassHover(radius: 12)
                 .disabled(searchDisabled)
                 .frame(width: searchWidth)
             }
@@ -490,6 +491,7 @@ struct LibraryAlternateLayout: View {
                     .buttonStyle(.plain)
                     .padding(.horizontal, 8).padding(.vertical, 5)
                     .background(index.isMultiple(of: 2) ? Color.primary.opacity(0.045) : Color.clear, in: .rect(cornerRadius: 5))
+                    .glassHover(radius: 6)
                     .disabled(library.reconnecting)
                     .contextMenu {
                         if !entry.kind.isGroup { LibraryQueueActions(library: library, entry: entry) }

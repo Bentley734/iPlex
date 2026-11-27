@@ -10,6 +10,7 @@
   <script defer src="playback.js"></script>
   <script defer src="clickwheel.js"></script>
   <script defer src="hls.light.min.js"></script>
+  <script defer src="interface-motion.js"></script>
   <script defer src="video.js"></script>
   <script defer src="music.js"></script>
   <script defer src="wallpaper.js"></script>
@@ -339,6 +340,24 @@
     </section>
     <label class="theme-choice">Artwork Colors <input id="artwork-colors" type="checkbox"></label>
     <label class="theme-choice">Animate Artwork Colors <input id="animate-artwork-colors" type="checkbox" checked></label>
+    <label class="theme-choice">Page Transition
+      <select id="page-transition">
+        <option value="none">None</option>
+        <option value="fade">Fade</option>
+        <option value="slide">Slide</option>
+        <option value="zoom" selected>Zoom</option>
+      </select>
+    </label>
+    <label class="theme-choice">Liquid Glass Hover Effects <input id="glass-hover-effects" type="checkbox" checked></label>
+    <section aria-labelledby="subtitle-settings-title">
+      <h2 id="subtitle-settings-title">Subtitles</h2>
+      <label for="subtitle-default">Default Subtitles</label>
+      <select id="subtitle-default">
+        <option value="off">Off</option>
+        <option value="automatic">Automatic</option>
+      </select>
+      <p>Applies when you start a video. Change available tracks in the player.</p>
+    </section>
     <label class="theme-choice">Mini-player
       <select id="mini-player-style">
         <option value="automatic">Automatic</option>

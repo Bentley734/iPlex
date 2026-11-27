@@ -10,6 +10,7 @@ import TVVLCKit
 struct NativeVideoPlayer: View {
     let url: URL
     let startAt: Double
+    let subtitleMode: VideoSubtitleMode
     let progress: (Double, Bool) -> Void
     let fallback: (Double) -> Void
 
@@ -25,6 +26,15 @@ struct NativeVideoPlayer: View {
     @State private var ended = false
     @State private var scrubbing = false
     @State private var scrubPosition = 0.0
+    @State private var subtitles: [SubtitleTrack] = []
+    @State private var selectedSubtitle: Int32 = -1
+    @State private var subtitleDefaultApplied = false
+    @State private var subtitleCount = -1
+
+    private struct SubtitleTrack: Identifiable, Equatable {
+        let id: Int32
+        let name: String
+    }
 
     var body: some View {
         VStack(spacing: 8) {
@@ -53,15 +63,22 @@ struct NativeVideoPlayer: View {
                 }.disabled(!seekable || duration <= 0)
                 #endif
                 Text(time(duration)).monospacedDigit()
-                #if !os(iOS)
-                Button("Use Compatibility Mode") { fallback(current) }
-                #endif
             }
             .font(.callout)
             .padding(.horizontal, 16).padding(.bottom, 10)
-            #if os(iOS)
-            Button("Use Compatibility Mode") { fallback(current) }.font(.footnote).padding(.bottom, 6)
-            #endif
+            HStack {
+                if !subtitles.isEmpty {
+                    Picker("Subtitles", selection: Binding(
+                        get: { selectedSubtitle },
+                        set: { player.currentVideoSubTitleIndex = $0; selectedSubtitle = $0 }
+                    )) {
+                        Text("Off").tag(Int32(-1))
+                        ForEach(subtitles) { Text($0.name).tag($0.id) }
+                    }
+                }
+                Button("Use Compatibility Mode") { fallback(current) }
+            }
+            .font(.callout).padding(.horizontal, 16).padding(.bottom, 8)
         }
         #if os(tvOS)
         .onPlayPauseCommand(perform: toggle)
@@ -114,6 +131,7 @@ struct NativeVideoPlayer: View {
             let length = Double(player.media?.length.value?.intValue ?? 0) / 1_000
             if length > 0 { duration = length }
             seekable = player.isSeekable
+            if ready && !ended { updateSubtitles() }
             if awaitingSeek, ready, seekable, duration > 0 {
                 awaitingSeek = false
                 if startAt < duration { seek(startAt) }
@@ -139,9 +157,31 @@ struct NativeVideoPlayer: View {
                 player.media = VLCMedia(url: url)
                 ended = false
                 current = 0
+                subtitleDefaultApplied = false
+                subtitleCount = -1
             }
             player.play()
         }
+    }
+
+    private func updateSubtitles() {
+        let count = Int(player.numberOfSubtitlesTracks)
+        if count != subtitleCount {
+            subtitleCount = count
+            let ids = player.videoSubTitlesIndexes as? [NSNumber] ?? []
+            let names = player.videoSubTitlesNames as? [String] ?? []
+            subtitles = ids.enumerated().compactMap { index, number in
+                guard number.int32Value >= 0 else { return nil }
+                let name = names.indices.contains(index) ? names[index] : "Track \(index + 1)"
+                return SubtitleTrack(id: number.int32Value, name: name)
+            }
+        }
+        if !subtitleDefaultApplied, !subtitles.isEmpty {
+            if subtitleMode == .off { player.currentVideoSubTitleIndex = -1 }
+            subtitleDefaultApplied = true
+        }
+        let track = player.currentVideoSubTitleIndex
+        selectedSubtitle = subtitles.contains { $0.id == track } ? track : -1
     }
 
     private func seek(_ seconds: Double) {

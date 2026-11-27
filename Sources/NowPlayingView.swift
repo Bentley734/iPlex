@@ -2,19 +2,21 @@ import SwiftUI
 
 struct NowPlayingPresentation: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(PageTransitionStyle.preferenceKey) private var style = PageTransitionStyle.zoom
     let showing: Bool
 
     func body(content: Content) -> some View {
-        content.animation(reduceMotion ? .easeInOut(duration: 0.15) : .spring(duration: 0.4, bounce: 0.13), value: showing)
+        content.animation(reduceMotion ? nil : style.animation, value: showing)
     }
 }
 
 struct NowPlayingPopTransition: ViewModifier {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @AppStorage(PageTransitionStyle.preferenceKey) private var style = PageTransitionStyle.zoom
 
     func body(content: Content) -> some View {
         content.zIndex(1).clipShape(Rectangle())
-            .transition(reduceMotion ? .opacity : .scale(scale: 0.92, anchor: .bottomLeading).combined(with: .opacity))
+            .transition(reduceMotion ? .identity : style.presentation)
     }
 }
 
@@ -777,6 +779,7 @@ struct PinnedMusicShelf: View {
                                 }
                             }
                             .buttonStyle(.bordered)
+                            .glassHover(lift: true)
                             .contextMenu { PlexPinButton(library: library, entry: entry) }
                         }
                     }

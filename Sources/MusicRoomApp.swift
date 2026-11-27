@@ -105,12 +105,19 @@ private struct MusicWindow: View {
         }
     }
 
+    private var browseRoute: [String] {
+        if let videoSection { return [videoSection.rawValue] }
+        return ["music", model.libraryID, model.kind.rawValue, model.selectedGroup?.id ?? "", model.selectedDetail?.id ?? ""]
+    }
+
     private var libraryContent: some View {
         GeometryReader { geometry in
             VStack(spacing: 0) {
                 HStack(spacing: 0) {
                     resizableSidebar(availableWidth: geometry.size.width, defaultWidth: 216)
                     mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .pageTransition(on: browseRoute)
+                        .clipped()
                         .musicGlass(theme, radius: 22)
                         .padding(7)
                 }
@@ -201,6 +208,7 @@ private struct MusicWindow: View {
             Label("Settings", systemImage: "gearshape")
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .glassHover()
     }
 
     private func sidebarButton(_ title: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
@@ -217,6 +225,7 @@ private struct MusicWindow: View {
             .background(selected ? copper.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
+        .glassHover()
         .accessibilityAddTraits(selected ? [.isSelected] : [])
     }
 
@@ -365,6 +374,7 @@ private struct MusicWindow: View {
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
+                        .glassHover(lift: !trackList)
                         .contextMenu {
                             if !entry.kind.isGroup { LibraryQueueActions(library: model, entry: entry) }
                             PlexPinButton(library: model, entry: entry)
@@ -471,6 +481,7 @@ private struct MusicWindow: View {
                     miniPlayer.show(library: model, style: miniPlayerStyle.resolved, hiding: window)
                 }
             }
+            .glassHover()
         }
     }
 
@@ -499,6 +510,7 @@ private struct MusicWindow: View {
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .glassHover()
             .accessibilityHint("Opens Now Playing")
             .help("Open Now Playing")
         } else {
@@ -509,14 +521,14 @@ private struct MusicWindow: View {
     private var transportButtons: some View {
         HStack(spacing: 16) {
             Button { model.player.previous() } label: { Image(systemName: "backward.fill") }
-                .disabled(!model.state.previous).accessibilityLabel("Previous")
+                .glassHover().disabled(!model.state.previous).accessibilityLabel("Previous")
             Button { model.player.toggle() } label: {
                 Image(systemName: model.state.playing ? "pause.fill" : "play.fill").font(.title3)
                     .foregroundStyle(theme.text)
             }
-            .disabled(model.playingAlbum == nil).accessibilityLabel(model.state.playing ? "Pause" : "Play")
+            .glassHover().disabled(model.playingAlbum == nil).accessibilityLabel(model.state.playing ? "Pause" : "Play")
             Button { model.player.next() } label: { Image(systemName: "forward.fill") }
-                .disabled(!model.state.next).accessibilityLabel("Next")
+                .glassHover().disabled(!model.state.next).accessibilityLabel("Next")
         }.buttonStyle(.borderless)
     }
 

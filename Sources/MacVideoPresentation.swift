@@ -76,6 +76,7 @@ final class MacVideoPresentation: NSObject, NSWindowDelegate {
             let exit = NSButton(title: "Exit Fullscreen", target: self, action: #selector(restoreVideo))
             exit.translatesAutoresizingMaskIntoConstraints = false
             root.addSubview(exit)
+            window.configureFullscreenExit(exit)
             NSLayoutConstraint.activate([
                 exit.topAnchor.constraint(equalTo: root.topAnchor, constant: 18),
                 exit.trailingAnchor.constraint(equalTo: root.trailingAnchor, constant: -18)
@@ -106,6 +107,7 @@ final class MacVideoPresentation: NSObject, NSWindowDelegate {
     func windowWillClose(_ notification: Notification) {
         guard let closing = notification.object as? VideoPresentationWindow, closing === window else { return }
         if mode == .floating { floatingFrame = closing.frame }
+        closing.stopTrackingFullscreenExit()
         mode = nil
         window = nil
         if let inline { mount(in: inline) }
@@ -130,8 +132,40 @@ final class MacVideoPresentation: NSObject, NSWindowDelegate {
 
 private final class VideoPresentationWindow: NSWindow {
     var togglePlayback: (() -> Void)?
+    private weak var fullscreenExit: NSButton?
+    private var hideExit: Task<Void, Never>?
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { true }
+
+    func configureFullscreenExit(_ button: NSButton) {
+        fullscreenExit = button
+        acceptsMouseMovedEvents = true
+        revealFullscreenExit()
+    }
+
+    func stopTrackingFullscreenExit() {
+        hideExit?.cancel()
+        hideExit = nil
+        fullscreenExit = nil
+    }
+
+    private func revealFullscreenExit() {
+        guard let button = fullscreenExit else { return }
+        button.isHidden = false
+        hideExit?.cancel()
+        hideExit = Task { [weak button] in
+            do { try await Task.sleep(for: .seconds(3)) } catch { return }
+            button?.isHidden = true
+        }
+    }
+
+    override func sendEvent(_ event: NSEvent) {
+        if event.type == .mouseMoved || event.type == .leftMouseDragged ||
+            event.type == .rightMouseDragged || event.type == .otherMouseDragged {
+            revealFullscreenExit()
+        }
+        super.sendEvent(event)
+    }
 
     override func cancelOperation(_ sender: Any?) { close() }
     override func keyDown(with event: NSEvent) {

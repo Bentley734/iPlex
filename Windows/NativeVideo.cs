@@ -1,5 +1,7 @@
 using System;
 using System.Drawing;
+using System.Diagnostics;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
@@ -24,6 +26,7 @@ namespace MusicRoom
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate void SetPointer(IntPtr player, IntPtr value);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate int IntValue(IntPtr player);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate long LongValue(IntPtr player);
+        [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate int SetInt(IntPtr player, int value);
         [UnmanagedFunctionPointer(CallingConvention.Cdecl)] internal delegate void SetLong(IntPtr player, long value);
 
         internal readonly New Create;
@@ -31,7 +34,25 @@ namespace MusicRoom
         internal readonly CreatePlayer Player;
         internal readonly CreateMedia Media;
         internal readonly SetPointer SetMedia, Window;
-        internal readonly IntValue Play, State, Seekable;
+        internal readonly IntValue Play, State, Seekable, SubtitleCount, Subtitle;
+        internal readonly SetInt SetSubtitle;
+        readonly CreatePlayer subtitleDescriptions;
+        readonly Release releaseDescriptions;
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct TrackDescription
+        {
+            internal int Id;
+            internal IntPtr Name, Next;
+        }
+
+        internal sealed class SubtitleTrack
+        {
+            internal readonly int Id;
+            readonly string name;
+            internal SubtitleTrack(int id, string name) { Id = id; this.name = name; }
+            public override string ToString() { return name; }
+        }
         internal readonly LongValue Time, Length;
         internal readonly SetLong Seek;
         static NativeVideoRuntime shared;
@@ -68,6 +89,43 @@ namespace MusicRoom
             Time = Bind<LongValue>(module, "libvlc_media_player_get_time");
             Length = Bind<LongValue>(module, "libvlc_media_player_get_length");
             Seek = Bind<SetLong>(module, "libvlc_media_player_set_time");
+            Subtitle = Bind<IntValue>(module, "libvlc_video_get_spu");
+            SetSubtitle = Bind<SetInt>(module, "libvlc_video_set_spu");
+            SubtitleCount = Bind<IntValue>(module, "libvlc_video_get_spu_count");
+            subtitleDescriptions = Bind<CreatePlayer>(module, "libvlc_video_get_spu_description");
+            releaseDescriptions = Bind<Release>(module, "libvlc_track_description_list_release");
+        }
+
+        internal List<SubtitleTrack> Subtitles(IntPtr player)
+        {
+            var tracks = new List<SubtitleTrack>();
+            var first = subtitleDescriptions(player);
+            try
+            {
+                var cursor = first;
+                for (int index = 0; cursor != IntPtr.Zero && index < 256; index++)
+                {
+                    var row = Marshal.PtrToStructure<TrackDescription>(cursor);
+                    if (row.Id >= 0)
+                    {
+                        string name = ReadUtf8(row.Name);
+                        tracks.Add(new SubtitleTrack(row.Id, name.Length == 0 ? "Track " + (index + 1) : name));
+                    }
+                    cursor = row.Next;
+                }
+            }
+            finally { if (first != IntPtr.Zero) releaseDescriptions(first); }
+            return tracks;
+        }
+
+        static string ReadUtf8(IntPtr address)
+        {
+            if (address == IntPtr.Zero) return "";
+            int length = 0;
+            while (length < 4096 && Marshal.ReadByte(address, length) != 0) length++;
+            var bytes = new byte[length];
+            Marshal.Copy(address, bytes, 0, length);
+            return Encoding.UTF8.GetString(bytes);
         }
 
         static T Bind<T>(IntPtr module, string name) where T : class
@@ -128,11 +186,18 @@ namespace MusicRoom
         readonly Uri source;
         readonly Action<string, double> completion;
         readonly double startAt;
-        readonly bool advanceOnEnd;
+        readonly bool advanceOnEnd, automaticSubtitles;
         readonly NativeVideoRuntime vlc;
         readonly VideoWindowPresentation presentation;
         readonly FlowLayoutPanel controls = new FlowLayoutPanel { Dock = DockStyle.Bottom, Height = 66, Padding = new Padding(8, 5, 8, 3) };
-        readonly Button fullscreen = new Button { Text = "Fullscreen", AutoSize = true };
+        readonly Button fullscreen = new Button { Text = "Fullscreen", AutoSize = true, Dock = DockStyle.Fill };
+        readonly Panel fullscreenSlot = new Panel();
+        readonly ComboBox subtitles = new ComboBox { AccessibleName = "Subtitles", DropDownStyle = ComboBoxStyle.DropDownList,
+                                                     Width = 145, Visible = false };
+        int subtitleCount = -1;
+        bool subtitleDefaultApplied;
+        readonly Stopwatch pointerIdle = new Stopwatch();
+        Point lastPointer;
         readonly Button floating = new Button { Text = "Picture in Picture", AutoSize = true };
         readonly Panel surface = new Panel { BackColor = Color.Black, Dock = DockStyle.Fill };
         readonly Button toggle = new Button { Text = "Pause", Width = 85 };
@@ -145,11 +210,13 @@ namespace MusicRoom
         bool ready, scrubbing, stopping, startedAtPosition, endedReported, closeRequested;
         string result = "closed";
 
-        internal NativeVideoWindow(Uri source, string title, double startAt, bool advanceOnEnd, bool hasVersions, Action<string, double> completion)
+        internal NativeVideoWindow(Uri source, string title, double startAt, bool advanceOnEnd, bool hasVersions,
+                                   bool automaticSubtitles, Action<string, double> completion)
         {
             this.source = source;
             this.startAt = startAt;
             this.advanceOnEnd = advanceOnEnd;
+            this.automaticSubtitles = automaticSubtitles;
             this.completion = completion;
             vlc = NativeVideoRuntime.Load();
             Text = title;
@@ -168,8 +235,15 @@ namespace MusicRoom
                 versions.Click += delegate { result = "versions"; Close(); };
                 controls.Controls.Add(versions);
             }
-            controls.Controls.Add(fullscreen);
+            fullscreenSlot.Size = fullscreen.PreferredSize;
+            fullscreenSlot.Controls.Add(fullscreen);
+            controls.Controls.Add(fullscreenSlot);
             controls.Controls.Add(floating);
+            controls.Controls.Add(subtitles);
+            subtitles.SelectionChangeCommitted += delegate {
+                var track = subtitles.SelectedItem as NativeVideoRuntime.SubtitleTrack;
+                if (!stopping && track != null && player != IntPtr.Zero) vlc.SetSubtitle(player, track.Id);
+            };
             fullscreen.Click += delegate {
                 SetPresentation(presentation.Mode == VideoWindowMode.Fullscreen ? VideoWindowMode.Inline : VideoWindowMode.Fullscreen);
             };
@@ -225,6 +299,7 @@ namespace MusicRoom
 
         void Poll()
         {
+            if (presentation.Mode == VideoWindowMode.Fullscreen) UpdateFullscreenExit();
             int state = vlc.State(player);
             ready = ready || state == 3 || state == 4 || state == 6;
             if (state == 7 || (!ready && DateTime.UtcNow >= deadline))
@@ -238,6 +313,7 @@ namespace MusicRoom
             duration = Math.Max(0, vlc.Length(player));
             if (state == 6 && duration > 0) position = duration;
             timeline.Enabled = duration > 0 && vlc.Seekable(player) != 0;
+            if (ready && state != 6) UpdateSubtitles();
             if (!startedAtPosition && ready && timeline.Enabled)
             {
                 startedAtPosition = true;
@@ -264,6 +340,32 @@ namespace MusicRoom
             elapsed.Text = ready ? Format(position) + " / " + Format(duration) : "Opening video…";
             toggle.Text = state == 3 ? "Pause" : "Play";
             toggle.Enabled = ready;
+        }
+
+        void UpdateSubtitles()
+        {
+            int count = vlc.SubtitleCount(player);
+            if (count != subtitleCount)
+            {
+                subtitleCount = count;
+                var tracks = count > 0 ? vlc.Subtitles(player) : new List<NativeVideoRuntime.SubtitleTrack>();
+                subtitles.Items.Clear();
+                if (tracks.Count == 0) { subtitles.Visible = false; return; }
+                subtitles.Items.Add(new NativeVideoRuntime.SubtitleTrack(-1, "Subtitles Off"));
+                foreach (var track in tracks) subtitles.Items.Add(track);
+                subtitles.Visible = true;
+            }
+            if (subtitles.Items.Count == 0) return;
+            if (!subtitleDefaultApplied)
+            {
+                if (!automaticSubtitles) vlc.SetSubtitle(player, -1);
+                subtitleDefaultApplied = true;
+            }
+            int selected = vlc.Subtitle(player);
+            int visibleIndex = 0;
+            for (int i = 1; i < subtitles.Items.Count; i++)
+                if (((NativeVideoRuntime.SubtitleTrack)subtitles.Items[i]).Id == selected) { visibleIndex = i; break; }
+            if (subtitles.SelectedIndex != visibleIndex) subtitles.SelectedIndex = visibleIndex;
         }
 
         static string Format(long milliseconds)
@@ -294,7 +396,24 @@ namespace MusicRoom
             presentation.SetMode(mode);
             controls.Visible = mode != VideoWindowMode.Floating;
             fullscreen.Text = mode == VideoWindowMode.Fullscreen ? "Exit Fullscreen" : "Fullscreen";
+            fullscreenSlot.Size = fullscreen.PreferredSize;
+            fullscreen.Visible = true;
+            lastPointer = Cursor.Position;
+            if (mode == VideoWindowMode.Fullscreen) pointerIdle.Restart();
+            else pointerIdle.Reset();
             if (mode == VideoWindowMode.Floating) ActiveControl = null;
+        }
+
+        void UpdateFullscreenExit()
+        {
+            var cursor = Cursor.Position;
+            if (cursor != lastPointer && Bounds.Contains(cursor))
+            {
+                pointerIdle.Restart();
+                fullscreen.Visible = true;
+            }
+            else if (pointerIdle.ElapsedMilliseconds >= 3000) fullscreen.Visible = false;
+            lastPointer = cursor;
         }
 
         internal void EndPlayback()

@@ -405,8 +405,9 @@ namespace MusicRoom
                     var options = requested < 0 ? versions : versions.Where(option => option.index == requested).ToArray();
                     var direct = options.Where(option => option.url.Length != 0).ToArray();
                     var fallbackIndices = options.Select(option => option.index).DefaultIfEmpty(0);
+                    bool automaticSubtitles = Str(request, "subtitles") == "automatic";
                     var fallbacks = fallbackIndices.ToDictionary(index => index,
-                        index => RegisterVideoFallback(server, result.Base, path, index));
+                        index => RegisterVideoFallback(server, result.Base, path, index, automaticSubtitles));
                     var showID = Str(item, "grandparentRatingKey");
                     activeVideoServer = server.Id;
                     activeVideoLibrary = library;
@@ -481,12 +482,12 @@ namespace MusicRoom
                 video = Str(media, "videoCodec").ToLowerInvariant(), audio = Str(media, "audioCodec").ToLowerInvariant() };
         }
 
-        string RegisterVideoFallback(Server server, Uri basis, string path, int index)
+        string RegisterVideoFallback(Server server, Uri basis, string path, int index, bool automaticSubtitles)
         {
             var query = VideoQuery(new Dictionary<string, string> {
                 { "path", path }, { "protocol", "hls" }, { "directPlay", "0" }, { "directStream", "0" },
                 { "mediaIndex", index.ToString(CultureInfo.InvariantCulture) }, { "session", Guid.NewGuid().ToString("N") },
-                { "subtitles", "burn" }, { "videoQuality", "100" }, { "videoResolution", "1920x1080" },
+                { "subtitles", automaticSubtitles ? "burn" : "none" }, { "videoQuality", "100" }, { "videoResolution", "1920x1080" },
                 { "maxVideoBitrate", "20000" }, { "X-Plex-Client-Profile-Name", "iOS" },
                 { "X-Plex-Client-Profile-Extra", "add-transcode-target(type=videoProfile&context=streaming&protocol=hls&container=mpegts&videoCodec=h264&audioCodec=aac&replace=true)" }
             });
