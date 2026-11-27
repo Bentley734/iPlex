@@ -113,83 +113,74 @@ private struct TVCatalogView: View {
     var body: some View {
         let matches = filters.matches(archive.shows, query: query, savedOnly: savedOnly, savedIDs: archive.savedIDs, sort: archive.home.catalogSort)
         NavigationStack(path: $path) {
-            GeometryReader { geometry in
-                HStack(alignment: .top, spacing: 60) {
-                    VStack(alignment: .leading, spacing: 24) {
-                        HStack(spacing: 14) {
-                            NavigationLink(value: TVRoute.menu) {
-                                Label("Menu", systemImage: "line.3.horizontal")
-                            }
-                            .accessibilityIdentifier("tv.menu")
-                            .focused($menuFocused)
-                            Button { useShortcut(.filters, matches: matches) } label: {
-                                Label(HomeShortcut.filters.label(savedOnly: savedOnly, activeFilters: filters.activeCount),
-                                      systemImage: HomeShortcut.filters.icon)
-                            }
-                            .accessibilityIdentifier("tv.filters")
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(spacing: 16) {
+                    Text(appearance.title)
+                        .font(.system(size: 50, weight: .bold))
+                        .accessibilityIdentifier("tv.catalog")
+                        .accessibilityAddTraits(.isHeader)
+                    Spacer(minLength: 8)
+                    Text(matches.count.formatted())
+                        .font(.headline.monospacedDigit())
+                        .foregroundStyle(appearance.accent)
+                }
+                searchField
+                    .padding(.horizontal, 18)
+                    .frame(minHeight: 60)
+                    .archiveControl()
+                ScrollView(.horizontal) {
+                    HStack(spacing: 16) {
+                        NavigationLink(value: TVRoute.menu) {
+                            Label("Menu", systemImage: "line.3.horizontal")
                         }
-                        .buttonStyle(TVActionStyle())
-                        .frame(maxWidth: .infinity)
-                        if !archive.home.pins.isEmpty {
-                            VStack(spacing: 10) {
-                                ForEach(archive.home.pins) { shortcut in
-                                    Button { useShortcut(shortcut, matches: matches) } label: {
-                                        Label(shortcut.label(savedOnly: savedOnly, activeFilters: filters.activeCount),
-                                              systemImage: shortcut.icon)
-                                    }
-                                    .disabled(shortcut == .random && matches.isEmpty)
-                                    .disabled(shortcut == .onThisDay && archive.isLoading)
-                                }
-                            }
-                            .buttonStyle(TVActionStyle())
-                            .frame(maxWidth: .infinity)
+                        .accessibilityIdentifier("tv.menu")
+                        .focused($menuFocused)
+                        Button { useShortcut(.filters, matches: matches) } label: {
+                            Label(HomeShortcut.filters.label(savedOnly: savedOnly, activeFilters: filters.activeCount),
+                                  systemImage: HomeShortcut.filters.icon)
                         }
+                        .accessibilityIdentifier("tv.filters")
+                        if savedOnly && !archive.home.pins.contains(.saved) {
+                            Button("All Shows") { savedOnly = false }
+                        }
+                        Button("Recently Listened", systemImage: "clock") { path.append(.recentlyListened) }
+                            .accessibilityIdentifier("tv.recentlyListened")
+                        ForEach(archive.home.pins.filter { $0 != .filters }) { shortcut in
+                            Button { useShortcut(shortcut, matches: matches) } label: {
+                                Label(shortcut.label(savedOnly: savedOnly, activeFilters: filters.activeCount),
+                                      systemImage: shortcut.icon)
+                            }
+                            .disabled(shortcut == .random && matches.isEmpty)
+                            .disabled(shortcut == .onThisDay && archive.isLoading)
+                        }
+                    }
+                    .buttonStyle(.bordered)
+                    .padding(8)
+                }
+                .scrollIndicators(.hidden)
+                .focusSection()
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: archive.home.density == .compact ? 10 : 16) {
                         if !player.isVisible, let saved = player.resumePoint {
                             HStack(spacing: 12) {
                                 Button {
                                     Task { await player.resumeLastShow(archive: archive, library: library, plex: plex) }
                                 } label: {
-                                    VStack(spacing: 4) {
+                                    VStack(alignment: .leading, spacing: 4) {
                                         Label("Resume a Show", systemImage: "play.circle.fill")
                                         ArchiveScrollingTitle(saved.title, active: false).font(.caption)
                                     }
-                                    .frame(maxWidth: .infinity)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                                 }
-                                .buttonStyle(TVActionStyle())
                                 .accessibilityIdentifier("tv.resumeShow")
                                 Button {
                                     player.clearResumePoint()
                                     menuFocused = true
                                 } label: { Image(systemName: "xmark") }
-                                .buttonStyle(TVActionStyle(iconOnly: true))
-                                .buttonBorderShape(.circle)
                                 .accessibilityLabel("Clear saved playback position")
                                 .accessibilityIdentifier("tv.clearResumeShow")
                             }
-                        }
-                        Button { path.append(.recentlyListened) } label: {
-                            Label("Recently Listened", systemImage: "clock")
-                        }
-                        .buttonStyle(TVActionStyle())
-                        .accessibilityIdentifier("tv.recentlyListened")
-                        Spacer(minLength: 0)
-                    }
-                    .frame(width: min(625, geometry.size.width * 0.38), alignment: .leading)
-                    .focusSection()
-
-                    VStack(alignment: .leading, spacing: 18) {
-                        HStack(spacing: 18) {
-                            Text(appearance.title).font(.title.bold())
-                                .accessibilityIdentifier("tv.catalog")
-                            searchField
-                                .padding(.horizontal, 18)
-                                .frame(maxWidth: 450, minHeight: 54)
-                                .archiveControl()
-                            Spacer()
-                            if savedOnly && !archive.home.pins.contains(.saved) {
-                                Button("All Shows") { savedOnly = false }.buttonStyle(TVActionStyle())
-                            }
-                            Text(matches.count.formatted()).font(.headline.monospacedDigit()).foregroundStyle(appearance.accent)
+                            .buttonStyle(.bordered)
                         }
                         if archive.home.showStats { HomeArchiveStats() }
                         OnThisDayCard { path.append(.show($0.id)) }
@@ -201,21 +192,18 @@ private struct TVCatalogView: View {
                             Text(savedOnly ? "Bookmark a show to find it here, or adjust your filters." : "No matching shows. Try a different search or filter.")
                                 .foregroundStyle(archive.theme.muted)
                         } else {
-                            ScrollView {
-                                LazyVStack(spacing: archive.home.density == .compact ? 8 : 16) {
-                                    ForEach(matches) { match in
-                                        Button { path.append(.show(match.id)) } label: {
-                                            TVShowRow(match: match, saved: archive.savedIDs.contains(match.id), compact: archive.home.density == .compact)
-                                        }
-                                        .buttonStyle(.card)
-                                        .accessibilityIdentifier("tv.show.\(match.id)")
-                                    }
+                            ForEach(matches) { match in
+                                Button { path.append(.show(match.id)) } label: {
+                                    TVShowRow(match: match, saved: archive.savedIDs.contains(match.id), compact: archive.home.density == .compact)
                                 }
-                                .padding(14)
+                                .buttonStyle(.card)
+                                .accessibilityIdentifier("tv.show.\(match.id)")
                             }
                         }
-                    }.focusSection()
+                    }
+                    .padding(12)
                 }
+                .focusSection()
             }
             .padding(20)
             .archivePage(wallpaperID: archive.wallpaperID, sharesWindow: true)

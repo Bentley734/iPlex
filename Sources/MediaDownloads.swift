@@ -259,6 +259,14 @@ struct DownloadsBrowser: View {
 
     var body: some View {
         VStack(spacing: 12) {
+            #if os(tvOS)
+            VStack(alignment: .leading, spacing: 20) {
+                Text(library.sectionName(.downloads))
+                    .font(.system(size: 56, weight: .bold)).accessibilityAddTraits(.isHeader)
+                search
+            }
+            .padding(.horizontal, 24).padding(.top, 14)
+            #else
             ViewThatFits(in: .horizontal) {
                 HStack(spacing: 15) {
                     heading.fixedSize()
@@ -273,6 +281,7 @@ struct DownloadsBrowser: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.horizontal, 28).padding(.vertical, 20)
+            #endif
             if !downloads.status.isEmpty || !downloads.pending.isEmpty || !downloads.failed.isEmpty {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 8) {
@@ -348,7 +357,11 @@ struct DownloadsBrowser: View {
                         }
                     }.padding(.horizontal, 28).padding(.top, 12)
                 }
+                #if os(tvOS)
+                .focusSection()
+                #else
                 .frame(maxWidth: 720)
+                #endif
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)

@@ -111,11 +111,12 @@ struct VideoPosterGridLayout {
 
     init(availableWidth: CGFloat, size: LibraryArtworkSize) {
         #if os(tvOS)
-        let baseWidth: CGFloat = 180
+        let baseWidth: CGFloat = 205
+        let spacing: CGFloat = 26
         #else
         let baseWidth: CGFloat = 130
-        #endif
         let spacing: CGFloat = 18
+        #endif
         let preferredWidth = (baseWidth * size.scale).rounded()
         let width = max(1, availableWidth)
         let count = max(1, Int((width + spacing) / (preferredWidth + spacing)))
@@ -223,7 +224,9 @@ struct PlexVideoBrowser: View {
             }
         }
         .pageTransition(on: episodeDetail?.id ?? detail?.id)
+        #if !os(tvOS)
         .clipped()
+        #endif
         .task(id: [String(serverReady), String(discoveryRetry)]) {
             if serverReady { await discover() }
             else { discovered = false }
@@ -311,11 +314,17 @@ struct PlexVideoBrowser: View {
                     Text(summary).font(.callout).foregroundStyle(.secondary).lineLimit(3)
                 }
                 GeometryReader { viewport in
+                    #if os(tvOS)
+                    videoScroll(availableWidth: viewport.size.width - 28)
+                    #else
                     videoScroll(availableWidth: viewport.size.width)
+                    #endif
                 }
             }
             .pageTransition(on: [selection, parent?.id ?? ""])
+            #if !os(tvOS)
             .clipped()
+            #endif
             #if os(macOS)
             .padding(.horizontal, 28)
             #endif
@@ -332,6 +341,10 @@ struct PlexVideoBrowser: View {
             listingStatus
         }
         .libraryScrollTopInset()
+        #if os(tvOS)
+        .contentMargins(.horizontal, 14, for: .scrollContent)
+        .focusSection()
+        #endif
     }
 
     private func closeDetails() {
@@ -351,6 +364,13 @@ struct PlexVideoBrowser: View {
             } else {
                 Text("Seasons").font(.title2.bold()).accessibilityAddTraits(.isHeader)
             }
+            #if os(tvOS)
+            if rows.isEmpty && busy { ProgressView("Loading…") }
+            if rows.isEmpty && !busy && message == nil {
+                Text(episodes ? "No episodes available." : "No seasons available.")
+                    .foregroundStyle(.secondary)
+            }
+            #endif
             LazyVStack(alignment: .leading, spacing: 10) {
                 ForEach(rows) { item in
                     Button {
@@ -480,6 +500,9 @@ struct PlexVideoBrowser: View {
             Text(parent?.title ?? sectionName)
                 #if os(macOS)
                 .font(.system(size: 31, weight: .bold))
+                #elseif os(tvOS)
+                .font(.system(size: 56, weight: .bold))
+                .accessibilityAddTraits(.isHeader)
                 #else
                 .font(.largeTitle.bold())
                 #endif
@@ -958,7 +981,7 @@ private struct PlexVideoPlayback: View {
             if fullscreen { fullscreen = false } else { dismiss() }
         }
         #endif
-        .background(.black)
+        .background { Color.black.ignoresSafeArea() }
         .foregroundStyle(appearance.text)
         .tint(appearance.accent)
         .environment(\.colorScheme, .dark)

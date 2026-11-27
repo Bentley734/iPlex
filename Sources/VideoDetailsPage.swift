@@ -42,6 +42,10 @@ struct VideoDetailsPage<Actions: View, Episodes: View>: View {
     @State private var retry = 0
     var onCredit: ((PlexVideoCredit) -> Void)?
 
+    #if os(tvOS)
+    @FocusState private var backFocused: Bool
+    #endif
+
     private var isEpisode: Bool { item.type == "episode" }
 
     private var facts: [String] {
@@ -51,6 +55,80 @@ struct VideoDetailsPage<Actions: View, Episodes: View>: View {
     }
 
     var body: some View {
+        layout
+        .background {
+            if wallpaper.background == .gradient { theme.backdrop }
+        }
+        .task(id: [section, item.id, String(ready), String(retry)]) {
+            guard ready else { return }
+            loadError = false
+            do {
+                let result = try await service.videoDetails(server: server, section: section, item: item)
+                if !Task.isCancelled { details = result }
+            } catch {
+                if !Task.isCancelled { loadError = true }
+            }
+        }
+    }
+
+    @ViewBuilder private var layout: some View {
+        #if os(tvOS)
+        VStack(alignment: .leading, spacing: 20) {
+            Button("Back", systemImage: "chevron.backward", action: back)
+                .buttonStyle(.bordered)
+                .accessibilityLabel("Back to " + sectionName)
+                .accessibilityIdentifier("tv.video.back")
+                .focused($backFocused)
+            HStack(alignment: .top, spacing: 26) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        thumbnail.frame(width: isEpisode ? 240 : 132, height: isEpisode ? 135 : 198)
+                            .accessibilityHidden(true)
+                        information
+                        if requestedDownload && !downloads.status.isEmpty {
+                            Text(downloads.status).font(.callout).foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(18)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .frame(width: 485)
+                .background(.white.opacity(0.07), in: .rect(cornerRadius: 22))
+                .focusSection()
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 22) {
+                        episodes()
+                        let summary = details?.summary ?? item.summary
+                        if !summary.isEmpty {
+                            sectionPanel("Synopsis") {
+                                Text(summary).fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        if let details, !details.credits.isEmpty {
+                            sectionPanel("Cast and Crew") { credits(details.credits) }
+                        }
+                        if let details, !details.formats.isEmpty {
+                            sectionPanel(details.formats.count == 1 ? "Video Format" : "Video Formats") {
+                                ForEach(Array(details.formats.enumerated()), id: \.offset) { _, format in
+                                    Text(format).font(.callout.monospaced()).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        if loadError {
+                            Text("Plex couldn’t load the full details.").foregroundStyle(.secondary)
+                            Button("Retry") { retry += 1 }.buttonStyle(.bordered)
+                        }
+                    }
+                    .padding(14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .focusSection()
+            }
+        }
+        .padding(20)
+        .defaultFocus($backFocused, true)
+        .task { backFocused = true }
+        #else
         VStack(alignment: .leading, spacing: 0) {
             Button(action: back) {
                 Label("Back to " + sectionName, systemImage: "chevron.backward")
@@ -58,9 +136,7 @@ struct VideoDetailsPage<Actions: View, Episodes: View>: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.bordered)
-            #if !os(tvOS)
             .keyboardShortcut(.cancelAction)
-            #endif
             .padding(.horizontal, 20)
             .padding(.top, 16)
             ScrollView {
@@ -122,19 +198,7 @@ struct VideoDetailsPage<Actions: View, Episodes: View>: View {
                 .frame(maxWidth: .infinity, alignment: .center)
             }
         }
-        .background {
-            if wallpaper.background == .gradient { theme.backdrop }
-        }
-        .task(id: [section, item.id, String(ready), String(retry)]) {
-            guard ready else { return }
-            loadError = false
-            do {
-                let result = try await service.videoDetails(server: server, section: section, item: item)
-                if !Task.isCancelled { details = result }
-            } catch {
-                if !Task.isCancelled { loadError = true }
-            }
-        }
+        #endif
     }
 
     private var thumbnail: some View {
@@ -157,7 +221,11 @@ struct VideoDetailsPage<Actions: View, Episodes: View>: View {
         VStack(alignment: .leading, spacing: 12) {
             Text(item.title)
                 .font(.largeTitle.bold())
+                #if os(tvOS)
+                .fixedSize(horizontal: false, vertical: true)
+                #else
                 .lineLimit(3)
+                #endif
                 .accessibilityAddTraits(.isHeader)
             if !facts.isEmpty {
                 Text(facts.joined(separator: "  ·  "))
@@ -170,10 +238,15 @@ struct VideoDetailsPage<Actions: View, Episodes: View>: View {
                     .foregroundStyle(theme.text.opacity(0.8))
                     .lineLimit(2)
             }
+            #if os(tvOS)
+            VStack(alignment: .leading, spacing: 10) { controls }
+                .focusSection()
+            #else
             ViewThatFits(in: .horizontal) {
                 HStack { controls }
                 VStack(alignment: .leading, spacing: 8) { controls }
             }
+            #endif
             if let resume {
                 Text("Continue at " + videoTime(resume)).font(.caption).foregroundStyle(.secondary)
             }
@@ -210,11 +283,15 @@ struct VideoDetailsPage<Actions: View, Episodes: View>: View {
 
     private func credits(_ credits: [PlexVideoCredit]) -> some View {
         ScrollView(.horizontal) {
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .top, spacing: 18) {
                 ForEach(Array(credits.enumerated()), id: \.offset) { _, credit in
                     if credit.id != nil, let onCredit {
                         Button { onCredit(credit) } label: { creditCard(credit) }
+                            #if os(tvOS)
+                            .buttonStyle(.card)
+                            #else
                             .buttonStyle(.plain)
+                            #endif
                     } else {
                         creditCard(credit)
                     }
@@ -234,7 +311,12 @@ struct VideoDetailsPage<Actions: View, Episodes: View>: View {
                 Text(credit.role).font(.caption).foregroundStyle(.secondary).lineLimit(2)
             }
         }
+        #if os(tvOS)
+        .frame(width: 158, alignment: .leading)
+        .padding(8)
+        #else
         .frame(width: 112, alignment: .leading)
+        #endif
     }
 
     @ViewBuilder private func creditPortrait(_ credit: PlexVideoCredit) -> some View {

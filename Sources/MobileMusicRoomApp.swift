@@ -38,6 +38,10 @@ private struct MusicLibraryScreen: View {
     @State private var showMiniPlayer = false
     @State private var search: Task<Void, Never>?
 
+    #if os(tvOS)
+    @FocusState private var focusedSection: HeaderBrandSection?
+    #endif
+
     private var palette: ArtworkPalette? { artworkColors ? library.playingPalette : nil }
     private var accent: Color { theme.accent(using: palette) }
     private var videoSection: PlexVideoKind? { library.videoSection }
@@ -66,10 +70,16 @@ private struct MusicLibraryScreen: View {
             if showPlayer {
                 NowPlayingView(library: library, archive: library.toolDriveSelected ? archiveTransport : nil) { showPlayer = false }
                     .modifier(NowPlayingPopTransition())
+                    #if os(tvOS)
+                    .onExitCommand { showPlayer = false }
+                    #endif
             }
             if showMiniPlayer {
                 Color.black.ignoresSafeArea()
                 MiniPlayerContent(library: library, style: miniPlayerStyle.resolved) { showMiniPlayer = false }
+                    #if os(tvOS)
+                    .onExitCommand { showMiniPlayer = false }
+                    #endif
             }
         }
         .modifier(NowPlayingPresentation(showing: showPlayer))
@@ -108,6 +118,9 @@ private struct MusicLibraryScreen: View {
     }
 
     private var libraryScreen: some View {
+        #if os(tvOS)
+        tvLibraryScreen
+        #else
         VStack(spacing: 0) {
             HStack {
                 SectionHeaderBrand(section: library.activeSection,
@@ -127,59 +140,13 @@ private struct MusicLibraryScreen: View {
             .padding(.horizontal, 20)
             .musicGlass(theme, radius: 20)
             .padding(.horizontal, 12)
-            #if os(tvOS)
-            .focusSection()
-            #endif
-            #if os(iOS)
             ScrollView(.horizontal) { sectionTabs }.scrollIndicators(.hidden)
-            #else
-            sectionTabs.focusSection()
-            #endif
             if library.musicNavigationSelected && (library.toolDriveSelected ||
                 (library.selectedDetail == nil && library.selectedGroup == nil)) {
-                #if os(tvOS)
-                sectionButtons.focusSection()
-                #else
                 ScrollView(.horizontal) { sectionButtons }.scrollIndicators(.hidden)
-                #endif
             }
             VStack(spacing: 0) {
-                if library.toolDriveSelected {
-                    ToolDriveArchiveView(title: library.sectionName(.toolDrive), text: theme.text,
-                                         accent: accent, tint: glassTint.color(for: theme),
-                                         density: LiquidGlassAppearance.density(glassTransparency),
-                                         transport: archiveTransport, pauseOutsidePlayback: library.player.pause,
-                                         plexSettings: { AnyView(MusicSettings(library: library)) })
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .musicGlass(theme, radius: 22)
-                        .clipShape(.rect(cornerRadius: 22))
-                        .padding(.horizontal, 12)
-                } else if library.downloadsSelected {
-                    DownloadsBrowser(library: library)
-                } else if let videoSection, !library.serverID.isEmpty {
-                    PlexVideoBrowser(kind: videoSection, server: library.serverID, service: library.service,
-                                     serverReady: library.videoServerReady, connectionError: library.busy ? nil : library.message,
-                                     retryConnection: library.retryLibrary, pauseMusic: library.player.pause,
-                                     sectionName: library.sectionName(HeaderBrandSection(video: videoSection)),
-                                 searchResult: library.selectedVideoSearchResult,
-                                 searchRequest: library.videoSearchRequest,
-                                 onCredit: { library.selectedCredit = $0; showGlobalSearch = true })
-                        .id(library.serverID + videoSection.rawValue)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                        .musicGlass(theme, radius: 22)
-                        .padding(.horizontal, 12)
-                } else if library.libraryID.isEmpty {
-                    VStack {
-                        if !library.libraries.isEmpty { musicBrowseControls.padding(14) }
-                        connection.frame(maxWidth: .infinity, maxHeight: .infinity)
-                    }
-                        .musicGlass(theme, radius: 22)
-                        .padding(.horizontal, 12)
-                } else {
-                    browser
-                        .musicGlass(theme, radius: 22)
-                        .padding(.horizontal, 12)
-                }
+                destination
                 if library.toolDriveSelected, let title = archiveTransport.title {
                     playbackBar(title: title, detail: archiveTransport.context, isArchive: true,
                                 open: {
@@ -205,7 +172,124 @@ private struct MusicLibraryScreen: View {
             .clipped()
         }
         .background(theme.backdrop(using: palette).ignoresSafeArea())
+        #endif
     }
+
+    @ViewBuilder private var destination: some View {
+        if library.toolDriveSelected {
+            ToolDriveArchiveView(title: library.sectionName(.toolDrive), text: theme.text,
+                                 accent: accent, tint: glassTint.color(for: theme),
+                                 density: LiquidGlassAppearance.density(glassTransparency),
+                                 transport: archiveTransport, pauseOutsidePlayback: library.player.pause,
+                                 plexSettings: { AnyView(MusicSettings(library: library)) })
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .musicGlass(theme, radius: 22)
+                .clipShape(.rect(cornerRadius: 22))
+                .padding(.horizontal, 12)
+        } else if library.downloadsSelected {
+            DownloadsBrowser(library: library)
+        } else if let videoSection, !library.serverID.isEmpty {
+            PlexVideoBrowser(kind: videoSection, server: library.serverID, service: library.service,
+                             serverReady: library.videoServerReady, connectionError: library.busy ? nil : library.message,
+                             retryConnection: library.retryLibrary, pauseMusic: library.player.pause,
+                             sectionName: library.sectionName(HeaderBrandSection(video: videoSection)),
+                         searchResult: library.selectedVideoSearchResult,
+                         searchRequest: library.videoSearchRequest,
+                         onCredit: { library.selectedCredit = $0; showGlobalSearch = true })
+                .id(library.serverID + videoSection.rawValue)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .musicGlass(theme, radius: 22)
+                .padding(.horizontal, 12)
+        } else if library.libraryID.isEmpty {
+            VStack {
+                if !library.libraries.isEmpty { musicBrowseControls.padding(14) }
+                connection.frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+                .musicGlass(theme, radius: 22)
+                .padding(.horizontal, 12)
+        } else {
+            browser
+                .musicGlass(theme, radius: 22)
+                .padding(.horizontal, 12)
+        }
+    }
+
+    #if os(tvOS)
+    private var tvLibraryScreen: some View {
+        HStack(alignment: .top, spacing: 30) {
+            TVNavigationRail(title: "iPlex") {
+                tvSection(.music, icon: "music.note") { library.selectVideoSection(nil) }
+                ForEach(library.serverID.isEmpty ? [] : library.visibleVideoKinds) { kind in
+                    tvSection(HeaderBrandSection(video: kind), icon: kind.icon) { library.selectVideoSection(kind) }
+                }
+                tvSection(.downloads, icon: "arrow.down.circle", action: library.selectDownloads)
+                tvSection(.toolDrive, icon: "waveform", action: library.selectToolDrive)
+                Divider().padding(.vertical, 8)
+                TVRailButton(title: "Search", icon: "magnifyingglass") { showGlobalSearch = true }
+                TVRailButton(title: "Settings", icon: "gearshape") { showSettings = true }
+                TVRailButton(title: "App Icon", icon: "app.dashed") { showAppIcons = true }
+                if library.toolDriveSelected ? archiveTransport.title != nil : library.playingAlbum != nil {
+                    Divider().padding(.vertical, 8)
+                    TVRailButton(title: "Now Playing", icon: "play.circle") {
+                        if library.toolDriveSelected { archiveTransport.setPlaybackVolume(library.playbackVolume) }
+                        showPlayer = true
+                    }
+                    if !library.toolDriveSelected {
+                        TVRailButton(title: "Mini-player", icon: "ipod") { showMiniPlayer = true }
+                    }
+                }
+            }
+            VStack(alignment: .leading, spacing: 16) {
+                if library.activeSection == .music {
+                    HStack {
+                        Text(library.sectionName(.music)).font(.system(size: 56, weight: .bold))
+                            .accessibilityAddTraits(.isHeader)
+                        Spacer()
+                        if !library.libraryID.isEmpty && library.selectedDetail == nil && library.selectedGroup == nil {
+                            Menu("Browse: " + library.kind.rawValue, systemImage: "square.grid.2x2") {
+                                ForEach(library.visibleKinds, id: \.self) { kind in
+                                    Button(kind.rawValue, systemImage: library.kind == kind ? "checkmark" : kind.symbol) {
+                                        search?.cancel()
+                                        library.selectKind(kind)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.top, 14)
+                    .focusSection()
+                }
+                destination
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .focusSection()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .defaultFocus($focusedSection, library.activeSection)
+        .onExitCommand(perform: focusedSection == nil ? { focusedSection = library.activeSection } : nil)
+        .foregroundStyle(.white)
+        .background {
+            ZStack {
+                Color(red: 0.035, green: 0.044, blue: 0.075)
+                theme.backdrop(using: palette).opacity(0.45)
+            }
+            .ignoresSafeArea()
+        }
+    }
+
+    private func tvSection(_ section: HeaderBrandSection, icon: String, action: @escaping () -> Void) -> some View {
+        TVRailButton(title: library.sectionName(section), icon: icon, selected: library.activeSection == section, action: action)
+            .focused($focusedSection, equals: section)
+            .accessibilityIdentifier("tv.section." + section.rawValue)
+    }
+
+    private func backFromMusicDetail() {
+        if library.selectedDetail != nil { library.closeDetail() }
+        else if library.selectedGroup != nil { library.browse() }
+    }
+    #endif
 
     private func playbackBar<Artwork: View>(title: String, detail: String, isArchive: Bool,
                                             open: @escaping () -> Void,
@@ -377,8 +461,17 @@ private struct MusicLibraryScreen: View {
                 }
             }
             .libraryScrollTopInset()
+            #if os(tvOS)
+            .contentMargins(.horizontal, 16, for: .scrollContent)
+            .focusSection()
+            #else
             .contentMargins(.horizontal, 8, for: .scrollContent)
+            #endif
         }.padding(14)
+        #if os(tvOS)
+        .onExitCommand(perform: library.selectedDetail != nil || library.selectedGroup != nil
+                       ? backFromMusicDetail : nil)
+        #endif
     }
 
     private var sectionButtons: some View {

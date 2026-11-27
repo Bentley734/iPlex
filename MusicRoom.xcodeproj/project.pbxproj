@@ -25,6 +25,7 @@
 		1A50E93CF51B9E293A751C16 /* MobileVisualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67CBC0D30B927FC05781EA91 /* MobileVisualizerView.swift */; };
 		1A5471FBBEA94D0257B926DD /* NativeVideoPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41756213822D289CE6E5D98A /* NativeVideoPlayer.swift */; };
 		2173BC65A1CDA8D1AD4AC7E6 /* CatalogFilters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57C1069E561396E8408C4EFA /* CatalogFilters.swift */; };
+		273FDEEB20278438C38C0AC7 /* TVNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B9EC5A7497EDD55DA931FB6 /* TVNavigation.swift */; };
 		29CF984811D8CCAD74A6AB1F /* ClickWheelPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2DA695E5F978CFBEDD54C3D /* ClickWheelPlayer.swift */; };
 		2D71F95B30AF3AB3767A90B9 /* CatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26FC7003072EFC998B1C27CC /* CatalogView.swift */; };
 		2E4242D55B3F8D1593C2A0DD /* PlexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 790F4BA73F153291A9504706 /* PlexService.swift */; };
@@ -41,6 +42,7 @@
 		3D9F5B0880ED9C632AADB43B /* MediaDownloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62D082230979C3114636B87D /* MediaDownloads.swift */; };
 		3DD21C75E64AA3E64CD19A5D /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5E97A995568CE10A3749702 /* LibraryView.swift */; };
 		3EF2585F30717D69B126A221 /* TVKaleidoscopeSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50F3FF94B0657359491CB7D0 /* TVKaleidoscopeSurface.swift */; };
+		4013C4BCB3EBE83B64EE25FF /* TVNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4B9EC5A7497EDD55DA931FB6 /* TVNavigation.swift */; };
 		40C6885B2A3CD921E5069FF0 /* TVKaleidoscope.metal in Sources */ = {isa = PBXBuildFile; fileRef = D98D65C23D34BB9861A2626C /* TVKaleidoscope.metal */; };
 		40CCDAC2D8855E1F8AF96111 /* TVAboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA0234EDB29B91153A949FE7 /* TVAboutView.swift */; };
 		41BB757808343F6DE3116ACA /* AlbumCoverCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6581BBFF504F8BAA5B38470 /* AlbumCoverCache.swift */; };
@@ -217,6 +219,7 @@
 		3C9BAB797374ADD5B2683083 /* Updates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updates.swift; sourceTree = "<group>"; };
 		41756213822D289CE6E5D98A /* NativeVideoPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeVideoPlayer.swift; sourceTree = "<group>"; };
 		42E9465964E1A40B646867E4 /* AppearanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceView.swift; sourceTree = "<group>"; };
+		4B9EC5A7497EDD55DA931FB6 /* TVNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVNavigation.swift; sourceTree = "<group>"; };
 		4CEB33019888933A2455EB19 /* TVKaleidoscope.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = TVKaleidoscope.metal; sourceTree = "<group>"; };
 		4EFA099A27452963E48DAEFD /* MusicRoomApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicRoomApp.swift; sourceTree = "<group>"; };
 		50F3FF94B0657359491CB7D0 /* TVKaleidoscopeSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVKaleidoscopeSurface.swift; sourceTree = "<group>"; };
@@ -487,6 +490,7 @@
 				21FE99499ADF29BEBF367209 /* PlexVideo.swift */,
 				CFFD17F74980DC97E5F435E4 /* PlexVideoManifest.swift */,
 				8712B67A9D2431A2B0160DDC /* Track.swift */,
+				4B9EC5A7497EDD55DA931FB6 /* TVNavigation.swift */,
 				B231419E2817C1F973377DD4 /* VideoDetailsPage.swift */,
 				A2039AEF6F237EEFE851F5A1 /* VideoWatchStore.swift */,
 			);
@@ -679,6 +683,7 @@
 				B7ED9870A8F862FD22A8AAB8 /* PlexVideo.swift in Sources */,
 				41D79EEF812C5A9A994C8244 /* PlexVideoManifest.swift in Sources */,
 				F905822CE1DFB0F1DB80A2B6 /* TVKaleidoscope.metal in Sources */,
+				4013C4BCB3EBE83B64EE25FF /* TVNavigation.swift in Sources */,
 				559F2534C6897DF20AAC1E02 /* Track.swift in Sources */,
 				09FA5229CA9B1AB6B34BD1B9 /* VideoDetailsPage.swift in Sources */,
 				AD96252D7ED6ED6CE1A3368C /* VideoWatchStore.swift in Sources */,
@@ -785,6 +790,7 @@
 				553366239E97CB54D63B41BB /* PlexVideoManifest.swift in Sources */,
 				808C3E8E835C67BACE3CF0E3 /* TVFilament.metal in Sources */,
 				40C6885B2A3CD921E5069FF0 /* TVKaleidoscope.metal in Sources */,
+				273FDEEB20278438C38C0AC7 /* TVNavigation.swift in Sources */,
 				DF75E0B76CB29D9E9F9AF68C /* TVTunnel.metal in Sources */,
 				A69490A6AD7CB4C928AF43CD /* Track.swift in Sources */,
 				19C8471EF369CE7BD555B960 /* VideoDetailsPage.swift in Sources */,
@@ -889,7 +895,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 55;
+				CURRENT_PROJECT_VERSION = 56;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -904,7 +910,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
-				MARKETING_VERSION = 0.1.54;
+				MARKETING_VERSION = 0.1.55;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -994,7 +1000,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 55;
+				CURRENT_PROJECT_VERSION = 56;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -1015,7 +1021,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
-				MARKETING_VERSION = 0.1.54;
+				MARKETING_VERSION = 0.1.55;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

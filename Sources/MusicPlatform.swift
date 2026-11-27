@@ -619,7 +619,17 @@ struct LibraryBrowseControls<Selector: View>: View {
 
     var body: some View {
         Group {
-            #if os(iOS)
+            #if os(tvOS)
+            HStack(spacing: 18) {
+                if let query {
+                    TextField(placeholder, text: query)
+                        .disabled(searchDisabled)
+                        .accessibilityIdentifier("tv.library.search")
+                }
+                selector()
+            }
+            .focusSection()
+            #elseif os(iOS)
             row(searchWidth: nil)
             #else
             ViewThatFits(in: .horizontal) {
