@@ -128,11 +128,13 @@
   });
   window.addEventListener('resize', () => updateSidebar());
 
-  function selectArtworkSize(value) {
+  const artworkSizeControls = {'library-artwork-size':'libraryArtwork', 'video-poster-size':'videoPosterSize'};
+
+  function selectArtworkSize(control, value) {
     const size = ['small','large','extraLarge'].includes(value) ? value : 'medium';
-    layout.dataset.libraryArtwork = size;
-    get('library-artwork-size').value = size;
-    try { localStorage.setItem('musicroom-library-artwork-size', size); } catch {}
+    layout.dataset[artworkSizeControls[control]] = size;
+    get(control).value = size;
+    try { localStorage.setItem('musicroom-' + control, size); } catch {}
   }
 
   function cover(item) {
@@ -1246,7 +1248,8 @@
   get('glass-transparency').oninput = event => chooseGlassTransparency(event.target.value);
   get('artwork-colors').onchange = event => chooseArtworkColors(event.target.checked);
   get('animate-artwork-colors').onchange = event => chooseArtworkMotion(event.target.checked);
-  get('library-artwork-size').onchange = event => selectArtworkSize(event.target.value);
+  for (const control of Object.keys(artworkSizeControls))
+    get(control).onchange = event => selectArtworkSize(control, event.target.value);
   get('library-layout').onchange = event => useLibraryLayout(event.target.value);
   get('library-page-size').onchange = event => {
     selectPageSize(event.target.value);
@@ -1312,7 +1315,8 @@
   } catch {}
   try {
     selectPageSize(localStorage.getItem('musicroom-library-page-size'));
-    selectArtworkSize(localStorage.getItem('musicroom-library-artwork-size'));
+    for (const control of Object.keys(artworkSizeControls))
+      selectArtworkSize(control, localStorage.getItem('musicroom-' + control));
     useLibraryLayout(localStorage.getItem('musicroom-library-layout'));
     savedSidebarWidth = Number(localStorage.getItem('musicroom-sidebar-width')) || 0;
     for (const type of Object.keys(glassDefaults))

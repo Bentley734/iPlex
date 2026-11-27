@@ -283,6 +283,7 @@ enum LibraryLayout: String, CaseIterable, Identifiable {
 
 enum LibraryArtworkSize: String, CaseIterable, Identifiable {
     static let preferenceKey = "LibraryArtworkSize"
+    static let videoPosterPreferenceKey = "VideoPosterSize"
     case small, medium, large, extraLarge
 
     var id: Self { self }
@@ -325,6 +326,7 @@ struct MusicSettings: View {
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @AppStorage(LibraryLayout.preferenceKey) private var libraryLayout = LibraryLayout.grid
     @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
+    @AppStorage(LibraryArtworkSize.videoPosterPreferenceKey) private var videoPosterSize = LibraryArtworkSize.medium
     @AppStorage(VideoSubtitleMode.preferenceKey) private var subtitleMode = VideoSubtitleMode.off
     @AppStorage(LibraryPageSize.preferenceKey) private var pageSize = LibraryPageSize.standard
     @Environment(\.dismiss) private var dismiss
@@ -412,6 +414,11 @@ struct MusicSettings: View {
                         }
                     }
                     Picker("Library Artwork Size", selection: $libraryArtworkSize) {
+                        ForEach(LibraryArtworkSize.allCases) { size in
+                            Text(size.label).tag(size)
+                        }
+                    }
+                    Picker("Movie & TV Poster Size", selection: $videoPosterSize) {
                         ForEach(LibraryArtworkSize.allCases) { size in
                             Text(size.label).tag(size)
                         }

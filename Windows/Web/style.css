@@ -596,7 +596,15 @@ body {
 #video-browser { height:100%; display:flex; flex-direction:column; }
 #video-browser .content { overflow:auto; }
 #video-summary,#video-playing-summary { color:var(--muted); }
-.video-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(128px,1fr)); gap:20px; }
+:root { --video-poster-min:128px; --video-poster-max:166px; }
+:root[data-video-poster-size="small"] { --video-poster-min:97px; --video-poster-max:126px; }
+:root[data-video-poster-size="large"] { --video-poster-min:172px; --video-poster-max:223px; }
+:root[data-video-poster-size="extraLarge"] { --video-poster-min:220px; --video-poster-max:286px; }
+.video-grid {
+  display:grid; grid-template-columns:repeat(auto-fill,minmax(min(100%,var(--video-poster-min)),1fr)); gap:20px;
+}
+.video-grid:not(.video-episodes) > * { width:100%; max-width:var(--video-poster-max); }
+.video-grid:not(.video-episodes) .video-poster { width:100%; }
 .video-tile { display:grid; gap:8px; text-align:left; align-content:start; border:0; background:transparent; min-width:0; }
 .video-tile strong,.video-tile small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .video-tile small { color:var(--muted); margin-top:3px; }
