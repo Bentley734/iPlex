@@ -1,23 +1,23 @@
 import SwiftUI
 
-struct PlexMovieCredit {
+struct PlexVideoCredit {
     let name: String
     let role: String
     let photo: String?
 }
 
-struct PlexMovieDetails {
+struct PlexVideoDetails {
     let summary: String?
     let year: Int?
     let minutes: Int?
     let classification: String?
     let genres: [String]
     let backdrop: String?
-    let credits: [PlexMovieCredit]
+    let credits: [PlexVideoCredit]
     let formats: [String]
 }
 
-struct MovieDetailsPage<Actions: View>: View {
+struct VideoDetailsPage<Actions: View, Episodes: View>: View {
     let item: PlexVideoItem
     let server: String
     let section: String
@@ -29,11 +29,12 @@ struct MovieDetailsPage<Actions: View>: View {
     let play: () -> Void
     let download: () -> Void
     @ViewBuilder let actions: () -> Actions
+    @ViewBuilder let episodes: () -> Episodes
 
     @MusicAppearance private var theme
     @ObservedObject private var downloads = MediaDownloads.shared
     @State private var requestedDownload = false
-    @State private var details: PlexMovieDetails?
+    @State private var details: PlexVideoDetails?
     @State private var loadError = false
     @State private var retry = 0
 
@@ -82,6 +83,7 @@ struct MovieDetailsPage<Actions: View>: View {
                 if let details, !details.credits.isEmpty {
                     sectionPanel("Cast and Crew") { credits(details.credits) }
                 }
+                episodes()
                 if let details, !details.formats.isEmpty {
                     sectionPanel(details.formats.count == 1 ? "Video Format" : "Video Formats") {
                         ForEach(Array(details.formats.enumerated()), id: \.offset) { _, format in
@@ -91,7 +93,7 @@ struct MovieDetailsPage<Actions: View>: View {
                 }
                 if loadError {
                     HStack {
-                        Text("Plex couldn’t load the full movie details.").foregroundStyle(.secondary)
+                        Text("Plex couldn’t load the full details.").foregroundStyle(.secondary)
                         Button("Retry") { retry += 1 }.buttonStyle(.bordered)
                     }
                 }
@@ -104,7 +106,7 @@ struct MovieDetailsPage<Actions: View>: View {
             guard ready else { return }
             loadError = false
             do {
-                let result = try await service.movieDetails(server: server, section: section, item: item)
+                let result = try await service.videoDetails(server: server, section: section, item: item)
                 if !Task.isCancelled { details = result }
             } catch {
                 if !Task.isCancelled { loadError = true }
@@ -154,16 +156,18 @@ struct MovieDetailsPage<Actions: View>: View {
     }
 
     @ViewBuilder private var controls: some View {
-        Button(resume == nil ? "Play Movie" : "Resume", systemImage: "play.fill", action: play)
-            .buttonStyle(.borderedProminent)
-            .disabled(!ready)
-        Button("Download", systemImage: "arrow.down.circle") {
-            requestedDownload = true
-            download()
+        if item.type == "movie" {
+            Button(resume == nil ? "Play Movie" : "Resume", systemImage: "play.fill", action: play)
+                .buttonStyle(.borderedProminent)
+                .disabled(!ready)
+            Button("Download", systemImage: "arrow.down.circle") {
+                requestedDownload = true
+                download()
+            }
+            .buttonStyle(.bordered)
+            .disabled(!ready || downloads.busy)
         }
-        .buttonStyle(.bordered)
-        .disabled(!ready || downloads.busy)
-        Menu("Movie Actions", systemImage: "ellipsis.circle", content: actions)
+        Menu(item.type == "show" ? "Show Actions" : "Movie Actions", systemImage: "ellipsis.circle", content: actions)
             .disabled(!ready)
     }
 
@@ -177,20 +181,15 @@ struct MovieDetailsPage<Actions: View>: View {
         .musicGlass(theme, radius: 18)
     }
 
-    private func credits(_ credits: [PlexMovieCredit]) -> some View {
+    private func credits(_ credits: [PlexVideoCredit]) -> some View {
         ScrollView(.horizontal) {
             HStack(alignment: .top, spacing: 12) {
                 ForEach(Array(credits.enumerated()), id: \.offset) { _, credit in
                     VStack(alignment: .leading, spacing: 6) {
-                        if let photo = credit.photo {
-                            artwork(photo, icon: "person.crop.square")
-                                .frame(width: 64, height: 64)
-                        } else {
-                            Image(systemName: credit.role == "Director" ? "film" : "person")
-                                .frame(width: 64, height: 64)
-                                .background(theme.accent.opacity(0.14), in: .rect(cornerRadius: 12))
-                                .accessibilityHidden(true)
-                        }
+                        creditPortrait(credit)
+                            .frame(width: 64, height: 64)
+                            .clipShape(.rect(cornerRadius: 12))
+                            .accessibilityHidden(true)
                         Text(credit.name).font(.callout.weight(.semibold)).lineLimit(2)
                         if !credit.role.isEmpty {
                             Text(credit.role).font(.caption).foregroundStyle(.secondary).lineLimit(2)
@@ -200,6 +199,22 @@ struct MovieDetailsPage<Actions: View>: View {
                 }
             }
         }
+    }
+
+    @ViewBuilder private func creditPortrait(_ credit: PlexVideoCredit) -> some View {
+        let placeholder = Image(systemName: credit.role == "Director" ? "film" : "person")
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(theme.accent.opacity(0.14))
+        if let photo = credit.photo {
+            if let url = PlexParser.remoteCreditPhoto(photo), ready {
+                AsyncImage(url: url) { phase in
+                    if let image = phase.image { image.resizable().scaledToFill() }
+                    else { placeholder }
+                }
+            } else if photo.hasPrefix("/") {
+                artwork(photo, icon: "person.crop.square")
+            } else { placeholder }
+        } else { placeholder }
     }
 
     private func artwork(_ path: String?, icon: String, placeholder: Bool = true) -> some View {

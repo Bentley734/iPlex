@@ -2102,22 +2102,22 @@ extension PlexParser {
         return PlexVideoPage(items: items, next: more ? end : nil)
     }
 
-    static func movieDetails(_ data: Data, section: String, item: PlexVideoItem) throws -> PlexMovieDetails {
+    static func videoDetails(_ data: Data, section: String, item: PlexVideoItem) throws -> PlexVideoDetails {
         guard let row = try metadataRows(data, sectionID: section).first(where: {
-            $0["type"] as? String == "movie" && numericIdentifier($0["ratingKey"]) == item.id
-        }) else { throw PlexServiceError("This movie is no longer available in the selected library.") }
+            $0["type"] as? String == item.type && numericIdentifier($0["ratingKey"]) == item.id
+        }) else { throw PlexServiceError("This title is no longer available in the selected library.") }
 
         func tags(_ field: String, limit: Int) -> [[String: Any]] {
             Array(((row[field] as? [[String: Any]]) ?? []).prefix(limit))
         }
-        let directors = tags("Director", limit: 8).compactMap { credit -> PlexMovieCredit? in
+        let directors = tags("Director", limit: 8).compactMap { credit -> PlexVideoCredit? in
             guard let name = string(credit["tag"], maximum: 150) else { return nil }
-            return PlexMovieCredit(name: name, role: "Director", photo: videoArtworkPath(credit["thumb"] as? String))
+            return PlexVideoCredit(name: name, role: "Director", photo: creditPhoto(credit["thumb"] as? String))
         }
-        let cast = tags("Role", limit: 24).compactMap { credit -> PlexMovieCredit? in
+        let cast = tags("Role", limit: 24).compactMap { credit -> PlexVideoCredit? in
             guard let name = string(credit["tag"], maximum: 150) else { return nil }
-            return PlexMovieCredit(name: name, role: string(credit["role"], maximum: 180) ?? "",
-                                   photo: videoArtworkPath(credit["thumb"] as? String))
+            return PlexVideoCredit(name: name, role: string(credit["role"], maximum: 180) ?? "",
+                                   photo: creditPhoto(credit["thumb"] as? String))
         }
         let formats = tags("Media", limit: 8).compactMap { media -> String? in
             let resolution = string(media["videoResolution"], maximum: 12) ?? ""
@@ -2130,11 +2130,28 @@ extension PlexParser {
             return fields.isEmpty ? nil : fields.joined(separator: " · ")
         }
         let duration = integer(row["duration"]).flatMap { (1...259_200_000).contains($0) ? $0 / 60_000 : nil }
-        return PlexMovieDetails(summary: string(row["summary"], maximum: 8_000), year: integer(row["year"]),
+        return PlexVideoDetails(summary: string(row["summary"], maximum: 8_000), year: integer(row["year"]),
                                 minutes: duration, classification: string(row["contentRating"], maximum: 24),
                                 genres: tags("Genre", limit: 12).compactMap { string($0["tag"], maximum: 80) },
                                 backdrop: videoArtworkPath(row["art"] as? String),
                                 credits: directors + cast, formats: formats)
+    }
+
+    private static func creditPhoto(_ value: String?) -> String? {
+        if let path = value, path.hasPrefix("/") { return musicArtworkPath(path) }
+        return value.flatMap { remoteCreditPhoto($0)?.absoluteString }
+    }
+
+    static func remoteCreditPhoto(_ value: String) -> URL? {
+        guard value.count < 250 else { return nil }
+        if value.range(of: #"^https?://image\.tmdb\.org/t/p/(?:original|w[0-9]{2,4})/[A-Za-z0-9_-]+\.(?:jpe?g|png|webp)\z"#,
+                       options: .regularExpression) != nil,
+           let image = value.split(separator: "/").last {
+            return URL(string: "https://image.tmdb.org/t/p/w185/" + image)
+        }
+        if value.range(of: #"^https://metadata-static\.plex\.tv/(?:[a-f0-9]/)?people/[a-f0-9]+\.(?:jpe?g|png|webp)\z"#,
+                       options: .regularExpression) != nil { return URL(string: value) }
+        return nil
     }
 
     static func videoArtworkPath(_ value: String?) -> String? {
@@ -2342,13 +2359,13 @@ extension PlexService {
         return request
     }
 
-    func movieDetails(server: String, section: String, item: PlexVideoItem) async throws -> PlexMovieDetails {
-        guard item.type == "movie", PlexParser.validPlaylistID(item.id) else {
-            throw PlexServiceError("Choose a movie first.")
+    func videoDetails(server: String, section: String, item: PlexVideoItem) async throws -> PlexVideoDetails {
+        guard PlexVideoKind(rawValue: item.type) != nil, PlexParser.validPlaylistID(item.id) else {
+            throw PlexServiceError("Choose a movie or TV show first.")
         }
         return try await serverOperation(server: server) { record, base, operation in
             let request = try self.serverRequest(base: base, path: "/library/metadata/" + item.id, query: [], token: record.token)
-            return try PlexParser.movieDetails(operation.fetch(request, limit: 8 * 1024 * 1024, timeout: 8),
+            return try PlexParser.videoDetails(operation.fetch(request, limit: 8 * 1024 * 1024, timeout: 8),
                                                section: section, item: item)
         }
     }

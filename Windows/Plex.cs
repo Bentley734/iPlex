@@ -1091,7 +1091,7 @@ namespace MusicRoom
             }
             if (action == "videoSearchMatches" || action == "videoApplyMatch")
             { await VideoMatchAction(body, action, id); return; }
-            if (action == "movieDetails" || action == "videoBrowse" || action == "videoPlay" || action == "videoNext" || action == "videoClose" ||
+            if (action == "videoDetails" || action == "videoBrowse" || action == "videoPlay" || action == "videoNext" || action == "videoClose" ||
                 action == "videoWatchState" || action == "videoWatchUpdate" || action == "videoWatchClear")
             { await VideoAction(body, action, id); return; }
             if (action == "lyrics") { await LoadLyrics(Str(body, "handle"), id); return; }

@@ -832,3 +832,6 @@ body {
   .movie-hero { min-height:270px; }
   #movie-poster { display:none; }
 }
+
+#show-browse .content { padding:0; overflow:visible; }
+#show-all-seasons { margin-bottom:12px; }

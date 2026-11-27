@@ -133,6 +133,7 @@ struct PlexVideoBrowser: View {
     let pauseMusic: () -> Void
     let sectionName: String
 
+    @MusicAppearance private var theme
     @State private var snapshot: PlexVideoSnapshot?
     @State private var discovered = false
     @State private var libraries = [PlexLibrary]()
@@ -147,7 +148,7 @@ struct PlexVideoBrowser: View {
     @State private var discoveryRetry = 0
     @State private var generation = UUID()
     @State private var presentation: PlexVideoItem?
-    @State private var movie: PlexVideoItem?
+    @State private var detail: PlexVideoItem?
     @State private var matching: PlexVideoItem?
     @AppStorage(LibraryPageSize.preferenceKey) private var pageSize = LibraryPageSize.standard
     @AppStorage(LibraryArtworkSize.videoPosterPreferenceKey) private var posterSize = LibraryArtworkSize.medium
@@ -182,28 +183,33 @@ struct PlexVideoBrowser: View {
     var body: some View {
         ZStack {
             listing
-                .opacity(movie == nil ? 1 : 0)
-                .allowsHitTesting(movie == nil)
-                .accessibilityHidden(movie != nil)
-                .disabled(movie != nil)
-            if let movie {
-                MovieDetailsPage(item: movie, server: server, section: selection, service: service,
-                                 ready: ready, resume: resumePosition(for: movie), sectionName: sectionName,
-                                 back: { self.movie = nil },
-                                 play: { presentation = movie }, download: {
-                    MediaDownloads.shared.downloadVideo(service: service, server: server, section: selection, item: movie)
-                }) {
-                    watchActions(movie)
-                    Button("Fix Match", systemImage: "magnifyingglass") { matching = movie }
+                .opacity(detail == nil ? 1 : 0)
+                .allowsHitTesting(detail == nil)
+                .accessibilityHidden(detail != nil)
+                .disabled(detail != nil)
+            if let detail {
+                VideoDetailsPage(item: detail, server: server, section: selection, service: service,
+                                 ready: ready, resume: detail.type == "movie" ? resumePosition(for: detail) : nil,
+                                 sectionName: sectionName, back: closeDetails,
+                                 play: { presentation = detail }, download: {
+                    MediaDownloads.shared.downloadVideo(service: service, server: server, section: selection, item: detail)
+                }, actions: {
+                    if detail.type == "movie" { watchActions(detail) }
+                    Button("Fix Match", systemImage: "magnifyingglass") { matching = detail }
                         .disabled(!ready)
-                }
-                .id(movie.id)
+                }, episodes: {
+                    if detail.type == "show" { showNavigation }
+                })
+                .id(detail.id)
                 #if os(tvOS)
-                .onExitCommand { self.movie = nil }
+                .onExitCommand {
+                    if episodes { trail.removeLast() }
+                    else { closeDetails() }
+                }
                 #endif
             }
         }
-        .pageTransition(on: movie?.id)
+        .pageTransition(on: detail?.id)
         .clipped()
         .task(id: [String(serverReady), String(discoveryRetry)]) {
             if serverReady { await discover() }
@@ -220,13 +226,13 @@ struct PlexVideoBrowser: View {
         .onChange(of: selection) { _, value in
             if !value.isEmpty { UserDefaults.standard.set(value, forKey: preference) }
             trail = []
-            movie = nil
+            detail = nil
             items = showingRoot && snapshot?.library.id == value ? snapshot?.items ?? [] : []
             refreshWatchState()
         }
         .sheet(item: $matching) { item in
             PlexVideoMatchEditor(item: item, server: server, section: selection, service: service) {
-                if movie?.id == item.id { movie = nil }
+                if detail?.id == item.id { closeDetails() }
                 retry += 1
             }
         }
@@ -274,61 +280,98 @@ struct PlexVideoBrowser: View {
     private func videoScroll(availableWidth: CGFloat) -> some View {
         ScrollView {
             if parent == nil, query.isEmpty, !recent.isEmpty { continueWatching }
-            if episodes {
-                LazyVStack(alignment: .leading, spacing: 10) {
-                    ForEach(items) { item in
-                        Button { presentation = item } label: {
-                            HStack(spacing: 15) {
-                                poster(item).frame(width: 100, height: 62)
-                                labels(item)
-                                Spacer()
-                                Image(systemName: watchedItems.contains(item.id) ? "checkmark.circle.fill" : "play.circle")
-                            }.frame(maxWidth: .infinity, alignment: .leading)
-                        }.buttonStyle(.bordered)
-                            .glassHover(lift: true)
-                            .contextMenu { watchActions(item); downloadAction(item) }
-                    }
-                }
-            } else {
-                posterGrid(VideoPosterGridLayout(availableWidth: availableWidth, size: posterSize))
-            }
-            if !serverReady {
-                if let connectionError {
-                    VStack(spacing: 8) {
-                        Text(connectionError).foregroundStyle(.secondary)
-                        Button("Retry", action: retryConnection)
-                    }.padding(16)
-                } else {
-                    ProgressView("Reconnecting to Plex…").padding(16)
-                }
-            } else if let message {
-                VStack(spacing: 8) {
-                    Text(message).foregroundStyle(.secondary)
-                    Button("Retry") {
-                        if !discovered { discoveryRetry += 1 }
-                        else { retry += 1 }
-                    }
-                }.padding(16)
-            } else if busy {
-                ProgressView().padding(16)
-            } else if items.isEmpty {
-                Text(libraries.isEmpty ? "No \(kind.title) libraries on this Plex server." : "No matches.")
-                    .foregroundStyle(.secondary).padding(16)
-            }
-            if let next, message == nil, pageSize != .all {
-                Button("Load more") { Task { await load(offset: next, generation: generation) } }
-                    .disabled(busy)
-            }
+            posterGrid(VideoPosterGridLayout(availableWidth: availableWidth, size: posterSize))
+            listingStatus
         }
         .libraryScrollTopInset()
+    }
+
+    private func closeDetails() {
+        detail = nil
+        trail = []
+    }
+
+    private var showNavigation: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            if episodes {
+                Button("All Seasons", systemImage: "chevron.backward") { trail.removeLast() }
+                    .buttonStyle(.bordered)
+                Text(parent?.title ?? "Episodes").font(.title2.bold()).accessibilityAddTraits(.isHeader)
+            } else {
+                Text("Seasons").font(.title2.bold()).accessibilityAddTraits(.isHeader)
+            }
+            LazyVStack(alignment: .leading, spacing: 10) {
+                ForEach(items.filter { $0.type == (episodes ? "episode" : "season") }) { item in
+                    Button {
+                        if episodes { presentation = item }
+                        else { trail.append(item) }
+                    } label: {
+                        HStack(spacing: 15) {
+                            poster(item).frame(width: 100, height: 62)
+                            VStack(alignment: .leading, spacing: 4) {
+                                labels(item)
+                                if episodes, let position = resumePosition(for: item) {
+                                    Text("Resume at " + videoTime(position)).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            Image(systemName: episodes
+                                  ? (watchedItems.contains(item.id) ? "checkmark.circle.fill" : "play.circle")
+                                  : "chevron.forward")
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.bordered)
+                    .disabled(!ready)
+                    .contextMenu {
+                        if episodes { watchActions(item); downloadAction(item) }
+                    }
+                }
+            }
+            listingStatus
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .musicGlass(theme, radius: 18)
+        .pageTransition(on: parent?.id)
+    }
+
+    @ViewBuilder private var listingStatus: some View {
+        if !serverReady {
+            if let connectionError {
+                VStack(spacing: 8) {
+                    Text(connectionError).foregroundStyle(.secondary)
+                    Button("Retry", action: retryConnection)
+                }.padding(16)
+            } else {
+                ProgressView("Reconnecting to Plex…").padding(16)
+            }
+        } else if let message {
+            VStack(spacing: 8) {
+                Text(message).foregroundStyle(.secondary)
+                Button("Retry") {
+                    if !discovered { discoveryRetry += 1 }
+                    else { retry += 1 }
+                }
+            }.padding(16)
+        } else if busy {
+            ProgressView().padding(16)
+        } else if items.isEmpty {
+            Text(libraries.isEmpty ? "No \(kind.title) libraries on this Plex server." : "No matches.")
+                .foregroundStyle(.secondary).padding(16)
+        }
+        if let next, message == nil, pageSize != .all {
+            Button("Load more") { Task { await load(offset: next, generation: generation) } }
+                .disabled(busy)
+        }
     }
 
     private func posterGrid(_ layout: VideoPosterGridLayout) -> some View {
         LazyVGrid(columns: layout.columns, alignment: .leading, spacing: 22) {
             ForEach(items) { item in
                 Button {
-                    if item.type == "movie" { movie = item }
-                    else { trail.append(item) }
+                    detail = item
+                    if item.type == "show" { trail = [item] }
                 } label: {
                     VStack(alignment: .leading, spacing: 8) {
                         poster(item).frame(width: layout.posterWidth, height: layout.posterHeight)

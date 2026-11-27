@@ -104,7 +104,7 @@
   const moviePage = get('movie-details');
   const listingHeader = browser.querySelector('.library-page-header');
   const listingContent = browser.querySelector('.content');
-  let selectedMovie, movieOpener, movieDetailSequence = 0, requestedMovieDownload = false, downloadBusy = false;
+  let selectedDetail, movieOpener, videoDetailSequence = 0, requestedMovieDownload = false, downloadBusy = false;
 
   let watchRecords = new Map(), watchSequence = 0, activeItem, activeScope, lastReport = 0;
   let lastSaved = 0, awaitingSeek = false, nativeActive = false;
@@ -165,7 +165,7 @@
     matchEdit.saving = false;
     if (reply.saved) {
       matchDialog.close();
-      closeMovie();
+      closeDetails();
       browse();
       return;
     }
@@ -283,7 +283,7 @@
       parent = [];
       watchRecords.clear();
     }
-    if (library !== restored) closeMovie();
+    if (library !== restored) closeDetails();
     library = restored;
     libraryReady = available.some(row => row.id === library);
     const choices = libraryReady ? available : (restored ? [{name:preview.name, id:restored}] : []);
@@ -316,7 +316,7 @@
         previous?.videoConnectionError !== state.videoConnectionError ||
         JSON.stringify(previous?.videoLibraries) !== JSON.stringify(state.videoLibraries)) {
       if (changedServer) {
-        closeMovie();
+        closeDetails();
         if (dialog.open) dialog.close();
         if (matchDialog.open) matchDialog.close();
         watchRecords.clear();
@@ -337,7 +337,7 @@
 
   function showMusic() {
     if (!kind) return;
-    closeMovie();
+    closeDetails();
     kind = '';
     if (matchDialog.open) matchDialog.close();
     watchRecords.clear();
@@ -382,7 +382,7 @@
   };
 
   function openSection(type) {
-    closeMovie();
+    closeDetails();
     if (archiveOpen) openArchive(false);
     if (downloadsOpen) openDownloads(false);
     kind = type;
@@ -536,7 +536,12 @@
       rendered.clear();
     }
     const current = parent.at(-1);
-    if (!selectedMovie) window.interfaceMotion.show(browser, ['video', kind, library, current?.key]);
+    if (!selectedDetail) window.interfaceMotion.show(browser, ['video', kind, library, current?.key]);
+    if (selectedDetail?.type === 'show') {
+      const season = current?.type === 'season';
+      get('show-all-seasons').hidden = !season;
+      get('show-browse-title').textContent = season ? current.title : 'Seasons';
+    }
     get('video-title').textContent = current?.title || titles[kind];
     search.placeholder = 'Search ' + titles[kind];
     search.setAttribute('aria-label', search.placeholder);
@@ -544,7 +549,7 @@
     search.disabled = !libraryReady;
     get('video-back').hidden = !current;
     const summary = get('video-summary');
-    summary.textContent = current?.summary || '';
+    summary.textContent = selectedDetail?.key === current?.key ? '' : current?.summary || '';
     summary.hidden = !summary.textContent;
     tiles.classList.toggle('video-episodes', current?.type === 'season');
     loadMore.hidden = true;
@@ -633,7 +638,7 @@
       labels.append(badge);
       tile.append(poster, labels);
       tile.onclick = () => {
-        if (row.type === 'movie') openMovie(row, tile);
+        if (row.type === 'movie' || row.type === 'show') openDetails(row, tile);
         else if (row.type === 'episode') open(row);
         else { parent.push(row); browse(); }
       };
@@ -677,85 +682,105 @@
   }
 
   function updateMovieActions() {
-    if (!selectedMovie) return;
-    const watch = watchRecords.get(selectedMovie.key);
+    if (selectedDetail?.type !== 'movie') return;
+    const watch = watchRecords.get(selectedDetail.key);
     const resume = watch && !watch.watched && watch.seconds >= 5;
     get('movie-play').textContent = resume ? 'Resume' : 'Play Movie';
     get('movie-watch').textContent = watch?.watched ? 'Mark Unwatched' : 'Mark Watched';
     showMovieText(get('movie-resume'), resume ? 'Continue at ' + watchTime(watch.seconds) : '');
   }
 
-  function openMovie(item, opener) {
-    selectedMovie = item;
+  function openDetails(item, opener) {
+    selectedDetail = item;
     requestedMovieDownload = false;
     showMovieText(get('movie-download-status'), '');
     movieOpener = opener;
-    listingHeader.hidden = listingContent.hidden = true;
+    const show = item.type === 'show';
+    const showBrowse = get('show-browse');
+    listingHeader.hidden = true;
+    listingContent.hidden = !show;
+    showBrowse.hidden = !show;
+    for (const id of ['movie-play','movie-download','movie-watch','movie-resume']) get(id).hidden = show;
+    if (show) {
+      showBrowse.append(listingContent);
+      parent = [item];
+    }
     moviePage.hidden = false;
     moviePage.scrollTop = 0;
-    get('movie-back').textContent = '‹ Back to ' + titles.movie;
+    get('movie-back').textContent = '‹ Back to ' + titles[item.type];
     get('movie-detail-title').textContent = item.title;
     setMovieArt(get('movie-poster'), item.artwork);
     updateMovieActions();
-    renderMovieDetails({});
-    window.interfaceMotion.show(moviePage, ['movieDetails', library, item.key]);
+    renderVideoDetails({});
+    window.interfaceMotion.show(moviePage, ['videoDetails', library, item.key]);
     get('movie-detail-title').focus({preventScroll:true});
-    requestMovieDetails();
+    requestVideoDetails();
+    if (show) browse();
   }
 
-  function closeMovie() {
-    if (!selectedMovie) return;
-    selectedMovie = null;
-    ++movieDetailSequence;
+  function closeDetails() {
+    if (!selectedDetail) return;
+    if (selectedDetail.type === 'show') {
+      browser.insertBefore(listingContent, moviePage);
+      parent = [];
+    }
+    selectedDetail = null;
+    ++videoDetailSequence;
     moviePage.hidden = true;
     listingHeader.hidden = listingContent.hidden = false;
   }
 
   get('movie-back').onclick = () => {
-    closeMovie();
-    window.interfaceMotion.show(browser, ['video', kind, library, parent.at(-1)?.key]);
+    const wasShow = selectedDetail?.type === 'show';
+    closeDetails();
+    if (wasShow) browse();
+    else window.interfaceMotion.show(browser, ['video', kind, library, parent.at(-1)?.key]);
     if (movieOpener?.isConnected) movieOpener.focus({preventScroll:true});
     else search.focus({preventScroll:true});
   };
+  get('show-all-seasons').onclick = () => { if (parent.at(-1)?.type === 'season') { parent.pop(); browse(); } };
   moviePage.addEventListener('keydown', event => {
-    if (event.key === 'Escape') { event.preventDefault(); get('movie-back').click(); }
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      get(parent.at(-1)?.type === 'season' ? 'show-all-seasons' : 'movie-back').click();
+    }
   });
-  get('movie-play').onclick = () => { if (selectedMovie) open(selectedMovie); };
-  get('movie-match').onclick = () => { if (selectedMovie) openMatch(selectedMovie); };
+  get('movie-play').onclick = () => { if (selectedDetail?.type === 'movie') open(selectedDetail); };
+  get('movie-match').onclick = () => { if (selectedDetail) openMatch(selectedDetail); };
   get('movie-download').onclick = () => {
-    if (!selectedMovie || downloadBusy) return;
+    if (selectedDetail?.type !== 'movie' || downloadBusy) return;
     requestedMovieDownload = true;
-    host({action:'offlineDownloadVideo', item:selectedMovie.key, library,
-      kind:'movie', title:selectedMovie.title, detail:selectedMovie.subtitle, version:-1});
+    host({action:'offlineDownloadVideo', item:selectedDetail.key, library,
+      kind:'movie', title:selectedDetail.title, detail:selectedDetail.subtitle, version:-1});
   };
   get('movie-watch').onclick = () => {
-    if (!selectedMovie) return;
-    const {key, type, title, subtitle, thumb} = selectedMovie;
+    if (selectedDetail?.type !== 'movie') return;
+    const {key, type, title, subtitle, thumb} = selectedDetail;
     if (watchRecords.get(key)?.watched) {
       watchRecords.delete(key);
       host({action:'videoWatchClear', id:++watchSequence, ...watchContext(), item:key, type});
     } else {
-      watchRecords.set(key, {...selectedMovie, watched:true, seconds:0});
+      watchRecords.set(key, {...selectedDetail, watched:true, seconds:0});
       host({action:'videoWatchUpdate', id:++watchSequence, ...watchContext(), item:key,
         type, title, subtitle, artwork:thumb, watched:true, seconds:0});
     }
     renderWatch();
   };
 
-  function requestMovieDetails() {
-    if (!selectedMovie) return;
+  function requestVideoDetails() {
+    if (!selectedDetail) return;
     showMovieText(get('movie-detail-status'), '');
     get('movie-detail-retry').hidden = true;
-    host({action:'movieDetails', id:++movieDetailSequence, item:selectedMovie.key, ...watchContext()});
+    host({action:'videoDetails', id:++videoDetailSequence, item:selectedDetail.key, ...watchContext()});
   }
 
-  function renderMovieDetails(details) {
-    get('movie-facts').textContent = [details.year || selectedMovie.subtitle, details.minutes ? details.minutes + ' min' : '',
+  function renderVideoDetails(details) {
+    get('movie-facts').textContent = [details.year || selectedDetail.subtitle, details.minutes ? details.minutes + ' min' : '',
       details.classification].filter(Boolean).join('  ·  ');
     setMovieArt(get('movie-backdrop'), details.backdrop);
     showMovieText(get('movie-genres'), (details.genres || []).join(' · '));
     const synopsis = get('movie-synopsis');
-    const summary = details.summary || selectedMovie.summary || '';
+    const summary = details.summary || selectedDetail.summary || '';
     synopsis.hidden = !summary;
     synopsis.querySelector('p').textContent = summary;
     const credits = get('movie-credits'), formats = get('movie-formats');
@@ -763,7 +788,11 @@
     credits.querySelector('ul').replaceChildren(...(details.credits || []).map(credit => {
       const li = document.createElement('li'), image = document.createElement('img');
       image.alt = '';
-      setMovieArt(image, credit.photo);
+      if (/^https:\/\/(?:image\.tmdb\.org\/t\/p\/w185\/[A-Za-z0-9_-]+|metadata-static\.plex\.tv\/(?:[a-f0-9]\/)?people\/[a-f0-9]+)\.(?:jpe?g|png|webp)$/.test(credit.photo)) {
+        image.referrerPolicy = 'no-referrer';
+        image.loading = 'lazy';
+        image.src = credit.photo;
+      } else setMovieArt(image, credit.photo);
       const initials = document.createElement('span');
       initials.className = 'movie-credit-symbol';
       initials.textContent = credit.name.trim().split(/\s+/).slice(0,2).map(word => word[0]).join('');
@@ -787,12 +816,12 @@
     }));
   }
 
-  get('movie-detail-retry').onclick = requestMovieDetails;
-  window.plexMovieDetails = reply => {
-    if (!selectedMovie || reply.id !== movieDetailSequence || reply.key !== selectedMovie.key) return;
+  get('movie-detail-retry').onclick = requestVideoDetails;
+  window.plexVideoDetails = reply => {
+    if (!selectedDetail || reply.id !== videoDetailSequence || reply.key !== selectedDetail.key) return;
     showMovieText(get('movie-detail-status'), reply.error || '');
     get('movie-detail-retry').hidden = !reply.error;
-    if (!reply.error) renderMovieDetails(reply);
+    if (!reply.error) renderVideoDetails(reply);
   };
 
   function open(item) {

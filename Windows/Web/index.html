@@ -2,7 +2,7 @@
 <html lang="en" data-glass>
 <head>
   <meta charset="utf-8">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob:; media-src https://media.musicroom.invalid blob:; connect-src https://media.musicroom.invalid; object-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' blob: https://image.tmdb.org https://metadata-static.plex.tv; media-src https://media.musicroom.invalid blob:; connect-src https://media.musicroom.invalid; object-src 'none'; base-uri 'none'; form-action 'none'">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>iPlex</title>
   <link rel="icon" href="prismatic-note.ico">
@@ -147,6 +147,10 @@
         </section>
         <section class="movie-detail-panel" id="movie-credits" hidden>
           <h2>Cast and Crew</h2><ul></ul>
+        </section>
+        <section class="movie-detail-panel" id="show-browse" aria-labelledby="show-browse-title" hidden>
+          <button id="show-all-seasons" type="button" hidden>‹ All Seasons</button>
+          <h2 id="show-browse-title">Seasons</h2>
         </section>
         <section class="movie-detail-panel" id="movie-formats" hidden>
           <h2>Video Format</h2><ul></ul>

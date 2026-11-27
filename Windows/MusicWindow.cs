@@ -426,6 +426,12 @@ namespace MusicRoom
                 var uri = new Uri(args.Request.Uri);
                 var path = uri.AbsolutePath;
                 var method = args.Request.Method;
+                if (uri.Scheme == "https" && (method == "GET" || method == "HEAD") &&
+                    args.ResourceContext == CoreWebView2WebResourceContext.Image &&
+                    view.Source != null && view.Source.AbsoluteUri == Page &&
+                    WindowsMediaService.RemoteCreditPhoto(uri.AbsoluteUri) == uri.AbsoluteUri)
+                    return;
+
                 if (uri.Scheme == "https" && uri.IsDefaultPort && uri.Host == "musicroom.invalid" && uri.Query.Length == 0)
                 {
                     byte[] data;
