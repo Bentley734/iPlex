@@ -21,10 +21,17 @@ ditto --norsrc --noextattr --noqtn "$project/Assets/HeaderMarks" "$bundle/Conten
 ditto --norsrc --noextattr --noqtn "$project/Assets/GlassBackgrounds" "$bundle/Contents/Resources/GlassBackgrounds"
 cp "$project"/Assets/VideoLAN-*.txt "$bundle/Contents/Resources/"
 cp "$project/Assets/install-update.sh" "$bundle/Contents/Resources/install-update.sh"
+ditto --norsrc --noextattr --noqtn "$project/ToolDrive/macOS/Resources" "$bundle/Contents/Resources/ToolDrive"
+python3 "$project/ToolDrive/Desktop/integrate.py" "$bundle/Contents/Resources/ToolDrive/index.html"
 scratch="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 for architecture in arm64 x86_64; do
+    mkdir -p "$scratch/$architecture"
     xcrun swiftc -parse-as-library -O -target "$architecture-apple-macosx14.0" \
+        -module-name ToolDriveMac -emit-module -emit-library -static \
+        "$project"/ToolDrive/macOS/*.swift -o "$scratch/$architecture/libToolDriveMac.a"
+    xcrun swiftc -parse-as-library -O -target "$architecture-apple-macosx14.0" \
+        -I "$scratch/$architecture" -L "$scratch/$architecture" -lToolDriveMac \
         -F "$kit" -L "$frameworks" -lVLCKit -Xlinker -rpath -Xlinker @executable_path/../Frameworks \
         "$project"/Sources/*.swift -o "$scratch/iPlex-$architecture"
 done

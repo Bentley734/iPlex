@@ -131,6 +131,7 @@ struct PlexVideoBrowser: View {
     let connectionError: String?
     let retryConnection: () -> Void
     let pauseMusic: () -> Void
+    let sectionName: String
 
     @State private var snapshot: PlexVideoSnapshot?
     @State private var discovered = false
@@ -153,7 +154,8 @@ struct PlexVideoBrowser: View {
     @State private var watchedItems = Set<String>()
 
     init(kind: PlexVideoKind, server: String, service: PlexService, serverReady: Bool,
-         connectionError: String?, retryConnection: @escaping () -> Void, pauseMusic: @escaping () -> Void) {
+         connectionError: String?, retryConnection: @escaping () -> Void, pauseMusic: @escaping () -> Void,
+         sectionName: String? = nil) {
         self.kind = kind
         self.server = server
         self.service = service
@@ -161,6 +163,7 @@ struct PlexVideoBrowser: View {
         self.connectionError = connectionError
         self.retryConnection = retryConnection
         self.pauseMusic = pauseMusic
+        self.sectionName = sectionName ?? kind.title
         let saved = PlexVideoSnapshot.restore(kind: kind, server: server)
         _snapshot = State(initialValue: saved)
         _libraries = State(initialValue: saved.map { [$0.library] } ?? [])
@@ -252,7 +255,7 @@ struct PlexVideoBrowser: View {
                             }.frame(maxWidth: .infinity, alignment: .leading)
                         }.buttonStyle(.bordered)
                             .glassHover(lift: true)
-                            .contextMenu { watchActions(item) }
+                            .contextMenu { watchActions(item); downloadAction(item) }
                     }
                 }
             } else {
@@ -318,7 +321,7 @@ struct PlexVideoBrowser: View {
                 .glassHover(lift: true)
                 .disabled(!ready)
                 .contextMenu {
-                    if ready && item.type == "movie" { watchActions(item) }
+                    if ready && item.type == "movie" { watchActions(item); downloadAction(item) }
                     if ready && item.type == kind.rawValue {
                         Button("Fix Match", systemImage: "magnifyingglass") { matching = item }
                     }
@@ -333,7 +336,7 @@ struct PlexVideoBrowser: View {
                 Button("Back", systemImage: "chevron.left") { trail.removeLast() }
                     .labelStyle(.iconOnly)
             }
-            Text(parent?.title ?? kind.title)
+            Text(parent?.title ?? sectionName)
                 #if os(macOS)
                 .font(.system(size: 31, weight: .bold))
                 #else
@@ -344,7 +347,7 @@ struct PlexVideoBrowser: View {
     }
 
     private var browseControls: some View {
-        LibraryBrowseControls(placeholder: "Search " + kind.title.lowercased(),
+        LibraryBrowseControls(placeholder: "Search " + sectionName,
                               query: parent == nil && !selection.isEmpty ? $query : nil,
                               searchDisabled: !ready) {
             if !libraries.isEmpty {
@@ -352,7 +355,7 @@ struct PlexVideoBrowser: View {
                     ForEach(libraries, id: \.id) { Text($0.name).tag($0.id) }
                 }
                 .labelsHidden()
-                .accessibilityLabel("Switch " + kind.title + " Library")
+                .accessibilityLabel("Switch " + sectionName + " Library")
                 .disabled(!ready)
             }
         }
@@ -360,6 +363,13 @@ struct PlexVideoBrowser: View {
 
     private func videoSession(_ item: PlexVideoItem) -> some View {
         PlexVideoSession(item: item, server: server, section: selection, service: service, pauseMusic: pauseMusic)
+    }
+
+    private func downloadAction(_ item: PlexVideoItem) -> some View {
+        Button("Download", systemImage: "arrow.down.circle") {
+            MediaDownloads.shared.downloadVideo(service: service, server: server, section: selection, item: item)
+        }
+        .disabled(!ready)
     }
 
     private var continueWatching: some View {
@@ -704,6 +714,12 @@ private struct PlexVideoPlayback: View {
                         VStack(alignment: .leading) { versionControls }
                     }
                 }
+                if selectedVersion >= 0, source?.versions.first(where: { $0.id == selectedVersion })?.file != nil {
+                    Button("Download Original", systemImage: "arrow.down.circle") {
+                        MediaDownloads.shared.downloadVideo(service: service, server: server, section: section,
+                                                            item: item, version: selectedVersion)
+                    }
+                }
             }
             .padding(12)
             .musicGlass(appearance, radius: 16)
@@ -737,10 +753,10 @@ private struct PlexVideoPlayback: View {
             } else if pending {
                 ProgressView("Preparing video…").frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let native {
-                NativeVideoPlayer(url: native, startAt: resumeAt.seconds, subtitleMode: subtitleMode, progress: saveProgress) { seconds in
+                NativeVideoPlayer(url: native, startAt: resumeAt.seconds, subtitleMode: subtitleMode, progress: saveProgress, fallback: { seconds in
                     resumeAt = CMTime(seconds: seconds >= 5 ? seconds : lastSaved, preferredTimescale: 1_000)
                     forceTranscode = true
-                }
+                })
                 #if os(macOS)
                 .environment(\.macVideoPresentation, presentation)
                 #endif

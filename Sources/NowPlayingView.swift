@@ -563,6 +563,9 @@ struct LibraryQueueActions: View {
         Button("Add to Queue", systemImage: "text.append") {
             library.enqueue(entry, track: track, playNext: false)
         }
+        Button("Download", systemImage: "arrow.down.circle") {
+            library.downloadMusic(entry, track: track)
+        }
         if let trackID = track?.plexID ?? (entry.kind == .tracks ? entry.id : nil) {
             Button("Add to Playlist", systemImage: "text.badge.plus") {
                 library.editPlaylist(track: trackID, trackTitle: track?.title ?? entry.title)

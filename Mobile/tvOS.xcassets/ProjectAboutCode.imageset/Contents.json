@@ -1,0 +1,15 @@
+{
+  "images" : [
+    {
+      "filename" : "project-about.png",
+      "idiom" : "tv"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  },
+  "properties" : {
+    "template-rendering-intent" : "original"
+  }
+}

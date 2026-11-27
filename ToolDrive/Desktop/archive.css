@@ -1,0 +1,154 @@
+:root[data-iplex-archive] {
+  --text: var(--iplex-text, #f2f7ff) !important;
+  --muted: color-mix(in srgb, var(--text) 73%, transparent) !important;
+  --faint: color-mix(in srgb, var(--text) 58%, transparent);
+  --amber: var(--iplex-accent, #abe3ff) !important;
+  --accent: var(--amber);
+  --lg-ink: var(--text);
+  --lg-muted: var(--muted);
+  --lg-row: transparent;
+  --lg-row-hover: color-mix(in srgb, var(--accent) 12%, transparent);
+  --iplex-density-value: var(--iplex-density, .6);
+  --iplex-glass-edge: color-mix(in srgb, var(--text) 25%, transparent);
+  --iplex-glass-highlight: rgb(233 247 255 / calc(.13 + .09 * var(--iplex-density-value)));
+  --iplex-glass-tint: color-mix(in srgb, var(--iplex-tint, transparent) calc(6% + 20% * var(--iplex-density-value)), transparent);
+  --iplex-control: color-mix(in srgb, var(--iplex-tint, transparent) 22%, rgb(173 207 255 / calc(.08 + .22 * var(--iplex-density, .6))));
+  color-scheme: dark;
+  background: linear-gradient(145deg, var(--iplex-wash, transparent), transparent),
+              var(--iplex-background, transparent) !important;
+}
+:root[data-iplex-archive] body {
+  background: transparent !important;
+  color: var(--text);
+  font: 15px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+:root[data-iplex-archive] .shell {
+  max-width: none !important;
+  padding-inline: 28px !important;
+}
+:root[data-iplex-archive] :is(.topbar, .hero, #settings-appearance, [data-home-action="appearance"]) {
+  display: none !important;
+}
+:root[data-iplex-archive] .iplex-archive-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  padding-block: 19px 14px;
+}
+:root[data-iplex-archive] .iplex-archive-header h1 {
+  flex: 1 1 auto;
+  margin: 0;
+  color: var(--text);
+  font-size: 31px;
+  font-weight: 700;
+  line-height: 1.18;
+  letter-spacing: -.025em;
+  overflow-wrap: anywhere;
+}
+:root[data-iplex-archive] .iplex-archive-header .search-wrap {
+  flex: 0 1 205px;
+  min-width: 130px;
+  margin: 0;
+}
+:root[data-iplex-archive] .iplex-archive-header .topbar-tools {
+  display: flex !important;
+  flex: 0 0 auto;
+  gap: 7px;
+}
+:root[data-iplex-archive] .iplex-archive-header :is(.theme-picker, .topbar-status) {
+  display: none !important;
+}
+:root[data-iplex-archive] .iplex-archive-header :is(button, input) {
+  height: 34px !important;
+  min-height: 34px;
+  border-radius: 10px;
+  color: var(--text);
+  border: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
+  background: var(--iplex-control) !important;
+}
+:root[data-iplex-archive] .iplex-archive-header input::placeholder { color: var(--muted); }
+:root[data-iplex-archive] .workspace {
+  margin-top: 8px;
+}
+:root[data-iplex-archive] .results {
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+:root[data-iplex-archive] :is(.filters, .catalog-stats) {
+  background: var(--iplex-control) !important;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  box-shadow: none !important;
+  border-radius: 12px;
+}
+:root[data-iplex-archive] .filters { top: 12px; }
+:root[data-iplex-archive] .iplex-archive-table {
+  overflow: hidden;
+  border: 1px solid var(--iplex-glass-edge);
+  border-radius: 16px;
+  background:
+    radial-gradient(ellipse at top left, var(--iplex-glass-highlight), transparent 65%),
+    linear-gradient(155deg, var(--iplex-glass-tint), rgb(18 27 45 / calc(.10 + .28 * var(--iplex-density-value))));
+  box-shadow: inset 0 1px 1px rgb(245 251 255 / .32), inset 0 -1px 1px rgb(185 220 255 / .13);
+  -webkit-backdrop-filter: blur(14px) saturate(135%);
+  backdrop-filter: blur(14px) saturate(135%);
+}
+:root[data-iplex-archive] .iplex-archive-table .list-head {
+  border-top: 0;
+  background: var(--iplex-glass-highlight);
+  color: var(--text);
+}
+:root[data-iplex-archive] .iplex-archive-table .show-row {
+  border-bottom: 1px solid color-mix(in srgb, var(--text) 14%, transparent);
+}
+:root[data-iplex-archive] .iplex-archive-table .show-row:last-child { border-bottom: 0; }
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-iplex-archive] .iplex-archive-table {
+    background: #19273e;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+:root[data-iplex-archive] .show-row {
+  background: transparent !important;
+  border-radius: 8px !important;
+  box-shadow: none;
+  transform: none;
+}
+:root[data-iplex-archive]:not([data-iplex-hover]) :is(.show-row, .iplex-archive-header button) {
+  transition: none;
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  :root[data-iplex-archive][data-iplex-hover] :is(.show-row, .iplex-archive-header button) {
+    transition: background-color 160ms ease, box-shadow 160ms ease;
+  }
+  :root[data-iplex-archive][data-iplex-hover] :is(.show-row, .iplex-archive-header button):hover {
+    background: var(--lg-row-hover) !important;
+    box-shadow: inset 0 1px 0 color-mix(in srgb, var(--text) 24%, transparent);
+  }
+}
+@media (max-width: 665px) {
+  :root[data-iplex-archive] .shell { padding-inline: 15px !important; }
+  :root[data-iplex-archive] .iplex-archive-header h1 { flex-basis: 100%; }
+  :root[data-iplex-archive] .iplex-archive-header .search-wrap { flex-grow: 1; }
+}
+
+:root[data-iplex-archive] :is(.venue, .date-cell, .result-count strong) {
+  color: var(--text) !important;
+}
+:root[data-iplex-archive] .location { color: var(--muted) !important; }
+
+@media (min-width: 700px) {
+  :root[data-iplex-archive] body:not([data-tracklist-side]) :is(.show-row, .list-head) {
+    grid-template-columns: 105px minmax(0, 1fr) 65px 42px !important;
+    grid-template-areas: "date venue score actions" !important;
+    gap: 10px;
+  }
+  :root[data-iplex-archive] body:not([data-tracklist-side]) .show-row .date-cell { grid-area: date; }
+  :root[data-iplex-archive] body:not([data-tracklist-side]) .show-row .show-cell { grid-area: venue; }
+  :root[data-iplex-archive] body:not([data-tracklist-side]) .show-row .sound { grid-area: score; }
+  :root[data-iplex-archive] body:not([data-tracklist-side]) .show-row .row-actions { grid-area: actions; }
+}

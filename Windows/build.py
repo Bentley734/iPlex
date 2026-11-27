@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import struct
 import subprocess
+import sys
 import tempfile
 from zipfile import ZipFile, ZIP_DEFLATED
 from io import BytesIO
@@ -155,11 +156,24 @@ def main():
             for background in sorted((ASSETS / "GlassBackgrounds").glob("*.jpg")):
                 web.write(background, "GlassBackgrounds/" + background.name)
         embed(site, "site.zip")
+        tool_drive = ROOT.parent / "ToolDrive" / "Windows"
+        archive_site = stage / "ToolDrive.site.zip"
+        integrated_index = stage / "ToolDrive.index.html"
+        integrated_index.write_bytes((tool_drive / "Resources" / "index.html").read_bytes())
+        subprocess.run([sys.executable, str(tool_drive.parent / "Desktop" / "integrate.py"), str(integrated_index)], check=True)
+        with ZipFile(archive_site, "w", ZIP_DEFLATED) as archive:
+            for file in sorted((tool_drive / "Resources").rglob("*")):
+                if file.is_file():
+                    name = file.relative_to(tool_drive / "Resources").as_posix()
+                    archive.write(integrated_index if name == "index.html" else file, name)
+        embed(archive_site, archive_site.name)
+        embed(tool_drive / "Resources" / "catalog.json", "ToolDrive.catalog.json")
         flags.append("/win32icon:" + str(stage / (DEFAULT_ICON + ".ico")))
         command = [str(args.compiler)]
         if args.compiler.suffix == ".dll":
             command.insert(0, os.environ.get("DOTNET_HOST_PATH", "dotnet"))
-        subprocess.run(command + flags + [str(p) for p in sorted(ROOT.glob("*.cs"))], check=True)
+        sources = sorted(ROOT.glob("*.cs")) + sorted(tool_drive.glob("*.cs"))
+        subprocess.run(command + flags + [str(p) for p in sources], check=True)
         with ZipFile(args.output / "iPlex.Windows.zip", "w", ZIP_DEFLATED) as bundle:
             bundle.write(args.output / "iPlex.exe", "iPlex.exe")
             bundle.write(stage / (DEFAULT_ICON + ".ico"), "Icons/Prismatic Note Light.ico")

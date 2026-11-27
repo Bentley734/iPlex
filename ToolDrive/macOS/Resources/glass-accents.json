@@ -1,0 +1,11 @@
+[
+  {"id": "default", "title": "Original", "hex": null},
+  {"id": "aqua", "title": "Aqua", "hex": "#64EAD5"},
+  {"id": "blue", "title": "Blue", "hex": "#80B7FF"},
+  {"id": "violet", "title": "Violet", "hex": "#C7A1FF"},
+  {"id": "rose", "title": "Rose", "hex": "#FF9CBC"},
+  {"id": "amber", "title": "Amber", "hex": "#FFD081"},
+  {"id": "green", "title": "Green", "hex": "#97E8A3"},
+  {"id": "black", "title": "Black", "hex": "#FFFFFF"},
+  {"id": "liquid-glass", "title": "Liquid Glass", "hex": "#FFFFFF"}
+]

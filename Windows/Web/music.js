@@ -61,6 +61,7 @@
     if (!album && hasMore && !busy && !pageFailed && rows.some(row => row.isIntersecting)) browse(true);
   }, {root:get('scroll')});
   const bands = ['bass', 'mid', 'treble'];
+  const eqPresets = {flat:[0, 0, 0], bassBoost:[8, 0, 2], vocal:[-3, 6, 1], bright:[-1, 1, 7]};
   const node = (tag, text = '', cls = '') => {
     const el = document.createElement(tag);
     el.textContent = text;
@@ -220,6 +221,10 @@
         ['Add to Queue', () => enqueueItem(item, false, track)]);
     }
     const key = trackID || (item.kind === 'track' ? item.id : undefined);
+    if (key || ['album', 'playlist'].includes(item.kind)) {
+      commands.push(['Download', () => host({action:'offlineDownloadMusic', item:key || item.id,
+        kind:key ? 'track' : item.kind, title:trackTitle || item.title, detail:item.artist || ''})]);
+    }
     if (key) commands.push(['Add to Playlist', () => editPlaylist(key, trackTitle || item.title)]);
     if (track === undefined && ['album', 'artist', 'playlist'].includes(item.kind)) {
       commands.push([pins.some(pin => pin.id === item.id) ? 'Unpin' : 'Pin',
@@ -506,7 +511,8 @@
     render();
   }
   function renderMusicPage() {
-    if (layout.hasAttribute('data-video-open')) return;
+    if (layout.hasAttribute('data-video-open') || layout.hasAttribute('data-tool-drive-open') ||
+        layout.hasAttribute('data-downloads-open')) return;
     const panel = get('browser');
     if (panel.hidden) window.interfaceMotion.show(get('welcome'), ['welcome']);
     else window.interfaceMotion.show(panel, ['music', launchPreview?.library || library, kind, group?.id, album?.id]);
@@ -599,6 +605,14 @@
     const revision = player.reset(reply.context, 'plex');
     footerKey = '';
     player.queue(reply, reply.startIndex, revision, null);
+  };
+  window.offlineQueue = reply => {
+    pendingAlbum = pendingEnqueue = null;
+    playing = {title:reply.title, artist:reply.artist, kind:'offline'};
+    nowQueue = reply.tracks;
+    footerKey = '';
+    const revision = player.reset(reply.context, 'offline');
+    player.queue(reply, 0, revision, null);
   };
   window.musicEntries = reply => {
     if (reply.id !== request || album) return;
@@ -1155,6 +1169,8 @@
   const headerPreview = document.querySelector('.header-preview');
   const headerLogo = get('header-logo');
   const headerWordmark = get('header-wordmark');
+  const logoOptions = [...headerLogo.options];
+  const wordmarkOptions = [...headerWordmark.options];
   const brandWordmarks = new Map([
     ['netflix', 'netflix-wordmark'], ['hulu', 'hulu'],
     ['disney-plus', 'disney-plus'], ['disney-plus-mono', 'disney-plus-mono'],
@@ -1170,8 +1186,13 @@
   function brandPart(part) {
     return part === 'logo' ? headerLogo : headerWordmark;
   }
+  function brandOptions(section, part) {
+    return part === 'logo' ? logoOptions.filter(option => section === 'toolDrive' || !option.hasAttribute('data-tool-drive'))
+      : wordmarkOptions;
+  }
   function loadHeaderSection() {
     const choices = headerChoices.get(headerSection.value);
+    headerLogo.replaceChildren(...brandOptions(headerSection.value, 'logo').map(option => option.cloneNode(true)));
     headerLogo.value = choices.logo;
     headerWordmark.value = choices.wordmark;
     renderHeaderBrands();
@@ -1183,8 +1204,7 @@
     renderHeaderBrands();
   }
   function cycleHeaderChoice(part) {
-    const select = brandPart(part);
-    const options = [...select.options].filter(option => option.value !== 'none');
+    const options = brandOptions(activeHeaderSection, part).filter(option => option.value !== 'none');
     const current = options.findIndex(option => option.value === headerChoices.get(activeHeaderSection)[part]);
     chooseHeaderPart(activeHeaderSection, part, options[(current + 1) % options.length].value);
   }
@@ -1204,7 +1224,7 @@
     cycleMark.hidden = active.logo === 'none';
     cycleWordmark.hidden = active.wordmark === 'none';
     for (const [control, part] of [[cycleMark, 'logo'], [cycleWordmark, 'wordmark']]) {
-      const option = [...brandPart(part).options].find(option => option.value === active[part]);
+      const option = brandOptions(activeHeaderSection, part).find(option => option.value === active[part]);
       control.setAttribute('aria-label', 'Change header ' + part + ', ' + option.textContent);
     }
   }
@@ -1251,11 +1271,11 @@
     });
   });
   for (const {value: section} of headerSection.options) {
-    const choices = {logo:'none', wordmark:'iplex'};
+    const choices = {logo:section === 'toolDrive' ? 'tool-archive-classic' : 'none', wordmark:'iplex'};
     for (const part of Object.keys(choices)) {
       try {
         const saved = localStorage.getItem(brandKey(section, part));
-        if ([...brandPart(part).options].some(option => option.value === saved)) choices[part] = saved;
+        if (brandOptions(section, part).some(option => option.value === saved)) choices[part] = saved;
       } catch {}
     }
     headerChoices.set(section, choices);
@@ -1269,14 +1289,22 @@
     try { localStorage.setItem('musicroom-header-logo-size', choice.value); } catch {}
   }
   function updateEQ() {
-    const settings = {};
+    const settings = {magik:get('eq-magik').checked};
     for (const band of bands) {
       const value = Number(get(band).value);
       settings[band] = value;
       get(band + '-value').textContent = (value >= 0 ? '+' : '') + value + ' dB';
     }
+    get('eq-preset').value = Object.keys(eqPresets).find(name =>
+      eqPresets[name].every((gain, index) => settings[bands[index]] === gain)) || 'custom';
     player.eq(settings);
     try { localStorage.setItem('musicroom-eq', JSON.stringify(settings)); } catch {}
+  }
+  function chooseEQPreset(preset) {
+    if (!Object.hasOwn(eqPresets, preset)) return;
+    eqPresets[preset].forEach((gain, index) => { get(bands[index]).value = gain; });
+    if (preset === 'flat') get('eq-magik').checked = false;
+    updateEQ();
   }
   for (const type of Object.keys(glassDefaults)) {
     get('glass-' + type + '-color').oninput = event => chooseGlassColor(type, event.target.value);
@@ -1301,10 +1329,9 @@
   wordmarkSheet.addEventListener('load', renderHeaderBrands);
   get('header-logo-size').onchange = event => chooseHeaderLogoSize(event.target.value);
   for (const band of bands) get(band).oninput = updateEQ;
-  get('reset-eq').onclick = () => {
-    for (const band of bands) get(band).value = 0;
-    updateEQ();
-  };
+  get('eq-preset').onchange = event => chooseEQPreset(event.target.value);
+  get('eq-magik').onchange = updateEQ;
+  get('reset-eq').onclick = () => chooseEQPreset('flat');
   window.macEqualizerState = ({available}) => {
     get('eq-status').hidden = available !== false;
     get('eq-status').textContent = available === false ? 'Equalizer is unavailable for this track.' : '';
@@ -1370,6 +1397,7 @@
     chooseMiniPlayer(localStorage.getItem('musicroom-mini-player'));
     chooseHeaderLogoSize(localStorage.getItem('musicroom-header-logo-size'));
     const eq = JSON.parse(localStorage.getItem('musicroom-eq')) || {};
+    get('eq-magik').checked = eq.magik === true;
     for (const band of bands) get(band).value = Math.max(-10, Math.min(10, Number(eq[band]) || 0));
     chooseIcon(localStorage.getItem('musicroom-icon'));
   } catch {}

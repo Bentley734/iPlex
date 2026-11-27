@@ -1,5 +1,6 @@
 #if os(iOS) || os(tvOS)
 import SwiftUI
+import ToolDriveMobile
 
 @main
 struct MobileMusicRoomApp: App {
@@ -22,6 +23,8 @@ struct MobileMusicRoomApp: App {
 private struct MusicLibraryScreen: View {
     @ObservedObject var library: LibraryModel
     @MusicAppearance private var theme
+    @AppStorage(LiquidGlassAppearance.transparencyKey) private var glassTransparency = LiquidGlassAppearance.defaultTransparency
+    @AppStorage(LiquidGlassTint.preferenceKey) private var glassTint = LiquidGlassTint.themeDefault
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @State private var showSettings = false
     @AppStorage(LibraryLayout.preferenceKey) private var libraryLayout = LibraryLayout.grid
@@ -85,6 +88,7 @@ private struct MusicLibraryScreen: View {
     }
 
     private var browseRoute: [String] {
+        if library.toolDriveSelected || library.downloadsSelected { return [library.activeSection.rawValue] }
         if let videoSection { return [videoSection.rawValue] }
         return ["music", library.libraryID, library.kind.rawValue, library.selectedGroup?.id ?? "", library.selectedDetail?.id ?? ""]
     }
@@ -92,7 +96,7 @@ private struct MusicLibraryScreen: View {
     private var libraryScreen: some View {
         VStack(spacing: 0) {
             HStack {
-                SectionHeaderBrand(section: HeaderBrandSection(video: videoSection),
+                SectionHeaderBrand(section: library.activeSection,
                                    theme: theme, width: columnWidth, height: 56)
                 Spacer()
                 Button { showAppIcons = true } label: { Image(systemName: "app.dashed") }
@@ -109,31 +113,28 @@ private struct MusicLibraryScreen: View {
             #if os(tvOS)
             .focusSection()
             #endif
-            if !library.serverID.isEmpty && !library.visibleVideoKinds.isEmpty {
-                HStack {
-                    ForEach(library.visibleVideoKinds) { kind in
-                        Button(kind.title, systemImage: kind.icon) { library.selectVideoSection(kind) }
-                            .tint(videoSection == kind ? accent : .primary)
-                            .accessibilityAddTraits(videoSection == kind ? [.isSelected] : [])
-                            .glassHover()
-                    }
-                    Button("Music", systemImage: "music.note") { library.selectVideoSection(nil) }
-                        .tint(videoSection == nil ? accent : .primary)
-                        .accessibilityAddTraits(videoSection == nil ? [.isSelected] : [])
-                        .glassHover()
-                    Spacer()
-                }
-                .buttonStyle(.bordered)
-                .padding(.horizontal, 20).padding(.vertical, 8)
-                #if os(tvOS)
-                .focusSection()
-                #endif
-            }
+            #if os(iOS)
+            ScrollView(.horizontal) { sectionTabs }.scrollIndicators(.hidden)
+            #else
+            sectionTabs.focusSection()
+            #endif
             VStack(spacing: 0) {
-                if let videoSection, !library.serverID.isEmpty {
+                if library.toolDriveSelected {
+                    ToolDriveArchiveView(title: library.sectionName(.toolDrive), text: theme.text,
+                                         accent: accent, tint: glassTint.color(for: theme),
+                                         density: LiquidGlassAppearance.density(glassTransparency),
+                                         pauseOutsidePlayback: library.player.pause)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .musicGlass(theme, radius: 22)
+                        .clipShape(.rect(cornerRadius: 22))
+                        .padding(.horizontal, 12)
+                } else if library.downloadsSelected {
+                    DownloadsBrowser(library: library)
+                } else if let videoSection, !library.serverID.isEmpty {
                     PlexVideoBrowser(kind: videoSection, server: library.serverID, service: library.service,
                                      serverReady: library.videoServerReady, connectionError: library.busy ? nil : library.message,
-                                     retryConnection: library.retryLibrary, pauseMusic: library.player.pause)
+                                     retryConnection: library.retryLibrary, pauseMusic: library.player.pause,
+                                     sectionName: library.sectionName(HeaderBrandSection(video: videoSection)))
                         .id(library.serverID + videoSection.rawValue)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .musicGlass(theme, radius: 22)
@@ -149,7 +150,8 @@ private struct MusicLibraryScreen: View {
                     browser
                         .musicGlass(theme, radius: 22)
                         .padding(.horizontal, 12)
-                    if let album = library.playingAlbum {
+                }
+                if !library.toolDriveSelected, let album = library.playingAlbum {
                         HStack(spacing: 8) {
                             Button { showPlayer = true } label: {
                                 HStack(spacing: 14) {
@@ -180,13 +182,34 @@ private struct MusicLibraryScreen: View {
                                 .buttonStyle(.bordered)
                         }
                         .padding(.horizontal, 16)
-                    }
                 }
             }
             .pageTransition(on: browseRoute)
             .clipped()
         }
         .background(theme.backdrop(using: palette).ignoresSafeArea())
+    }
+
+    private var sectionTabs: some View {
+        HStack {
+            ForEach(library.serverID.isEmpty ? [] : library.visibleVideoKinds) { kind in
+                sectionTab(HeaderBrandSection(video: kind), icon: kind.icon) { library.selectVideoSection(kind) }
+            }
+            sectionTab(.toolDrive, icon: "waveform", action: library.selectToolDrive)
+            sectionTab(.music, icon: "music.note") { library.selectVideoSection(nil) }
+            sectionTab(.downloads, icon: "arrow.down.circle", action: library.selectDownloads)
+        }
+        .buttonStyle(.bordered)
+        .padding(.horizontal, 20).padding(.vertical, 8)
+    }
+
+    private func sectionTab(_ section: HeaderBrandSection, icon: String, action: @escaping () -> Void) -> some View {
+        let selected = library.activeSection == section
+        return Button(library.sectionName(section), systemImage: icon, action: action)
+            .lineLimit(1)
+            .tint(selected ? accent : .primary)
+            .accessibilityAddTraits(selected ? [.isSelected] : [])
+            .glassHover()
     }
 
     private var connection: some View {

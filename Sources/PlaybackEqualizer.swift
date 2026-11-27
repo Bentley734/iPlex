@@ -11,6 +11,24 @@ struct PlaybackEQSettings: Equatable {
     var isFlat: Bool { self == .flat }
 }
 
+enum PlaybackEQPreset: String, CaseIterable, Identifiable {
+    case flat = "Flat"
+    case bassBoost = "Bass Boost"
+    case vocal = "Vocal"
+    case bright = "Bright"
+
+    var id: Self { self }
+
+    func settings(magik: Bool) -> PlaybackEQSettings {
+        switch self {
+        case .flat: .flat
+        case .bassBoost: PlaybackEQSettings(bass: 8, treble: 2, magik: magik)
+        case .vocal: PlaybackEQSettings(bass: -3, mid: 6, treble: 1, magik: magik)
+        case .bright: PlaybackEQSettings(bass: -1, mid: 1, treble: 7, magik: magik)
+        }
+    }
+}
+
 // The three tone controls and Magik's eight serial bells follow the Tool Drive
 // Project player's published frequency, Q and gain settings. Filter history is
 // private to each channel. Only the audio-render thread touches this processor.

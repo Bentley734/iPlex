@@ -20,6 +20,7 @@ namespace MusicRoom
         readonly VideoWindowPresentation webVideo;
         readonly Dictionary<string, byte[]> assets = new Dictionary<string, byte[]>(StringComparer.Ordinal);
         Icon dockIcon;
+        ToolDriveOffline.ArchiveWindow toolDrive;
         bool closing;
         string updateAcknowledgment;
         CancellationTokenSource checkUpdate;
@@ -77,6 +78,7 @@ namespace MusicRoom
                     return;
                 }
                 closing = true;
+                if (toolDrive != null) toolDrive.Close();
                 if (nativeVideo != null) nativeVideo.EndPlayback();
                 if (checkUpdate != null) checkUpdate.Cancel();
                 media.Dispose();
@@ -214,6 +216,9 @@ namespace MusicRoom
                 else if (action == "dragFloatingPlayer")
                     BeginInvoke(new Action(() => { if (!closing && floatingPlayer) DragFloatingPlayer(); }));
                 else if (action == "updateApp") await UpdateApp();
+                else if (action == "toolDrivePanel") UpdateToolDrivePanel(request);
+                else if (action == "offlineVideo") OpenOfflineVideo(WindowsMediaService.Str(request, "media"),
+                    WindowsMediaService.Str(request, "title"));
                 else if (action == "videoDisplay")
                 {
                     string mode = WindowsMediaService.Str(request, "mode");
@@ -240,6 +245,59 @@ namespace MusicRoom
             }
             catch (ArgumentException) { }
             catch (InvalidOperationException) { }
+        }
+
+        void OpenOfflineVideo(string id, string title)
+        {
+            var uri = media.OfflineVideo(id);
+            if (uri == null || nativeVideo != null) return;
+            try
+            {
+                nativeVideo = new NativeVideoWindow(uri, title.Length <= 200 ? title : title.Substring(0, 200),
+                    0, false, false, false, (result, seconds) => {
+                        if (result != "progress") nativeVideo = null;
+                        if (result == "failed") Emit("offlineError", "This download could not be opened.");
+                    });
+                nativeVideo.Show(this);
+            }
+            catch (Exception)
+            {
+                if (nativeVideo != null) { nativeVideo.Dispose(); nativeVideo = null; }
+                Emit("offlineError", "This download could not be opened.");
+            }
+        }
+
+        void UpdateToolDrivePanel(Dictionary<string, object> request)
+        {
+            object visible;
+            if (!request.TryGetValue("visible", out visible) || !Object.Equals(visible, true))
+            {
+                if (toolDrive != null)
+                {
+                    toolDrive.Hide();
+                    object paused;
+                    if (request.TryGetValue("pause", out paused) && Object.Equals(paused, true)) toolDrive.PausePlayback();
+                }
+                return;
+            }
+            int left = (int)Math.Max(0, Math.Min(10000, WindowsMediaService.Num(request, "left")));
+            int top = (int)Math.Max(0, Math.Min(10000, WindowsMediaService.Num(request, "top")));
+            int width = (int)Math.Max(0, Math.Min(10000 - left, WindowsMediaService.Num(request, "width")));
+            int height = (int)Math.Max(0, Math.Min(10000 - top, WindowsMediaService.Num(request, "height")));
+            if (width == 0 || height == 0) return;
+            if (toolDrive == null || toolDrive.IsDisposed)
+            {
+                string warning;
+                var catalog = ToolDriveOffline.CatalogCache.Load(out warning);
+                toolDrive = new ToolDriveOffline.ArchiveWindow(catalog, warning);
+                Controls.Add(toolDrive);
+            }
+            object appearance;
+            if (request.TryGetValue("appearance", out appearance)) toolDrive.SetAppearance(appearance);
+            toolDrive.Bounds = new Rectangle(view.Left + view.Width * left / 10000,
+                view.Top + view.Height * top / 10000, view.Width * width / 10000, view.Height * height / 10000);
+            toolDrive.BringToFront();
+            toolDrive.Show();
         }
 
         async Task UpdateApp()

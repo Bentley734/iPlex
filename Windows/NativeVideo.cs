@@ -228,7 +228,8 @@ namespace MusicRoom
             var previous = new Button { Text = "−10 s", Width = 65 };
             var next = new Button { Text = "+10 s", Width = 65 };
             var fallback = new Button { Text = "Compatibility Mode", Width = 155 };
-            controls.Controls.AddRange(new Control[] { previous, toggle, next, timeline, elapsed, fallback });
+            controls.Controls.AddRange(new Control[] { previous, toggle, next, timeline, elapsed });
+            if (!source.IsFile) controls.Controls.Add(fallback);
             if (hasVersions)
             {
                 var versions = new Button { Text = "Versions…", Width = 92 };

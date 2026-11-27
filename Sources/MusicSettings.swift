@@ -2,10 +2,12 @@ import SwiftUI
 
 private struct HeaderBrandSettings: View {
     @AppStorage(HeaderMarkSize.preferenceKey) private var markSize = HeaderMarkSize.medium
+    private let section: HeaderBrandSection
     private var choices: HeaderBrandChoices
     let theme: MusicTheme
 
     init(section: HeaderBrandSection, theme: MusicTheme) {
+        self.section = section
         choices = HeaderBrandChoices(section: section)
         self.theme = theme
     }
@@ -15,12 +17,12 @@ private struct HeaderBrandSettings: View {
             ForEach(HeaderWordmark.allCases) { Text($0.label).tag($0) }
         }
         Picker("Header Logo", selection: choices.logoSelection) {
-            ForEach(HeaderMark.allCases) { Text($0.label).tag($0) }
+            ForEach(HeaderMark.choices(for: section)) { Text($0.label).tag($0) }
         }
         Picker("Header Logo Size", selection: $markSize) {
             ForEach(HeaderMarkSize.allCases) { Text($0.label).tag($0) }
         }
-        HeaderBrand(theme: theme, width: 170, height: 42, allowsCycling: false,
+        HeaderBrand(theme: theme, width: 170, height: 42, allowsCycling: false, section: section,
                     mark: choices.logoSelection, wordmark: choices.wordmarkSelection)
             .accessibilityHidden(true)
     }
@@ -407,7 +409,7 @@ struct MusicSettings: View {
                     }
                     Picker("Customize Header For", selection: $headerSection) {
                         ForEach(HeaderBrandSection.allCases) { section in
-                            Text(section.title).tag(section)
+                            Text(library.sectionName(section)).tag(section)
                         }
                     }
                     HeaderBrandSettings(section: headerSection, theme: theme)
@@ -446,6 +448,12 @@ struct MusicSettings: View {
                     Divider()
                     VStack(alignment: .leading, spacing: 10) {
                         Text("Library Sections").font(.headline)
+                        ForEach(HeaderBrandSection.allCases) { section in
+                            LabeledContent(section.title + " name") {
+                                TextField(section.title, text: library.customSectionName(section))
+                                    .accessibilityLabel(section.title + " name")
+                            }
+                        }
                         ForEach(MusicKind.allCases, id: \.self) { kind in
                             Toggle(kind.rawValue, isOn: Binding(
                                 get: { library.visibleKinds.contains(kind) },
@@ -489,6 +497,21 @@ struct MusicSettings: View {
                             Spacer()
                             Button("Reset EQ") { library.updateEqualizer(.flat) }
                         }
+                        HStack {
+                            ForEach(PlaybackEQPreset.allCases) { preset in
+                                Button(preset.rawValue) {
+                                    library.updateEqualizer(preset.settings(magik: library.equalizer.magik))
+                                }
+                            }
+                        }
+                        Toggle("Magik", isOn: Binding(
+                            get: { library.equalizer.magik },
+                            set: { enabled in
+                                var settings = library.equalizer
+                                settings.magik = enabled
+                                library.updateEqualizer(settings)
+                            }
+                        ))
                         band("Bass", \.bass)
                         band("Midrange", \.mid)
                         band("Treble", \.treble)

@@ -45,6 +45,9 @@ final class LibraryModel: ObservableObject {
     @Published private(set) var visibleKinds = MusicKind.allCases
     @Published private(set) var visibleVideoKinds = PlexVideoKind.allCases
     @Published private var lastVideoSection: PlexVideoKind?
+    @Published private(set) var toolDriveSelected = false
+    @Published private(set) var downloadsSelected = false
+    @Published private var sectionNames = [String: String]()
     @Published var query = ""
     @Published var playlistEdit: PlexPlaylistEdit?
     @Published private(set) var savingPlaylistTrack = false
@@ -57,6 +60,7 @@ final class LibraryModel: ObservableObject {
     private static let snapshotKey = "LastMusicLibrary"
     private static let musicSectionKey = "LastMusicSection"
     private static let videoSectionKey = "LastVideoSection"
+    private static let sectionNamesKey = "LibrarySectionNames"
 
     var videoSection: PlexVideoKind? { serverID.isEmpty ? nil : lastVideoSection }
 
@@ -105,6 +109,7 @@ final class LibraryModel: ObservableObject {
         artwork.countLimit = 100
         connected = service.status.connected
         let defaults = UserDefaults.standard
+        sectionNames = defaults.dictionary(forKey: Self.sectionNamesKey) as? [String: String] ?? [:]
         if let saved = defaults.stringArray(forKey: "VisibleMusicSections") {
             let enabled = MusicKind.allCases.filter { saved.contains($0.rawValue) }
             if let first = enabled.first {
@@ -123,6 +128,8 @@ final class LibraryModel: ObservableObject {
            visibleVideoKinds.contains(saved) {
             lastVideoSection = saved
         }
+        toolDriveSelected = defaults.string(forKey: Self.videoSectionKey) == HeaderBrandSection.toolDrive.rawValue
+        downloadsSelected = defaults.string(forKey: Self.videoSectionKey) == HeaderBrandSection.downloads.rawValue
         serverID = service.rememberedServerID ?? ""
         if let saved = service.rememberedMusicSelection {
             serverID = saved.server
@@ -139,7 +146,8 @@ final class LibraryModel: ObservableObject {
             reconnecting = true
         }
         if let values = defaults.array(forKey: "PlaybackEqualizer") as? [Double], values.count == 3 {
-            equalizer = PlaybackEQSettings(bass: values[0], mid: values[1], treble: values[2])
+            equalizer = PlaybackEQSettings(bass: values[0], mid: values[1], treble: values[2],
+                                           magik: defaults.bool(forKey: "PlaybackEqualizerMagik"))
             player.setEqualizer(equalizer)
         }
         player.onQueueChange = { [weak self] queue in
@@ -310,7 +318,7 @@ final class LibraryModel: ObservableObject {
             libraries = []
             serverID = ""
             libraryID = ""
-            selectVideoSection(nil)
+            if videoSection != nil || lastVideoSection != nil { selectVideoSection(nil) }
             resetLibrary()
         } catch { message = error.localizedDescription }
     }
@@ -359,8 +367,67 @@ final class LibraryModel: ObservableObject {
 
     func selectVideoSection(_ section: PlexVideoKind?) {
         if let section, !visibleVideoKinds.contains(section) || serverID.isEmpty { return }
+        toolDriveSelected = false
+        downloadsSelected = false
         lastVideoSection = section
         UserDefaults.standard.set(section?.rawValue, forKey: Self.videoSectionKey)
+    }
+
+    func selectToolDrive() {
+        lastVideoSection = nil
+        downloadsSelected = false
+        toolDriveSelected = true
+        UserDefaults.standard.set(HeaderBrandSection.toolDrive.rawValue, forKey: Self.videoSectionKey)
+    }
+
+    func selectDownloads() {
+        lastVideoSection = nil
+        toolDriveSelected = false
+        downloadsSelected = true
+        UserDefaults.standard.set(HeaderBrandSection.downloads.rawValue, forKey: Self.videoSectionKey)
+    }
+
+    var activeSection: HeaderBrandSection {
+        if toolDriveSelected { return .toolDrive }
+        if downloadsSelected { return .downloads }
+        return HeaderBrandSection(video: videoSection)
+    }
+
+    func downloadMusic(_ entry: MusicEntry, track: LiveTrack?) {
+        MediaDownloads.shared.start(title: track?.title ?? entry.title, detail: track?.artist ?? entry.artist, kind: .music) {
+            let selected: [LiveTrack]
+            if let track { selected = [track] }
+            else {
+                selected = try await self.request { self.service.musicTracks(entry: entry, inBackground: true, completion: $0) }
+            }
+            return selected.map { .init(url: $0.url, title: $0.title, duration: $0.duration, format: $0.format.container) }
+        }
+    }
+
+    func playDownload(_ item: OfflineMedia) {
+        let tracks = item.files.enumerated().map { index, file in
+            LiveTrack(number: index + 1, title: file.title, duration: file.duration,
+                      url: MediaDownloads.shared.url(file, in: item), artist: item.detail)
+        }
+        guard let first = tracks.first else { return }
+        playingAlbum = MusicEntry(id: item.id.uuidString, title: item.title, artist: item.detail,
+                                  year: nil, genres: [], artworkPath: nil, kind: .albums)
+        originalQueueIDs = Set(tracks.map(\.id))
+        playingArtworkKey = nil
+        playingArtwork = nil
+        player.loadTracks(tracks, collection: item.title, startTrack: first.number - 1, autoplay: true)
+    }
+
+    func sectionName(_ section: HeaderBrandSection) -> String {
+        let name = sectionNames[section.rawValue]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return name.isEmpty ? section.title : name
+    }
+
+    func customSectionName(_ section: HeaderBrandSection) -> Binding<String> {
+        Binding(get: { self.sectionNames[section.rawValue] ?? "" }, set: { draft in
+            self.sectionNames[section.rawValue] = String(draft.prefix(48))
+            UserDefaults.standard.set(self.sectionNames, forKey: Self.sectionNamesKey)
+        })
     }
 
     func setVisibility(_ section: MusicKind, visible: Bool) {
@@ -681,6 +748,7 @@ final class LibraryModel: ObservableObject {
         equalizer = settings
         player.setEqualizer(settings)
         UserDefaults.standard.set([settings.bass, settings.mid, settings.treble], forKey: "PlaybackEqualizer")
+        UserDefaults.standard.set(settings.magik, forKey: "PlaybackEqualizerMagik")
     }
 
     func cacheLibraryArtwork() {

@@ -7,27 +7,47 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		026D774C200AB8909C0A46F5 /* ArchiveWallpaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98840BB4D2D96BEA35B453B9 /* ArchiveWallpaper.swift */; };
+		0609E35D21E2E0057EE0D5D8 /* MobileLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01FF8E43B6C80BBAEE5E8F6 /* MobileLibrary.swift */; };
 		074FFEE30E6DF831BD87E62B /* PlexVideo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21FE99499ADF29BEBF367209 /* PlexVideo.swift */; };
 		0963354B7A8E8B7AC7C52E61 /* wordmark.png in Resources */ = {isa = PBXBuildFile; fileRef = F185419F294F55DB3C3CAE00 /* wordmark.png */; };
+		0D0B4EBF64F1367C4F00D611 /* ShowDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 955B0403FEE18C8FC3634CD5 /* ShowDetailView.swift */; };
 		0D8B9B802C2B23D503C305AE /* MusicAppIconPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B6189D5420E12F096AED5C /* MusicAppIconPicker.swift */; };
 		10340FE7F12AF86053A096ED /* MobileVLCKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = F28951F1D53D43A1D29492C2 /* MobileVLCKit.xcframework */; };
 		11A1EFAC56D164FB0A224889 /* PlayerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109D6CF5E45B4DDC6F61EF87 /* PlayerController.swift */; };
 		11F3BB75364189A5F0A3B672 /* MacMiniPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3A4685EF46B49FB6B22D90 /* MacMiniPlayer.swift */; };
+		12EF38926D4024B48E39F1BF /* ArchiveDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9DA536660BDBFEC705648A0 /* ArchiveDiscovery.swift */; };
 		188CBDBB2368F430ACD2DF00 /* PlexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C780AA4CF17CC09BC5ABE45 /* PlexService.swift */; };
+		1A50E93CF51B9E293A751C16 /* MobileVisualizerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 67CBC0D30B927FC05781EA91 /* MobileVisualizerView.swift */; };
 		1A5471FBBEA94D0257B926DD /* NativeVideoPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41756213822D289CE6E5D98A /* NativeVideoPlayer.swift */; };
+		2173BC65A1CDA8D1AD4AC7E6 /* CatalogFilters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57C1069E561396E8408C4EFA /* CatalogFilters.swift */; };
 		29CF984811D8CCAD74A6AB1F /* ClickWheelPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2DA695E5F978CFBEDD54C3D /* ClickWheelPlayer.swift */; };
+		2D71F95B30AF3AB3767A90B9 /* CatalogView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26FC7003072EFC998B1C27CC /* CatalogView.swift */; };
+		2E4242D55B3F8D1593C2A0DD /* PlexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 790F4BA73F153291A9504706 /* PlexService.swift */; };
 		2F7B05532D59401224593621 /* AudioAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED8702E61EE0F31C7677EC30 /* AudioAnalysis.swift */; };
 		302A4395B55B8B0627800F4D /* VideoLAN-SOURCE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 72754B9270BC4C0CFEE4A941 /* VideoLAN-SOURCE.txt */; };
 		30FB9912CFC98B40FC532C8F /* MacVideoPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF714F069BFA8BAE334EE31F /* MacVideoPresentation.swift */; };
+		35BFE8815C14CE85F8CBC1AF /* CatalogFilters.swift in Sources */ = {isa = PBXBuildFile; fileRef = 57C1069E561396E8408C4EFA /* CatalogFilters.swift */; };
 		37DBDBEFBCA7FA9300B97620 /* MusicSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81F02BA2B14ABC3859F379BD /* MusicSettings.swift */; };
+		38F439CF3FC372B6BB106E1E /* ToolDrive in Resources */ = {isa = PBXBuildFile; fileRef = 21DCA187065CE4E18A11F6DC /* ToolDrive */; };
 		3AF66C4880414EBC37880124 /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E789032BCF3A6169CFC2233 /* NowPlayingView.swift */; };
+		3B516F144A258899C30DB124 /* ArchiveScrollingTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34ADE339974C3A8F521D95AD /* ArchiveScrollingTitle.swift */; };
+		3D63E124AB89AC0E66C65483 /* GlassWallpaperPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84303833AB4AE2FE7352B25A /* GlassWallpaperPreferences.swift */; };
+		3D9F5B0880ED9C632AADB43B /* MediaDownloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62D082230979C3114636B87D /* MediaDownloads.swift */; };
+		3DD21C75E64AA3E64CD19A5D /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5E97A995568CE10A3749702 /* LibraryView.swift */; };
+		3EF2585F30717D69B126A221 /* TVKaleidoscopeSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 50F3FF94B0657359491CB7D0 /* TVKaleidoscopeSurface.swift */; };
+		40C6885B2A3CD921E5069FF0 /* TVKaleidoscope.metal in Sources */ = {isa = PBXBuildFile; fileRef = D98D65C23D34BB9861A2626C /* TVKaleidoscope.metal */; };
+		40CCDAC2D8855E1F8AF96111 /* TVAboutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA0234EDB29B91153A949FE7 /* TVAboutView.swift */; };
 		41BB757808343F6DE3116ACA /* AlbumCoverCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6581BBFF504F8BAA5B38470 /* AlbumCoverCache.swift */; };
 		41D79EEF812C5A9A994C8244 /* PlexVideoManifest.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFFD17F74980DC97E5F435E4 /* PlexVideoManifest.swift */; };
 		42811EF14C7EB41CB2F0D3CD /* MusicAppIconPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = A0B6189D5420E12F096AED5C /* MusicAppIconPicker.swift */; };
 		44CA82903C2BD4FAF29E8EDC /* PlaybackEqualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BC1D71E65269005100C4E31 /* PlaybackEqualizer.swift */; };
+		454E941322007F6FB5CD2536 /* ToolDrive-iOS.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = BC6F36BAF9881D7380AD17A1 /* ToolDrive-iOS.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		454FE1F4FDC5B933B903B4DD /* MusicRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EFA099A27452963E48DAEFD /* MusicRoomApp.swift */; };
 		45BD406408902A81EB0EE534 /* MusicRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4EFA099A27452963E48DAEFD /* MusicRoomApp.swift */; };
 		4852498FF890C183BB536F7A /* MacAppUpdates.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9C2A0F694BD3960FADA938 /* MacAppUpdates.swift */; };
+		4A84E5634EE00FE690D8CCE5 /* GlassAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFAC47C4D8A1C63AB2D5EDD /* GlassAppearance.swift */; };
+		4F7A11318E5573C59548FC41 /* LiveMedia.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F51B5492182699B91E5DA3B /* LiveMedia.swift */; };
 		4F8F42D2AB91DCC695B06BD6 /* MacAppUpdates.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED9C2A0F694BD3960FADA938 /* MacAppUpdates.swift */; };
 		50FD1E765EF3D610380E5C03 /* MacVideoPresentation.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF714F069BFA8BAE334EE31F /* MacVideoPresentation.swift */; };
 		523B49DEEF64BD699C9746FE /* HeaderMarks in Resources */ = {isa = PBXBuildFile; fileRef = DBB6ACEC51BC04DF53298E15 /* HeaderMarks */; };
@@ -35,15 +55,34 @@
 		559F2534C6897DF20AAC1E02 /* Track.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8712B67A9D2431A2B0160DDC /* Track.swift */; };
 		564AA314BCCD696C8A91607B /* MusicPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CCA42EAE03D88BB3496D33 /* MusicPlatform.swift */; };
 		5924AC6A593362AE94C03F0A /* TVVLCKit.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 036E50F9A09EABA89FACCA36 /* TVVLCKit.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		5B9040B565F3A0EC1E7DDA67 /* ToolDrive-tvOS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 83C70ECD704B3A919699054D /* ToolDrive-tvOS.framework */; };
+		5C0D157DFEB8B0A98AA1879E /* ArchiveStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4CFDD76F8DC8019AE8E5222 /* ArchiveStore.swift */; };
 		614CA070E7014A7C66698623 /* MacMiniPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE3A4685EF46B49FB6B22D90 /* MacMiniPlayer.swift */; };
 		6399573E99B6264BFA63F0EF /* VideoLAN-SOURCE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 72754B9270BC4C0CFEE4A941 /* VideoLAN-SOURCE.txt */; };
+		64E47D44C5DB9B09E0AC17E7 /* MobileAppIconPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75781DA236B2384F586B0575 /* MobileAppIconPicker.swift */; };
+		65E4EC4A96B6D8315CFE735F /* ArchiveWallpaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 98840BB4D2D96BEA35B453B9 /* ArchiveWallpaper.swift */; };
 		66D831237EA3E508723100E1 /* LibraryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C69FD3E93908A0408008D345 /* LibraryModel.swift */; };
+		6C1D719789E9E40BCAF6DEB5 /* AudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02C87E2B4629BAD90F14018F /* AudioPlayer.swift */; };
 		6C4C7A59ED6A720264345604 /* MusicSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 81F02BA2B14ABC3859F379BD /* MusicSettings.swift */; };
+		6F53ADB1B1E0AF62BECDE2EF /* GlassAppearance.swift in Sources */ = {isa = PBXBuildFile; fileRef = EEFAC47C4D8A1C63AB2D5EDD /* GlassAppearance.swift */; };
 		733CA465AF821A663909CC7B /* MobileMusicRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97A49FCD6AC086C13007CEB /* MobileMusicRoomApp.swift */; };
 		74F4D192E3D924D24E1E6E57 /* GlassBackgrounds in Resources */ = {isa = PBXBuildFile; fileRef = E359008C174456F0E7E13E19 /* GlassBackgrounds */; };
 		76564F19F8DE83CE1924C29F /* HeaderMarks in Resources */ = {isa = PBXBuildFile; fileRef = DBB6ACEC51BC04DF53298E15 /* HeaderMarks */; };
+		7661F79463DCC90C35126C47 /* TVPlexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 136639210F8036CBA68D9A9A /* TVPlexView.swift */; };
+		77E977CE1ED2FE53A0FB1A47 /* ToolDrive-iOS.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = BC6F36BAF9881D7380AD17A1 /* ToolDrive-iOS.framework */; };
+		78D9186DA8557BD1D0A74D8F /* MobilePlex.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE106F4D311A9287B57C73FC /* MobilePlex.swift */; };
+		7D42672F2827302D7FC6F97D /* PlaybackEqualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB2214A23F301E7CB08F0366 /* PlaybackEqualizer.swift */; };
+		7DAAC87336F0AFB6B5EBCF48 /* ToolDrive-tvOS.framework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = 83C70ECD704B3A919699054D /* ToolDrive-tvOS.framework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		7EB01C7C5A7A57BB11F7AF41 /* Updates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C9BAB797374ADD5B2683083 /* Updates.swift */; };
+		7F99338E1689E7FFB3B6570A /* MobileTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11258FE49A48E51D7EB9F265 /* MobileTheme.swift */; };
 		8024073E1FFD024E4705DA44 /* music-wordmarks.png in Resources */ = {isa = PBXBuildFile; fileRef = 295A13765A52602FCE1765AD /* music-wordmarks.png */; };
+		808C3E8E835C67BACE3CF0E3 /* TVFilament.metal in Sources */ = {isa = PBXBuildFile; fileRef = 85D1ACAEAEFF49688072EAE3 /* TVFilament.metal */; };
+		82621AE7CE4C7B347586D4CC /* ToolDrive in Resources */ = {isa = PBXBuildFile; fileRef = 21DCA187065CE4E18A11F6DC /* ToolDrive */; };
+		8440B0A38BA6C09E611768FE /* TVTunnelSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D3865D7A65EBE4D423C5065 /* TVTunnelSurface.swift */; };
 		857073C928677ED881AC8112 /* GlassWallpaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83BDC61173C885223594A01D /* GlassWallpaper.swift */; };
+		88B7080065BAA189D02114BD /* TVPlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC176A40B020B605D69FA449 /* TVPlayerView.swift */; };
+		8A8160A3A7189873B61A6FC2 /* AudioPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02C87E2B4629BAD90F14018F /* AudioPlayer.swift */; };
+		8BDDD4590B9BCB1F86355CD0 /* MobileTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 11258FE49A48E51D7EB9F265 /* MobileTheme.swift */; };
 		8E529B00CBCA255DA72EBCA3 /* MusicPlatform.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12CCA42EAE03D88BB3496D33 /* MusicPlatform.swift */; };
 		93D79DBF914029D9676C6472 /* iOS.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A5FD29343DF8F67713D13B64 /* iOS.xcassets */; };
 		977E177DAED424AE445D3F86 /* InterfaceMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E11ED386C44B1F0E5CB11FA /* InterfaceMotion.swift */; };
@@ -51,31 +90,74 @@
 		9986C5B0BC30A08F62C49E57 /* GlassWallpaper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83BDC61173C885223594A01D /* GlassWallpaper.swift */; };
 		9B3C788DCE3EB58EF492A7D2 /* PlexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6C780AA4CF17CC09BC5ABE45 /* PlexService.swift */; };
 		9E13CD90F05F5C673D88190D /* iOSIconPreviews in Resources */ = {isa = PBXBuildFile; fileRef = 05B2D2D87BA0747B37ECE8A0 /* iOSIconPreviews */; };
+		9E7D949FF1020B634D8E49BB /* ArchiveDiscovery.swift in Sources */ = {isa = PBXBuildFile; fileRef = D9DA536660BDBFEC705648A0 /* ArchiveDiscovery.swift */; };
+		A272A82CAFFB57F00ACE8FCE /* MobilePlex.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE106F4D311A9287B57C73FC /* MobilePlex.swift */; };
+		A310ABD4935205734328FB47 /* PlaybackEqualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB2214A23F301E7CB08F0366 /* PlaybackEqualizer.swift */; };
 		A69490A6AD7CB4C928AF43CD /* Track.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8712B67A9D2431A2B0160DDC /* Track.swift */; };
+		A89ADC1CC1824BC82D3DC44B /* MobileAppIconPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75781DA236B2384F586B0575 /* MobileAppIconPicker.swift */; };
+		A9EAEC209BFD4B9636562A90 /* ToolDriveArchiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AAE84EB4B19D4FAFFB1819D /* ToolDriveArchiveView.swift */; };
+		AAF9B4BC379E24A631ED8D0D /* TVKaleidoscopeSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA95B8C22D26F273C6476DD1 /* TVKaleidoscopeSurface.swift */; };
 		AD0027C3EA6B7D84AD57F90D /* ClickWheelPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = B2DA695E5F978CFBEDD54C3D /* ClickWheelPlayer.swift */; };
 		AD96252D7ED6ED6CE1A3368C /* VideoWatchStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2039AEF6F237EEFE851F5A1 /* VideoWatchStore.swift */; };
+		AFF18AC279DDCC25E54C7F9C /* TVBackgroundTransfer.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8B43425C6A64C40B6762686 /* TVBackgroundTransfer.swift */; };
 		B0BBD7ED21A32E626ECC7A08 /* AlbumCoverCache.swift in Sources */ = {isa = PBXBuildFile; fileRef = D6581BBFF504F8BAA5B38470 /* AlbumCoverCache.swift */; };
 		B14DB919AF1E5EA88CF12FE5 /* AudioAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = ED8702E61EE0F31C7677EC30 /* AudioAnalysis.swift */; };
 		B2C253CB334766259D06E91A /* NativeVideoPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 41756213822D289CE6E5D98A /* NativeVideoPlayer.swift */; };
 		B3454E96260F2C14C2E75C3E /* VideoLAN-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 20DA8624C5A602D1F228302A /* VideoLAN-LICENSE.txt */; };
+		B472B74042F99986CB2B1526 /* TVAppearanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B3A858D1BC0BAD7FE7E5A78C /* TVAppearanceView.swift */; };
+		B622BC84DAD72E7A756E7DFA /* Updates.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3C9BAB797374ADD5B2683083 /* Updates.swift */; };
 		B7E443953550133C851BC0A2 /* MobileMusicRoomApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = C97A49FCD6AC086C13007CEB /* MobileMusicRoomApp.swift */; };
 		B7ED9870A8F862FD22A8AAB8 /* PlexVideo.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21FE99499ADF29BEBF367209 /* PlexVideo.swift */; };
 		B959B6B9F749535AC78A8563 /* InterfaceMotion.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E11ED386C44B1F0E5CB11FA /* InterfaceMotion.swift */; };
 		B9FA1CBBF9218AE47683AD83 /* tvOS.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = EF99A5BF8FAE5BAC92EC8A5B /* tvOS.xcassets */; };
+		BAB6611C960DE93688BC5193 /* ArchiveScrollingTitle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 34ADE339974C3A8F521D95AD /* ArchiveScrollingTitle.swift */; };
 		BBE1D9643AC04B20AAFE1C47 /* music-wordmarks.png in Resources */ = {isa = PBXBuildFile; fileRef = 295A13765A52602FCE1765AD /* music-wordmarks.png */; };
+		C0D81CF68DBAA055BD54F71D /* PlayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37B149D29AEDD40D097193E3 /* PlayerView.swift */; };
 		C0F0713CDBB0212EBBDFA09D /* LibraryModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C69FD3E93908A0408008D345 /* LibraryModel.swift */; };
+		C284DBCED45CCE762D0F6D1D /* ArchiveStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4CFDD76F8DC8019AE8E5222 /* ArchiveStore.swift */; };
 		C5010D1FF9F009AF00F040A6 /* VideoWatchStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2039AEF6F237EEFE851F5A1 /* VideoWatchStore.swift */; };
+		C807279C131DCDCE259BF62E /* TVFilamentSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 994231CC3E59AB0C48302065 /* TVFilamentSurface.swift */; };
+		CCB98FB3410726E5C21B20C2 /* PlexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2D8D6D54E6232361B6D546B /* PlexView.swift */; };
 		CFCAD59E994057089D18A941 /* MusicGenreList.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C3DEA02512BD0C8E406A0F /* MusicGenreList.swift */; };
+		D296E8554105827C14E228BD /* LiveMedia.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F51B5492182699B91E5DA3B /* LiveMedia.swift */; };
+		D3ABC642B4A688092E67FF1C /* TVLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3A2C364BE3C8CBE2ED00AE6 /* TVLibraryView.swift */; };
+		D7F3323D37C9FD9A46742C77 /* MediaDownloads.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62D082230979C3114636B87D /* MediaDownloads.swift */; };
 		DB81C391DA990B61427422F0 /* PlayerController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 109D6CF5E45B4DDC6F61EF87 /* PlayerController.swift */; };
 		DC16CBF40A3BE11BC2CD44AE /* NowPlayingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5E789032BCF3A6169CFC2233 /* NowPlayingView.swift */; };
+		DF75E0B76CB29D9E9F9AF68C /* TVTunnel.metal in Sources */ = {isa = PBXBuildFile; fileRef = ED0603FCAE5EFBD80F77BDB9 /* TVTunnel.metal */; };
 		E1361EFA7954A2385E8B461A /* wordmark.png in Resources */ = {isa = PBXBuildFile; fileRef = F185419F294F55DB3C3CAE00 /* wordmark.png */; };
 		E301E1E7838B11175D01EF9A /* MusicGenreList.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C3DEA02512BD0C8E406A0F /* MusicGenreList.swift */; };
 		E3384EA3764C1AFFB071A675 /* TVVLCKit.xcframework in Frameworks */ = {isa = PBXBuildFile; fileRef = 036E50F9A09EABA89FACCA36 /* TVVLCKit.xcframework */; };
+		E34052C5BCE934DF2DCB8406 /* PlexService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 790F4BA73F153291A9504706 /* PlexService.swift */; };
+		E6F2F07A88B3C6E6B8379C91 /* AppearanceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42E9465964E1A40B646867E4 /* AppearanceView.swift */; };
+		EBD8B06105D92AE87435CFB6 /* AudioAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20ED016874656D8722273626 /* AudioAnalysis.swift */; };
 		EC3D3CB23563AC5726D4B22A /* PlaybackEqualizer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3BC1D71E65269005100C4E31 /* PlaybackEqualizer.swift */; };
+		EC460D45FB79918027ADC727 /* AudioAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20ED016874656D8722273626 /* AudioAnalysis.swift */; };
 		F182B582B8AD5EA4BE657200 /* MobileVLCKit.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = F28951F1D53D43A1D29492C2 /* MobileVLCKit.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		F307562545993D2771A354AC /* GlassWallpaperPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84303833AB4AE2FE7352B25A /* GlassWallpaperPreferences.swift */; };
 		F7D000EAFF036916AC9FA4E6 /* GlassBackgrounds in Resources */ = {isa = PBXBuildFile; fileRef = E359008C174456F0E7E13E19 /* GlassBackgrounds */; };
+		F905822CE1DFB0F1DB80A2B6 /* TVKaleidoscope.metal in Sources */ = {isa = PBXBuildFile; fileRef = 4CEB33019888933A2455EB19 /* TVKaleidoscope.metal */; };
 		FADC6818B7AC6229F0DB486F /* TVIconPreviews in Resources */ = {isa = PBXBuildFile; fileRef = C9C23189D2582E8551851186 /* TVIconPreviews */; };
+		FAF17BE90AAB14D3F3CA8252 /* MobileLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A01FF8E43B6C80BBAEE5E8F6 /* MobileLibrary.swift */; };
+		FE2F03EE995187836B4FACA3 /* ToolDriveArchiveView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A9BD3BFAFB5FB4D0AE6999C /* ToolDriveArchiveView.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		5BF9B20EF6149BD71F4E187C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E88A9D22A29A4523BD247FBF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E953FB72F2DD493234B1AFCE;
+			remoteInfo = "ToolDrive-tvOS";
+		};
+		EA463AA3F4B501FC0904C978 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = E88A9D22A29A4523BD247FBF /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 44451FD3370707B1DB9F17E2;
+			remoteInfo = "ToolDrive-iOS";
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
 		49EFC82D4416F0C5311EB5D4 /* Embed Frameworks */ = {
@@ -85,6 +167,7 @@
 			dstSubfolderSpec = 10;
 			files = (
 				5924AC6A593362AE94C03F0A /* TVVLCKit.xcframework in Embed Frameworks */,
+				7DAAC87336F0AFB6B5EBCF48 /* ToolDrive-tvOS.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -96,6 +179,7 @@
 			dstSubfolderSpec = 10;
 			files = (
 				F182B582B8AD5EA4BE657200 /* MobileVLCKit.xcframework in Embed Frameworks */,
+				454E941322007F6FB5CD2536 /* ToolDrive-iOS.framework in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -103,44 +187,88 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
+		02C87E2B4629BAD90F14018F /* AudioPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioPlayer.swift; sourceTree = "<group>"; };
 		036E50F9A09EABA89FACCA36 /* TVVLCKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = TVVLCKit.xcframework; path = Dependencies/TVVLCKit.xcframework; sourceTree = "<group>"; };
 		05B2D2D87BA0747B37ECE8A0 /* iOSIconPreviews */ = {isa = PBXFileReference; lastKnownFileType = folder; name = iOSIconPreviews; path = Mobile/iOSIconPreviews; sourceTree = SOURCE_ROOT; };
+		0A9BD3BFAFB5FB4D0AE6999C /* ToolDriveArchiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolDriveArchiveView.swift; sourceTree = "<group>"; };
 		109D6CF5E45B4DDC6F61EF87 /* PlayerController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerController.swift; sourceTree = "<group>"; };
+		11258FE49A48E51D7EB9F265 /* MobileTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileTheme.swift; sourceTree = "<group>"; };
 		12CCA42EAE03D88BB3496D33 /* MusicPlatform.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicPlatform.swift; sourceTree = "<group>"; };
+		136639210F8036CBA68D9A9A /* TVPlexView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVPlexView.swift; sourceTree = "<group>"; };
 		1E11ED386C44B1F0E5CB11FA /* InterfaceMotion.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InterfaceMotion.swift; sourceTree = "<group>"; };
 		20DA8624C5A602D1F228302A /* VideoLAN-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "VideoLAN-LICENSE.txt"; sourceTree = "<group>"; };
+		20ED016874656D8722273626 /* AudioAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioAnalysis.swift; sourceTree = "<group>"; };
+		21DCA187065CE4E18A11F6DC /* ToolDrive */ = {isa = PBXFileReference; lastKnownFileType = folder; name = ToolDrive; path = ToolDrive/Mobile/ToolDrive; sourceTree = SOURCE_ROOT; };
 		21FE99499ADF29BEBF367209 /* PlexVideo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlexVideo.swift; sourceTree = "<group>"; };
+		26FC7003072EFC998B1C27CC /* CatalogView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogView.swift; sourceTree = "<group>"; };
 		295A13765A52602FCE1765AD /* music-wordmarks.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = "music-wordmarks.png"; sourceTree = "<group>"; };
+		34ADE339974C3A8F521D95AD /* ArchiveScrollingTitle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveScrollingTitle.swift; sourceTree = "<group>"; };
+		37B149D29AEDD40D097193E3 /* PlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerView.swift; sourceTree = "<group>"; };
 		3BC1D71E65269005100C4E31 /* PlaybackEqualizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackEqualizer.swift; sourceTree = "<group>"; };
+		3C9BAB797374ADD5B2683083 /* Updates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Updates.swift; sourceTree = "<group>"; };
 		41756213822D289CE6E5D98A /* NativeVideoPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeVideoPlayer.swift; sourceTree = "<group>"; };
+		42E9465964E1A40B646867E4 /* AppearanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceView.swift; sourceTree = "<group>"; };
+		4CEB33019888933A2455EB19 /* TVKaleidoscope.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = TVKaleidoscope.metal; sourceTree = "<group>"; };
 		4EFA099A27452963E48DAEFD /* MusicRoomApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicRoomApp.swift; sourceTree = "<group>"; };
+		50F3FF94B0657359491CB7D0 /* TVKaleidoscopeSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVKaleidoscopeSurface.swift; sourceTree = "<group>"; };
+		57C1069E561396E8408C4EFA /* CatalogFilters.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogFilters.swift; sourceTree = "<group>"; };
 		5E789032BCF3A6169CFC2233 /* NowPlayingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NowPlayingView.swift; sourceTree = "<group>"; };
+		62D082230979C3114636B87D /* MediaDownloads.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MediaDownloads.swift; sourceTree = "<group>"; };
+		67CBC0D30B927FC05781EA91 /* MobileVisualizerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileVisualizerView.swift; sourceTree = "<group>"; };
 		6C780AA4CF17CC09BC5ABE45 /* PlexService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlexService.swift; sourceTree = "<group>"; };
+		6D3865D7A65EBE4D423C5065 /* TVTunnelSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVTunnelSurface.swift; sourceTree = "<group>"; };
 		72754B9270BC4C0CFEE4A941 /* VideoLAN-SOURCE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "VideoLAN-SOURCE.txt"; sourceTree = "<group>"; };
+		75781DA236B2384F586B0575 /* MobileAppIconPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileAppIconPicker.swift; sourceTree = "<group>"; };
+		790F4BA73F153291A9504706 /* PlexService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlexService.swift; sourceTree = "<group>"; };
+		7AAE84EB4B19D4FAFFB1819D /* ToolDriveArchiveView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolDriveArchiveView.swift; sourceTree = "<group>"; };
 		81F02BA2B14ABC3859F379BD /* MusicSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicSettings.swift; sourceTree = "<group>"; };
 		83BDC61173C885223594A01D /* GlassWallpaper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassWallpaper.swift; sourceTree = "<group>"; };
+		83C70ECD704B3A919699054D /* ToolDrive-tvOS.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = "ToolDrive-tvOS.framework"; sourceTree = BUILT_PRODUCTS_DIR; };
+		84303833AB4AE2FE7352B25A /* GlassWallpaperPreferences.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassWallpaperPreferences.swift; sourceTree = "<group>"; };
+		85D1ACAEAEFF49688072EAE3 /* TVFilament.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = TVFilament.metal; sourceTree = "<group>"; };
 		8712B67A9D2431A2B0160DDC /* Track.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Track.swift; sourceTree = "<group>"; };
+		8F51B5492182699B91E5DA3B /* LiveMedia.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LiveMedia.swift; sourceTree = "<group>"; };
+		955B0403FEE18C8FC3634CD5 /* ShowDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShowDetailView.swift; sourceTree = "<group>"; };
+		98840BB4D2D96BEA35B453B9 /* ArchiveWallpaper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveWallpaper.swift; sourceTree = "<group>"; };
+		994231CC3E59AB0C48302065 /* TVFilamentSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVFilamentSurface.swift; sourceTree = "<group>"; };
+		A01FF8E43B6C80BBAEE5E8F6 /* MobileLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileLibrary.swift; sourceTree = "<group>"; };
 		A0B6189D5420E12F096AED5C /* MusicAppIconPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicAppIconPicker.swift; sourceTree = "<group>"; };
 		A2039AEF6F237EEFE851F5A1 /* VideoWatchStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoWatchStore.swift; sourceTree = "<group>"; };
+		A2D8D6D54E6232361B6D546B /* PlexView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlexView.swift; sourceTree = "<group>"; };
 		A5FD29343DF8F67713D13B64 /* iOS.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = iOS.xcassets; sourceTree = "<group>"; };
 		A7C3DEA02512BD0C8E406A0F /* MusicGenreList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicGenreList.swift; sourceTree = "<group>"; };
 		AE3A4685EF46B49FB6B22D90 /* MacMiniPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMiniPlayer.swift; sourceTree = "<group>"; };
 		B2DA695E5F978CFBEDD54C3D /* ClickWheelPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClickWheelPlayer.swift; sourceTree = "<group>"; };
 		B368254AA2FA6C110A7860BB /* MusicRoom-tvOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "MusicRoom-tvOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		B3A858D1BC0BAD7FE7E5A78C /* TVAppearanceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVAppearanceView.swift; sourceTree = "<group>"; };
+		B4CFDD76F8DC8019AE8E5222 /* ArchiveStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveStore.swift; sourceTree = "<group>"; };
+		B5E97A995568CE10A3749702 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
+		BC6F36BAF9881D7380AD17A1 /* ToolDrive-iOS.framework */ = {isa = PBXFileReference; explicitFileType = wrapper.framework; includeInIndex = 0; path = "ToolDrive-iOS.framework"; sourceTree = BUILT_PRODUCTS_DIR; };
 		C69FD3E93908A0408008D345 /* LibraryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryModel.swift; sourceTree = "<group>"; };
 		C97A49FCD6AC086C13007CEB /* MobileMusicRoomApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobileMusicRoomApp.swift; sourceTree = "<group>"; };
 		C9C23189D2582E8551851186 /* TVIconPreviews */ = {isa = PBXFileReference; lastKnownFileType = folder; name = TVIconPreviews; path = Mobile/TVIconPreviews; sourceTree = SOURCE_ROOT; };
+		CA0234EDB29B91153A949FE7 /* TVAboutView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVAboutView.swift; sourceTree = "<group>"; };
 		CFFD17F74980DC97E5F435E4 /* PlexVideoManifest.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlexVideoManifest.swift; sourceTree = "<group>"; };
 		D6581BBFF504F8BAA5B38470 /* AlbumCoverCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumCoverCache.swift; sourceTree = "<group>"; };
+		D8B43425C6A64C40B6762686 /* TVBackgroundTransfer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVBackgroundTransfer.swift; sourceTree = "<group>"; };
+		D98D65C23D34BB9861A2626C /* TVKaleidoscope.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = TVKaleidoscope.metal; sourceTree = "<group>"; };
+		D9DA536660BDBFEC705648A0 /* ArchiveDiscovery.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArchiveDiscovery.swift; sourceTree = "<group>"; };
+		DB2214A23F301E7CB08F0366 /* PlaybackEqualizer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackEqualizer.swift; sourceTree = "<group>"; };
 		DBB6ACEC51BC04DF53298E15 /* HeaderMarks */ = {isa = PBXFileReference; lastKnownFileType = folder; name = HeaderMarks; path = Assets/HeaderMarks; sourceTree = SOURCE_ROOT; };
 		E359008C174456F0E7E13E19 /* GlassBackgrounds */ = {isa = PBXFileReference; lastKnownFileType = folder; name = GlassBackgrounds; path = Assets/GlassBackgrounds; sourceTree = SOURCE_ROOT; };
+		E3A2C364BE3C8CBE2ED00AE6 /* TVLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVLibraryView.swift; sourceTree = "<group>"; };
+		EA95B8C22D26F273C6476DD1 /* TVKaleidoscopeSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVKaleidoscopeSurface.swift; sourceTree = "<group>"; };
+		ED0603FCAE5EFBD80F77BDB9 /* TVTunnel.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = TVTunnel.metal; sourceTree = "<group>"; };
 		ED8702E61EE0F31C7677EC30 /* AudioAnalysis.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioAnalysis.swift; sourceTree = "<group>"; };
 		ED9C2A0F694BD3960FADA938 /* MacAppUpdates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacAppUpdates.swift; sourceTree = "<group>"; };
+		EEFAC47C4D8A1C63AB2D5EDD /* GlassAppearance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlassAppearance.swift; sourceTree = "<group>"; };
 		EF714F069BFA8BAE334EE31F /* MacVideoPresentation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacVideoPresentation.swift; sourceTree = "<group>"; };
 		EF99A5BF8FAE5BAC92EC8A5B /* tvOS.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = tvOS.xcassets; sourceTree = "<group>"; };
 		F185419F294F55DB3C3CAE00 /* wordmark.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; path = wordmark.png; sourceTree = "<group>"; };
 		F28951F1D53D43A1D29492C2 /* MobileVLCKit.xcframework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.xcframework; name = MobileVLCKit.xcframework; path = Dependencies/MobileVLCKit.xcframework; sourceTree = "<group>"; };
 		F34E9130E32BD7FD17500B48 /* MusicRoom-iOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "MusicRoom-iOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		FC176A40B020B605D69FA449 /* TVPlayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TVPlayerView.swift; sourceTree = "<group>"; };
+		FE106F4D311A9287B57C73FC /* MobilePlex.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MobilePlex.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -149,6 +277,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E3384EA3764C1AFFB071A675 /* TVVLCKit.xcframework in Frameworks */,
+				5B9040B565F3A0EC1E7DDA67 /* ToolDrive-tvOS.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -157,12 +286,22 @@
 			buildActionMask = 2147483647;
 			files = (
 				10340FE7F12AF86053A096ED /* MobileVLCKit.xcframework in Frameworks */,
+				77E977CE1ED2FE53A0FB1A47 /* ToolDrive-iOS.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		2B6D6A6842FCA82C7656CC2C /* Metal */ = {
+			isa = PBXGroup;
+			children = (
+				EE2A58234794A3461F292483 /* iOS */,
+				A794552AE7EA30FD763F986B /* tvOS */,
+			);
+			path = Metal;
+			sourceTree = "<group>";
+		};
 		42F67F8380F0DE1543EDBB7E /* Mobile */ = {
 			isa = PBXGroup;
 			children = (
@@ -179,8 +318,27 @@
 			children = (
 				F34E9130E32BD7FD17500B48 /* MusicRoom-iOS.app */,
 				B368254AA2FA6C110A7860BB /* MusicRoom-tvOS.app */,
+				BC6F36BAF9881D7380AD17A1 /* ToolDrive-iOS.framework */,
+				83C70ECD704B3A919699054D /* ToolDrive-tvOS.framework */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		54278123971794C37C683906 /* tvOS */ = {
+			isa = PBXGroup;
+			children = (
+				0A9BD3BFAFB5FB4D0AE6999C /* ToolDriveArchiveView.swift */,
+				CA0234EDB29B91153A949FE7 /* TVAboutView.swift */,
+				B3A858D1BC0BAD7FE7E5A78C /* TVAppearanceView.swift */,
+				D8B43425C6A64C40B6762686 /* TVBackgroundTransfer.swift */,
+				994231CC3E59AB0C48302065 /* TVFilamentSurface.swift */,
+				EA95B8C22D26F273C6476DD1 /* TVKaleidoscopeSurface.swift */,
+				E3A2C364BE3C8CBE2ED00AE6 /* TVLibraryView.swift */,
+				FC176A40B020B605D69FA449 /* TVPlayerView.swift */,
+				136639210F8036CBA68D9A9A /* TVPlexView.swift */,
+				6D3865D7A65EBE4D423C5065 /* TVTunnelSurface.swift */,
+			);
+			path = tvOS;
 			sourceTree = "<group>";
 		};
 		66B92525B616589C36D6A1F6 /* Assets */ = {
@@ -196,15 +354,62 @@
 			path = Assets;
 			sourceTree = "<group>";
 		};
+		A794552AE7EA30FD763F986B /* tvOS */ = {
+			isa = PBXGroup;
+			children = (
+				85D1ACAEAEFF49688072EAE3 /* TVFilament.metal */,
+				D98D65C23D34BB9861A2626C /* TVKaleidoscope.metal */,
+				ED0603FCAE5EFBD80F77BDB9 /* TVTunnel.metal */,
+			);
+			path = tvOS;
+			sourceTree = "<group>";
+		};
+		A81A2FBBA2973066B695979B /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				42E9465964E1A40B646867E4 /* AppearanceView.swift */,
+				26FC7003072EFC998B1C27CC /* CatalogView.swift */,
+				B5E97A995568CE10A3749702 /* LibraryView.swift */,
+				67CBC0D30B927FC05781EA91 /* MobileVisualizerView.swift */,
+				37B149D29AEDD40D097193E3 /* PlayerView.swift */,
+				A2D8D6D54E6232361B6D546B /* PlexView.swift */,
+				955B0403FEE18C8FC3634CD5 /* ShowDetailView.swift */,
+				7AAE84EB4B19D4FAFFB1819D /* ToolDriveArchiveView.swift */,
+				50F3FF94B0657359491CB7D0 /* TVKaleidoscopeSurface.swift */,
+			);
+			path = iOS;
+			sourceTree = "<group>";
+		};
 		B1212F1FE04C13B4DEBCB69A = {
 			isa = PBXGroup;
 			children = (
 				66B92525B616589C36D6A1F6 /* Assets */,
 				42F67F8380F0DE1543EDBB7E /* Mobile */,
 				CFC16E1EDD81B2C33EE455FD /* Sources */,
+				B5F73B34325F31F920EF57FA /* ToolDrive */,
 				C4FB96BA48F8BB37FEC8B2C3 /* Frameworks */,
 				432E4B33B14B9775787309F3 /* Products */,
 			);
+			sourceTree = "<group>";
+		};
+		B5F73B34325F31F920EF57FA /* ToolDrive */ = {
+			isa = PBXGroup;
+			children = (
+				BF3F5AC9F1B28FE505666D3B /* Mobile */,
+			);
+			path = ToolDrive;
+			sourceTree = "<group>";
+		};
+		BF3F5AC9F1B28FE505666D3B /* Mobile */ = {
+			isa = PBXGroup;
+			children = (
+				21DCA187065CE4E18A11F6DC /* ToolDrive */,
+				A81A2FBBA2973066B695979B /* iOS */,
+				2B6D6A6842FCA82C7656CC2C /* Metal */,
+				C860396800F8BCE616ED1F2A /* Shared */,
+				54278123971794C37C683906 /* tvOS */,
+			);
+			path = Mobile;
 			sourceTree = "<group>";
 		};
 		C4FB96BA48F8BB37FEC8B2C3 /* Frameworks */ = {
@@ -214,6 +419,30 @@
 				036E50F9A09EABA89FACCA36 /* TVVLCKit.xcframework */,
 			);
 			name = Frameworks;
+			sourceTree = "<group>";
+		};
+		C860396800F8BCE616ED1F2A /* Shared */ = {
+			isa = PBXGroup;
+			children = (
+				D9DA536660BDBFEC705648A0 /* ArchiveDiscovery.swift */,
+				34ADE339974C3A8F521D95AD /* ArchiveScrollingTitle.swift */,
+				B4CFDD76F8DC8019AE8E5222 /* ArchiveStore.swift */,
+				98840BB4D2D96BEA35B453B9 /* ArchiveWallpaper.swift */,
+				20ED016874656D8722273626 /* AudioAnalysis.swift */,
+				02C87E2B4629BAD90F14018F /* AudioPlayer.swift */,
+				57C1069E561396E8408C4EFA /* CatalogFilters.swift */,
+				EEFAC47C4D8A1C63AB2D5EDD /* GlassAppearance.swift */,
+				84303833AB4AE2FE7352B25A /* GlassWallpaperPreferences.swift */,
+				8F51B5492182699B91E5DA3B /* LiveMedia.swift */,
+				75781DA236B2384F586B0575 /* MobileAppIconPicker.swift */,
+				A01FF8E43B6C80BBAEE5E8F6 /* MobileLibrary.swift */,
+				FE106F4D311A9287B57C73FC /* MobilePlex.swift */,
+				11258FE49A48E51D7EB9F265 /* MobileTheme.swift */,
+				DB2214A23F301E7CB08F0366 /* PlaybackEqualizer.swift */,
+				790F4BA73F153291A9504706 /* PlexService.swift */,
+				3C9BAB797374ADD5B2683083 /* Updates.swift */,
+			);
+			path = Shared;
 			sourceTree = "<group>";
 		};
 		CFC16E1EDD81B2C33EE455FD /* Sources */ = {
@@ -228,6 +457,7 @@
 				ED9C2A0F694BD3960FADA938 /* MacAppUpdates.swift */,
 				AE3A4685EF46B49FB6B22D90 /* MacMiniPlayer.swift */,
 				EF714F069BFA8BAE334EE31F /* MacVideoPresentation.swift */,
+				62D082230979C3114636B87D /* MediaDownloads.swift */,
 				C97A49FCD6AC086C13007CEB /* MobileMusicRoomApp.swift */,
 				A0B6189D5420E12F096AED5C /* MusicAppIconPicker.swift */,
 				A7C3DEA02512BD0C8E406A0F /* MusicGenreList.swift */,
@@ -247,6 +477,14 @@
 			path = Sources;
 			sourceTree = "<group>";
 		};
+		EE2A58234794A3461F292483 /* iOS */ = {
+			isa = PBXGroup;
+			children = (
+				4CEB33019888933A2455EB19 /* TVKaleidoscope.metal */,
+			);
+			path = iOS;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -262,6 +500,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				718F449760BFA83792B1BFD1 /* PBXTargetDependency */,
 			);
 			name = "MusicRoom-tvOS";
 			packageProductDependencies = (
@@ -269,6 +508,23 @@
 			productName = "MusicRoom-tvOS";
 			productReference = B368254AA2FA6C110A7860BB /* MusicRoom-tvOS.app */;
 			productType = "com.apple.product-type.application";
+		};
+		44451FD3370707B1DB9F17E2 /* ToolDrive-iOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 195616E2DABBEF48D2A4FBE4 /* Build configuration list for PBXNativeTarget "ToolDrive-iOS" */;
+			buildPhases = (
+				8DC5847E31224C58A6C0EA8E /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "ToolDrive-iOS";
+			packageProductDependencies = (
+			);
+			productName = "ToolDrive-iOS";
+			productReference = BC6F36BAF9881D7380AD17A1 /* ToolDrive-iOS.framework */;
+			productType = "com.apple.product-type.framework";
 		};
 		A0D4B276365C34C91DD5F8BD /* MusicRoom-iOS */ = {
 			isa = PBXNativeTarget;
@@ -282,6 +538,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				A17E781BDF7284866CC74175 /* PBXTargetDependency */,
 			);
 			name = "MusicRoom-iOS";
 			packageProductDependencies = (
@@ -289,6 +546,23 @@
 			productName = "MusicRoom-iOS";
 			productReference = F34E9130E32BD7FD17500B48 /* MusicRoom-iOS.app */;
 			productType = "com.apple.product-type.application";
+		};
+		E953FB72F2DD493234B1AFCE /* ToolDrive-tvOS */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = ED462AD26AEFA738FF63654B /* Build configuration list for PBXNativeTarget "ToolDrive-tvOS" */;
+			buildPhases = (
+				91C3656345C88C77E4442F01 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "ToolDrive-tvOS";
+			packageProductDependencies = (
+			);
+			productName = "ToolDrive-tvOS";
+			productReference = 83C70ECD704B3A919699054D /* ToolDrive-tvOS.framework */;
+			productType = "com.apple.product-type.framework";
 		};
 /* End PBXNativeTarget section */
 
@@ -317,6 +591,8 @@
 			targets = (
 				A0D4B276365C34C91DD5F8BD /* MusicRoom-iOS */,
 				34BA7F85B2C91C701BA7B01E /* MusicRoom-tvOS */,
+				44451FD3370707B1DB9F17E2 /* ToolDrive-iOS */,
+				E953FB72F2DD493234B1AFCE /* ToolDrive-tvOS */,
 			);
 		};
 /* End PBXProject section */
@@ -328,6 +604,7 @@
 			files = (
 				74F4D192E3D924D24E1E6E57 /* GlassBackgrounds in Resources */,
 				76564F19F8DE83CE1924C29F /* HeaderMarks in Resources */,
+				38F439CF3FC372B6BB106E1E /* ToolDrive in Resources */,
 				9959D287B0EF37D30FBA83FB /* VideoLAN-LICENSE.txt in Resources */,
 				302A4395B55B8B0627800F4D /* VideoLAN-SOURCE.txt in Resources */,
 				93D79DBF914029D9676C6472 /* iOS.xcassets in Resources */,
@@ -344,6 +621,7 @@
 				F7D000EAFF036916AC9FA4E6 /* GlassBackgrounds in Resources */,
 				523B49DEEF64BD699C9746FE /* HeaderMarks in Resources */,
 				FADC6818B7AC6229F0DB486F /* TVIconPreviews in Resources */,
+				82621AE7CE4C7B347586D4CC /* ToolDrive in Resources */,
 				B3454E96260F2C14C2E75C3E /* VideoLAN-LICENSE.txt in Resources */,
 				6399573E99B6264BFA63F0EF /* VideoLAN-SOURCE.txt in Resources */,
 				BBE1D9643AC04B20AAFE1C47 /* music-wordmarks.png in Resources */,
@@ -368,6 +646,7 @@
 				4852498FF890C183BB536F7A /* MacAppUpdates.swift in Sources */,
 				614CA070E7014A7C66698623 /* MacMiniPlayer.swift in Sources */,
 				50FD1E765EF3D610380E5C03 /* MacVideoPresentation.swift in Sources */,
+				3D9F5B0880ED9C632AADB43B /* MediaDownloads.swift in Sources */,
 				733CA465AF821A663909CC7B /* MobileMusicRoomApp.swift in Sources */,
 				42811EF14C7EB41CB2F0D3CD /* MusicAppIconPicker.swift in Sources */,
 				E301E1E7838B11175D01EF9A /* MusicGenreList.swift in Sources */,
@@ -381,8 +660,76 @@
 				188CBDBB2368F430ACD2DF00 /* PlexService.swift in Sources */,
 				B7ED9870A8F862FD22A8AAB8 /* PlexVideo.swift in Sources */,
 				41D79EEF812C5A9A994C8244 /* PlexVideoManifest.swift in Sources */,
+				F905822CE1DFB0F1DB80A2B6 /* TVKaleidoscope.metal in Sources */,
 				559F2534C6897DF20AAC1E02 /* Track.swift in Sources */,
 				AD96252D7ED6ED6CE1A3368C /* VideoWatchStore.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8DC5847E31224C58A6C0EA8E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E6F2F07A88B3C6E6B8379C91 /* AppearanceView.swift in Sources */,
+				12EF38926D4024B48E39F1BF /* ArchiveDiscovery.swift in Sources */,
+				3B516F144A258899C30DB124 /* ArchiveScrollingTitle.swift in Sources */,
+				5C0D157DFEB8B0A98AA1879E /* ArchiveStore.swift in Sources */,
+				65E4EC4A96B6D8315CFE735F /* ArchiveWallpaper.swift in Sources */,
+				EC460D45FB79918027ADC727 /* AudioAnalysis.swift in Sources */,
+				8A8160A3A7189873B61A6FC2 /* AudioPlayer.swift in Sources */,
+				35BFE8815C14CE85F8CBC1AF /* CatalogFilters.swift in Sources */,
+				2D71F95B30AF3AB3767A90B9 /* CatalogView.swift in Sources */,
+				4A84E5634EE00FE690D8CCE5 /* GlassAppearance.swift in Sources */,
+				F307562545993D2771A354AC /* GlassWallpaperPreferences.swift in Sources */,
+				3DD21C75E64AA3E64CD19A5D /* LibraryView.swift in Sources */,
+				4F7A11318E5573C59548FC41 /* LiveMedia.swift in Sources */,
+				A89ADC1CC1824BC82D3DC44B /* MobileAppIconPicker.swift in Sources */,
+				FAF17BE90AAB14D3F3CA8252 /* MobileLibrary.swift in Sources */,
+				78D9186DA8557BD1D0A74D8F /* MobilePlex.swift in Sources */,
+				8BDDD4590B9BCB1F86355CD0 /* MobileTheme.swift in Sources */,
+				1A50E93CF51B9E293A751C16 /* MobileVisualizerView.swift in Sources */,
+				7D42672F2827302D7FC6F97D /* PlaybackEqualizer.swift in Sources */,
+				C0D81CF68DBAA055BD54F71D /* PlayerView.swift in Sources */,
+				E34052C5BCE934DF2DCB8406 /* PlexService.swift in Sources */,
+				CCB98FB3410726E5C21B20C2 /* PlexView.swift in Sources */,
+				0D0B4EBF64F1367C4F00D611 /* ShowDetailView.swift in Sources */,
+				3EF2585F30717D69B126A221 /* TVKaleidoscopeSurface.swift in Sources */,
+				A9EAEC209BFD4B9636562A90 /* ToolDriveArchiveView.swift in Sources */,
+				7EB01C7C5A7A57BB11F7AF41 /* Updates.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		91C3656345C88C77E4442F01 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				9E7D949FF1020B634D8E49BB /* ArchiveDiscovery.swift in Sources */,
+				BAB6611C960DE93688BC5193 /* ArchiveScrollingTitle.swift in Sources */,
+				C284DBCED45CCE762D0F6D1D /* ArchiveStore.swift in Sources */,
+				026D774C200AB8909C0A46F5 /* ArchiveWallpaper.swift in Sources */,
+				EBD8B06105D92AE87435CFB6 /* AudioAnalysis.swift in Sources */,
+				6C1D719789E9E40BCAF6DEB5 /* AudioPlayer.swift in Sources */,
+				2173BC65A1CDA8D1AD4AC7E6 /* CatalogFilters.swift in Sources */,
+				6F53ADB1B1E0AF62BECDE2EF /* GlassAppearance.swift in Sources */,
+				3D63E124AB89AC0E66C65483 /* GlassWallpaperPreferences.swift in Sources */,
+				D296E8554105827C14E228BD /* LiveMedia.swift in Sources */,
+				64E47D44C5DB9B09E0AC17E7 /* MobileAppIconPicker.swift in Sources */,
+				0609E35D21E2E0057EE0D5D8 /* MobileLibrary.swift in Sources */,
+				A272A82CAFFB57F00ACE8FCE /* MobilePlex.swift in Sources */,
+				7F99338E1689E7FFB3B6570A /* MobileTheme.swift in Sources */,
+				A310ABD4935205734328FB47 /* PlaybackEqualizer.swift in Sources */,
+				2E4242D55B3F8D1593C2A0DD /* PlexService.swift in Sources */,
+				40CCDAC2D8855E1F8AF96111 /* TVAboutView.swift in Sources */,
+				B472B74042F99986CB2B1526 /* TVAppearanceView.swift in Sources */,
+				AFF18AC279DDCC25E54C7F9C /* TVBackgroundTransfer.swift in Sources */,
+				C807279C131DCDCE259BF62E /* TVFilamentSurface.swift in Sources */,
+				AAF9B4BC379E24A631ED8D0D /* TVKaleidoscopeSurface.swift in Sources */,
+				D3ABC642B4A688092E67FF1C /* TVLibraryView.swift in Sources */,
+				88B7080065BAA189D02114BD /* TVPlayerView.swift in Sources */,
+				7661F79463DCC90C35126C47 /* TVPlexView.swift in Sources */,
+				8440B0A38BA6C09E611768FE /* TVTunnelSurface.swift in Sources */,
+				FE2F03EE995187836B4FACA3 /* ToolDriveArchiveView.swift in Sources */,
+				B622BC84DAD72E7A756E7DFA /* Updates.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -399,6 +746,7 @@
 				4F8F42D2AB91DCC695B06BD6 /* MacAppUpdates.swift in Sources */,
 				11F3BB75364189A5F0A3B672 /* MacMiniPlayer.swift in Sources */,
 				30FB9912CFC98B40FC532C8F /* MacVideoPresentation.swift in Sources */,
+				D7F3323D37C9FD9A46742C77 /* MediaDownloads.swift in Sources */,
 				B7E443953550133C851BC0A2 /* MobileMusicRoomApp.swift in Sources */,
 				0D8B9B802C2B23D503C305AE /* MusicAppIconPicker.swift in Sources */,
 				CFCAD59E994057089D18A941 /* MusicGenreList.swift in Sources */,
@@ -412,6 +760,9 @@
 				9B3C788DCE3EB58EF492A7D2 /* PlexService.swift in Sources */,
 				074FFEE30E6DF831BD87E62B /* PlexVideo.swift in Sources */,
 				553366239E97CB54D63B41BB /* PlexVideoManifest.swift in Sources */,
+				808C3E8E835C67BACE3CF0E3 /* TVFilament.metal in Sources */,
+				40C6885B2A3CD921E5069FF0 /* TVKaleidoscope.metal in Sources */,
+				DF75E0B76CB29D9E9F9AF68C /* TVTunnel.metal in Sources */,
 				A69490A6AD7CB4C928AF43CD /* Track.swift in Sources */,
 				C5010D1FF9F009AF00F040A6 /* VideoWatchStore.swift in Sources */,
 			);
@@ -419,7 +770,44 @@
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		718F449760BFA83792B1BFD1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E953FB72F2DD493234B1AFCE /* ToolDrive-tvOS */;
+			targetProxy = 5BF9B20EF6149BD71F4E187C /* PBXContainerItemProxy */;
+		};
+		A17E781BDF7284866CC74175 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 44451FD3370707B1DB9F17E2 /* ToolDrive-iOS */;
+			targetProxy = EA463AA3F4B501FC0904C978 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		155C9FD65C53D21DC53D4A55 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = net.bentley734.musicroom.tooldrive;
+				PRODUCT_NAME = ToolDriveMobile;
+				SDKROOT = appletvos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Debug;
+		};
 		397439B97D2997D30D57C318 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -477,7 +865,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 42;
+				CURRENT_PROJECT_VERSION = 43;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -492,7 +880,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
-				MARKETING_VERSION = 0.1.41;
+				MARKETING_VERSION = 0.1.42;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -582,7 +970,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 42;
+				CURRENT_PROJECT_VERSION = 43;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -603,7 +991,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
-				MARKETING_VERSION = 0.1.41;
+				MARKETING_VERSION = 0.1.42;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -611,6 +999,54 @@
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		CEF83D16002FE9926B3A3413 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = net.bentley734.musicroom.tooldrive;
+				PRODUCT_NAME = ToolDriveMobile;
+				SDKROOT = appletvos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 17.0;
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
+		D5596A9597F3534FA7B5D34A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = net.bentley734.musicroom.tooldrive;
+				PRODUCT_NAME = ToolDriveMobile;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
 			};
 			name = Debug;
 		};
@@ -637,9 +1073,42 @@
 			};
 			name = Release;
 		};
+		F9D8226E6EAB3165D7299AFE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_IDENTITY = "";
+				CURRENT_PROJECT_VERSION = 1;
+				DEFINES_MODULE = YES;
+				DYLIB_COMPATIBILITY_VERSION = 1;
+				DYLIB_CURRENT_VERSION = 1;
+				DYLIB_INSTALL_NAME_BASE = "@rpath";
+				INSTALL_PATH = "$(LOCAL_LIBRARY_DIR)/Frameworks";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = net.bentley734.musicroom.tooldrive;
+				PRODUCT_NAME = ToolDriveMobile;
+				SDKROOT = iphoneos;
+				SKIP_INSTALL = YES;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VERSIONING_SYSTEM = "apple-generic";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		195616E2DABBEF48D2A4FBE4 /* Build configuration list for PBXNativeTarget "ToolDrive-iOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D5596A9597F3534FA7B5D34A /* Debug */,
+				F9D8226E6EAB3165D7299AFE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		7E28B9D23FE15C992C13FEA7 /* Build configuration list for PBXNativeTarget "MusicRoom-tvOS" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
@@ -663,6 +1132,15 @@
 			buildConfigurations = (
 				91865EA8D807C9A6E0B6B4EF /* Debug */,
 				5D3E590BC650C5706CD11F73 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		ED462AD26AEFA738FF63654B /* Build configuration list for PBXNativeTarget "ToolDrive-tvOS" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				155C9FD65C53D21DC53D4A55 /* Debug */,
+				CEF83D16002FE9926B3A3413 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

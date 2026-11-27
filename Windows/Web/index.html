@@ -30,6 +30,7 @@
       <nav aria-label="Media">
         <button id="movies" aria-pressed="false" disabled>Movies</button>
         <button id="television" aria-pressed="false" disabled>TV Shows</button>
+        <button id="tool-drive" aria-pressed="false">Tool Drive</button>
         <button id="music" aria-pressed="true">Music</button>
       </nav>
       <nav id="music-sections" aria-label="Music Library">
@@ -39,6 +40,7 @@
         <button id="tracks" aria-pressed="false" disabled>Tracks</button>
         <button id="playlists" aria-pressed="false" disabled>Playlists</button>
       </nav>
+      <nav aria-label="Offline Library"><button id="downloads" aria-pressed="false">Downloads</button></nav>
     </div>
     <div class="sidebar-controls">
       <button id="settings" type="button">Settings</button>
@@ -47,6 +49,19 @@
   <div id="sidebar-resize" role="separator" aria-label="Sidebar width" aria-orientation="vertical"
        aria-controls="library-sidebar" tabindex="0" title="Drag to resize. Double-click to reset."></div>
   <main>
+    <section id="tool-drive-panel" aria-label="Tool Drive" hidden></section>
+    <section id="downloads-panel" hidden>
+      <header class="library-page-header">
+        <h1 id="downloads-title">Downloads</h1>
+        <input id="downloads-search" type="search" aria-label="Search downloads" placeholder="Search downloads">
+      </header>
+      <div class="content">
+        <p id="downloads-status" role="status"></p>
+        <button id="downloads-cancel" type="button" hidden>Cancel Download</button>
+        <p id="downloads-empty">Use Download in the item’s menu. Tool Drive recordings are in its Library.</p>
+        <div id="downloads-items"></div>
+      </div>
+    </section>
     <section id="welcome">
       <img src="prismatic-note.png" alt="" width="74" height="74">
       <h1 id="welcome-title">Connect to Plex</h1>
@@ -107,6 +122,12 @@
       </div>
     </section>
   </main>
+  <dialog id="remove-download" aria-labelledby="remove-download-title">
+    <h2 id="remove-download-title">Remove Download?</h2>
+    <p id="remove-download-name"></p>
+    <button id="remove-download-cancel" type="button">Cancel</button>
+    <button id="remove-download-confirm" type="button">Remove</button>
+  </dialog>
   <dialog id="playlist-editor" aria-labelledby="playlist-editor-title">
     <h2 id="playlist-editor-title">New Playlist</h2>
     <p id="playlist-editor-track" hidden></p>
@@ -141,6 +162,7 @@
       <button id="video-fullscreen" type="button" disabled>Fullscreen</button>
       <button id="video-pip" type="button" disabled>Picture in Picture</button>
       <button id="video-watch-toggle" type="button">Mark Watched</button>
+      <button id="video-download" type="button">Download Original</button>
       <button id="video-done" type="button">Done</button>
     </header>
     <section id="video-up-next" aria-label="Up Next" hidden>
@@ -375,6 +397,8 @@
           <option value="music">Music</option>
           <option value="movie">Movies</option>
           <option value="show">TV Shows</option>
+          <option value="toolDrive">Tool Drive</option>
+          <option value="downloads">Downloads</option>
         </select>
       </label>
       <label class="header-logo-choice">Header Wordmark
@@ -433,6 +457,28 @@
           <option value="quicktime">QuickTime</option>
           <option value="itunes-disc">iTunes Disc</option>
           <option value="itunes-11">iTunes 11</option>
+          <option value="tool-archive-classic" data-tool-drive>Tool Classic</option>
+          <option value="tool-archive-2006" data-tool-drive>Tool 2006</option>
+          <option value="tool-archive-opiate" data-tool-drive>Tool Opiate</option>
+          <option value="tool-archive-opiate2" data-tool-drive>Tool Opiate²</option>
+          <option value="tool-archive-fear-inoculum" data-tool-drive>Tool Fear Inoculum</option>
+          <option value="tool-archive-multicolor" data-tool-drive>Tool Multicolor</option>
+          <option value="tool-archive-marbled" data-tool-drive>Tool Marbled</option>
+          <option value="tool-archive-spectrum" data-tool-drive>Tool Spectrum</option>
+          <option value="tool-archive-block" data-tool-drive>Tool Block</option>
+          <option value="tool-archive-sawblade" data-tool-drive>Tool Sawblade</option>
+          <option value="tool-archive-reflection" data-tool-drive>Tool Reflection</option>
+          <option value="tool-archive-framed" data-tool-drive>Tool Framed</option>
+          <option value="tool-archive-orbit" data-tool-drive>Tool Orbit</option>
+          <option value="tool-archive-static" data-tool-drive>Tool Static</option>
+          <option value="tool-archive-erosion" data-tool-drive>Tool Erosion</option>
+          <option value="tool-archive-afterimage" data-tool-drive>Tool Afterimage</option>
+          <option value="tool-archive-light-trail" data-tool-drive>Tool Light Trail</option>
+          <option value="tool-archive-flare" data-tool-drive>Tool Flare</option>
+          <option value="tool-archive-blue-mist" data-tool-drive>Tool Blue Mist</option>
+          <option value="tool-archive-1992" data-tool-drive>Tool 1992</option>
+          <option value="tool-archive-aenima" data-tool-drive>Tool Ænima</option>
+          <option value="tool-archive-bone" data-tool-drive>Tool Bone</option>
         </select>
       </label>
       <label class="header-logo-choice">Header Logo Size
@@ -508,6 +554,11 @@
     </label>
     <section>
       <h2>Library Sections</h2>
+      <label>Movies name <input id="movies-name" type="text" maxlength="48" placeholder="Movies"></label>
+      <label>TV Shows name <input id="television-name" type="text" maxlength="48" placeholder="TV Shows"></label>
+      <label>Tool Drive name <input id="tool-drive-name" type="text" maxlength="48" placeholder="Tool Drive"></label>
+      <label>Music name <input id="music-name" type="text" maxlength="48" placeholder="Music"></label>
+      <label>Downloads name <input id="downloads-name" type="text" maxlength="48" placeholder="Downloads"></label>
       <div id="library-sections" class="library-sections"></div>
       <div class="library-sections">
         <label><input id="show-movies-section" type="checkbox" checked>Movies</label>
@@ -519,6 +570,14 @@
         <h2>Equalizer</h2>
         <button id="reset-eq" type="button">Reset EQ</button>
       </div>
+      <label>Preset
+        <select id="eq-preset">
+          <option value="flat">Flat</option><option value="bassBoost">Bass Boost</option>
+          <option value="vocal">Vocal</option><option value="bright">Bright</option>
+          <option value="custom" disabled>Custom</option>
+        </select>
+      </label>
+      <label><input id="eq-magik" type="checkbox">Magik</label>
       <label class="eq-band">Bass <input id="bass" type="range" min="-10" max="10" step="1" value="0"><output for="bass" id="bass-value">+0 dB</output></label>
       <label class="eq-band">Midrange <input id="mid" type="range" min="-10" max="10" step="1" value="0"><output for="mid" id="mid-value">+0 dB</output></label>
       <label class="eq-band">Treble <input id="treble" type="range" min="-10" max="10" step="1" value="0"><output for="treble" id="treble-value">+0 dB</output></label>

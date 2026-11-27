@@ -247,9 +247,39 @@ enum HeaderMark: String, CaseIterable, Identifiable {
     case itunesDisc = "itunes-disc"
     case itunes11 = "itunes-11"
 
+    case toolArchiveClassic = "tool-archive-classic"
+    case toolArchive2006 = "tool-archive-2006"
+    case toolArchiveOpiate = "tool-archive-opiate"
+    case toolArchiveOpiate2 = "tool-archive-opiate2"
+    case toolArchiveFearInoculum = "tool-archive-fear-inoculum"
+    case toolArchiveMulticolor = "tool-archive-multicolor"
+    case toolArchiveMarbled = "tool-archive-marbled"
+    case toolArchiveSpectrum = "tool-archive-spectrum"
+    case toolArchiveBlock = "tool-archive-block"
+    case toolArchiveSawblade = "tool-archive-sawblade"
+    case toolArchiveReflection = "tool-archive-reflection"
+    case toolArchiveFramed = "tool-archive-framed"
+    case toolArchiveOrbit = "tool-archive-orbit"
+    case toolArchiveStatic = "tool-archive-static"
+    case toolArchiveErosion = "tool-archive-erosion"
+    case toolArchiveAfterimage = "tool-archive-afterimage"
+    case toolArchiveLightTrail = "tool-archive-light-trail"
+    case toolArchiveFlare = "tool-archive-flare"
+    case toolArchiveBlueMist = "tool-archive-blue-mist"
+    case toolArchive1992 = "tool-archive-1992"
+    case toolArchiveAenima = "tool-archive-aenima"
+    case toolArchiveBone = "tool-archive-bone"
+
     var id: Self { self }
     var isMonochrome: Bool { self == .black || self == .white }
-    var usesTextColor: Bool { self == .disneyPlusMono || self == .appleTV || self == .appleTVClassic }
+    var usesTextColor: Bool {
+        self == .disneyPlusMono || self == .appleTV || self == .appleTVClassic ||
+        self == .toolArchiveClassic || self == .toolArchive2006
+    }
+
+    static func choices(for section: HeaderBrandSection) -> [Self] {
+        allCases.filter { section == .toolDrive || !$0.rawValue.hasPrefix("tool-archive-") }
+    }
     var assetName: String { isMonochrome ? "monochrome" : rawValue }
     // Ratios of the canvas height to the visible artwork height.
     var artworkScale: CGFloat {
@@ -263,6 +293,28 @@ enum HeaderMark: String, CaseIterable, Identifiable {
     }
     var label: String {
         switch self {
+        case .toolArchiveClassic: "Tool Classic"
+        case .toolArchive2006: "Tool 2006"
+        case .toolArchiveOpiate: "Tool Opiate"
+        case .toolArchiveOpiate2: "Tool Opiate²"
+        case .toolArchiveFearInoculum: "Tool Fear Inoculum"
+        case .toolArchiveMulticolor: "Tool Multicolor"
+        case .toolArchiveMarbled: "Tool Marbled"
+        case .toolArchiveSpectrum: "Tool Spectrum"
+        case .toolArchiveBlock: "Tool Block"
+        case .toolArchiveSawblade: "Tool Sawblade"
+        case .toolArchiveReflection: "Tool Reflection"
+        case .toolArchiveFramed: "Tool Framed"
+        case .toolArchiveOrbit: "Tool Orbit"
+        case .toolArchiveStatic: "Tool Static"
+        case .toolArchiveErosion: "Tool Erosion"
+        case .toolArchiveAfterimage: "Tool Afterimage"
+        case .toolArchiveLightTrail: "Tool Light Trail"
+        case .toolArchiveFlare: "Tool Flare"
+        case .toolArchiveBlueMist: "Tool Blue Mist"
+        case .toolArchive1992: "Tool 1992"
+        case .toolArchiveAenima: "Tool Ænima"
+        case .toolArchiveBone: "Tool Bone"
         case .none: "Text Only"
         case .black: "Black"
         case .white: "White"
@@ -312,7 +364,7 @@ enum HeaderMarkSize: String, CaseIterable, Identifiable {
 }
 
 enum HeaderBrandSection: String, CaseIterable, Identifiable {
-    case music, movies, television
+    case movies, television, toolDrive, music, downloads
 
     init(video: PlexVideoKind?) {
         switch video {
@@ -326,6 +378,8 @@ enum HeaderBrandSection: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .music: "Music"
+        case .toolDrive: "Tool Drive"
+        case .downloads: "Downloads"
         case .movies: PlexVideoKind.movies.title
         case .television: PlexVideoKind.television.title
         }
@@ -341,7 +395,8 @@ struct HeaderBrandChoices: DynamicProperty {
     @AppStorage private var wordmark: HeaderWordmark
 
     init(section: HeaderBrandSection) {
-        _mark = AppStorage(wrappedValue: .none, section.preferenceKey(HeaderMark.preferenceKey))
+        _mark = AppStorage(wrappedValue: section == .toolDrive ? .toolArchiveClassic : .none,
+                           section.preferenceKey(HeaderMark.preferenceKey))
         _wordmark = AppStorage(wrappedValue: .iplex, section.preferenceKey(HeaderWordmark.preferenceKey))
     }
 
@@ -355,6 +410,7 @@ struct HeaderBrand: View {
     let width: CGFloat
     let height: CGFloat
     var allowsCycling = true
+    let section: HeaderBrandSection
     @Binding var mark: HeaderMark
     @Binding var wordmark: HeaderWordmark
 
@@ -410,7 +466,7 @@ struct HeaderBrand: View {
     }
 
     private func cycleMark() {
-        let choices = HeaderMark.allCases.filter { $0 != .none }
+        let choices = HeaderMark.choices(for: section).filter { $0 != .none }
         let current = choices.firstIndex(of: mark) ?? -1
         mark = choices[(current + 1) % choices.count]
     }
@@ -437,9 +493,11 @@ struct SectionHeaderBrand: View {
         let theme: MusicTheme
         let width: CGFloat
         let height: CGFloat
+        private let section: HeaderBrandSection
         private var choices: HeaderBrandChoices
 
         init(section: HeaderBrandSection, theme: MusicTheme, width: CGFloat, height: CGFloat) {
+            self.section = section
             self.theme = theme
             self.width = width
             self.height = height
@@ -447,7 +505,7 @@ struct SectionHeaderBrand: View {
         }
 
         var body: some View {
-            HeaderBrand(theme: theme, width: width, height: height,
+            HeaderBrand(theme: theme, width: width, height: height, section: section,
                         mark: choices.logoSelection, wordmark: choices.wordmarkSelection)
         }
     }

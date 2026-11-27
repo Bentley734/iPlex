@@ -47,7 +47,38 @@
   const nextCancel = get('video-next-cancel');
   const nextPlay = get('video-next-play');
   const tabs = new Map([['movie', get('movies')], ['show', get('television')]]);
-  const titles = {movie:'Movies', show:'TV Shows'};
+  const defaults = {movie:'Movies', show:'TV Shows', toolDrive:'Tool Drive', music:'Music', downloads:'Downloads'};
+  const toolDrivePanel = get('tool-drive-panel');
+  const downloadsPanel = get('downloads-panel');
+  const sectionButtons = new Map([...tabs, ['toolDrive', get('tool-drive')], ['music', get('music')],
+    ['downloads', get('downloads')]]);
+  const titles = {...defaults};
+  for (const [section, button] of sectionButtons) {
+    const input = get(button.id + '-name');
+    const key = 'musicroom-section-name-' + section;
+    try { input.value = localStorage.getItem(key) || ''; } catch {}
+    function applyName() {
+      titles[section] = input.value.trim().slice(0, 48) || defaults[section];
+      button.textContent = titles[section];
+      const option = get('header-brand-section').querySelector('option[value="' + section + '"]');
+      option.textContent = titles[section];
+      if (section === 'downloads') get('downloads-title').textContent = titles[section];
+      if (section === kind) {
+        if (!parent.length) get('video-title').textContent = titles[section];
+        search.placeholder = 'Search ' + titles[section];
+        search.setAttribute('aria-label', search.placeholder);
+        picker.setAttribute('aria-label', 'Switch ' + titles[section] + ' Library');
+      }
+    }
+    input.oninput = () => {
+      try { localStorage.setItem(key, input.value); } catch {}
+      applyName();
+    };
+    // Read names before the initial Plex state activates a section.
+    button.textContent = titles[section] = input.value.trim().slice(0, 48) || defaults[section];
+    get('header-brand-section').querySelector('option[value="' + section + '"]').textContent = titles[section];
+    if (section === 'downloads') get('downloads-title').textContent = titles[section];
+  }
   const sectionToggles = new Map([['movie', get('show-movies-section')], ['show', get('show-tv-section')]]);
   const sectionPreference = 'musicroom-visible-video-sections';
   const lastSectionPreference = 'musicroom-last-video-section';
@@ -57,10 +88,12 @@
     const saved = JSON.parse(localStorage.getItem(sectionPreference));
     if (Array.isArray(saved)) visibleSections = visibleSections.filter(section => saved.includes(section));
     const last = localStorage.getItem(lastSectionPreference);
-    if (visibleSections.includes(last)) preferredKind = last;
+    if (last === 'toolDrive' || last === 'downloads' || visibleSections.includes(last)) preferredKind = last;
   } catch {}
   const validSource = /^https:\/\/media\.musicroom\.invalid\/video\/[a-f0-9]{32}$/;
   let state, kind = '', library = '', libraryReady = false, pending = 0, parent = [], next = null, busy = false, timer;
+  let archiveOpen = false;
+  let downloadsOpen = false;
   let source, hls, candidates = [], usingFallback = false, resumeAt = 0, listOffset = 0, failed = false;
   const rendered = new Set();
   let watchRecords = new Map(), watchSequence = 0, activeItem, activeScope, lastReport = 0;
@@ -215,8 +248,10 @@
   });
 
   function syncTabs() {
-    get('music').setAttribute('aria-pressed', String(!kind));
-    get('music-sections').hidden = Boolean(kind);
+    get('music').setAttribute('aria-pressed', String(!kind && !archiveOpen && !downloadsOpen));
+    get('tool-drive').setAttribute('aria-pressed', String(archiveOpen));
+    get('downloads').setAttribute('aria-pressed', String(downloadsOpen));
+    get('music-sections').hidden = Boolean(kind || archiveOpen || downloadsOpen);
     for (const [type, tab] of tabs) {
       tab.hidden = !visibleSections.includes(type);
       tab.disabled = !videoServer();
@@ -256,7 +291,7 @@
       syncTabs();
       return;
     }
-    if (!kind && preferredKind) {
+    if (!kind && visibleSections.includes(preferredKind)) {
       openSection(preferredKind);
       return;
     }
@@ -280,7 +315,7 @@
 
   function present() {
     document.documentElement.toggleAttribute('data-video-open', Boolean(kind));
-    window.renderHeaderForSection?.(kind || 'music');
+    window.renderHeaderForSection?.(archiveOpen ? 'toolDrive' : downloadsOpen ? 'downloads' : kind || 'music');
     browser.hidden = !kind;
     syncTabs();
   }
@@ -310,6 +345,8 @@
   window.plexVideoExit = () => {
     rememberSection('');
     showMusic();
+    if (archiveOpen) openArchive(false);
+    if (downloadsOpen) openDownloads(false);
   };
 
   get('music').onclick = () => window.plexVideoExit();
@@ -317,7 +354,7 @@
   for (const input of sectionToggles.values()) input.onchange = () => {
     visibleSections = [...sectionToggles].filter(([, toggle]) => toggle.checked).map(([type]) => type);
     try { localStorage.setItem(sectionPreference, JSON.stringify(visibleSections)); } catch {}
-    if (preferredKind && !visibleSections.includes(preferredKind)) window.plexVideoExit();
+    if (tabs.has(preferredKind) && !visibleSections.includes(preferredKind)) window.plexVideoExit();
     else syncTabs();
   };
   syncTabs();
@@ -329,6 +366,8 @@
   };
 
   function openSection(type) {
+    if (archiveOpen) openArchive(false);
+    if (downloadsOpen) openDownloads(false);
     kind = type;
     watchRecords.clear();
     parent = [];
@@ -336,6 +375,125 @@
     present();
     configure();
   }
+
+  function reportArchiveBounds() {
+    const visible = archiveOpen && !document.querySelector('dialog[open]');
+    const {left, top, width, height} = toolDrivePanel.getBoundingClientRect();
+    const unit = (value, size) => Math.round(value * 10000 / Math.max(1, size));
+    host({action:'toolDrivePanel', visible, pause:!archiveOpen, left:unit(left,innerWidth), top:unit(top,innerHeight),
+          width:unit(width,innerWidth), height:unit(height,innerHeight), appearance:archiveAppearance()});
+  }
+  function archiveAppearance() {
+    const root = document.documentElement;
+    const appearance = getComputedStyle(root);
+    const value = name => appearance.getPropertyValue('--' + name).trim();
+    const channels = value('custom-tint-rgb');
+    const tint = root.dataset.glassTint === 'none' ? '' : channels ? `rgb(${channels})` : value('accent');
+    return {title:titles.toolDrive, text:value('text'), accent:value('accent'),
+            density:value('glass-density'), tint,
+            background:value('panel'), hover:root.hasAttribute('data-glass-hover')};
+  }
+  function openArchive(open) {
+    if (open) {
+      showMusic();
+      if (downloadsOpen) openDownloads(false);
+      window.windowsPlayback?.action({action:'pause'});
+    }
+    archiveOpen = open;
+    document.documentElement.toggleAttribute('data-tool-drive-open', open);
+    toolDrivePanel.hidden = !open;
+    present();
+    reportArchiveBounds();
+    if (!open) window.renderMusicPage?.();
+  }
+  get('tool-drive').onclick = () => {
+    rememberSection('toolDrive');
+    openArchive(true);
+  };
+  new ResizeObserver(() => { if (archiveOpen) reportArchiveBounds(); }).observe(toolDrivePanel);
+  new MutationObserver(() => { if (archiveOpen) reportArchiveBounds(); })
+    .observe(document.body, {subtree:true, attributes:true, attributeFilter:['open']});
+  new MutationObserver(() => { if (archiveOpen) reportArchiveBounds(); })
+    .observe(document.documentElement, {attributes:true, attributeFilter:['style', 'data-glass-hover', 'data-glass-tint', 'data-artwork-colors']});
+  function resumeArchive() {
+    if (preferredKind === 'toolDrive') openArchive(true);
+    if (preferredKind === 'downloads') openDownloads(true);
+  }
+  window.addEventListener('DOMContentLoaded', resumeArchive, {once:true});
+
+  function openDownloads(open) {
+    if (open) {
+      showMusic();
+      if (archiveOpen) openArchive(false);
+    }
+    downloadsOpen = open;
+    document.documentElement.toggleAttribute('data-downloads-open', open);
+    downloadsPanel.hidden = !open;
+    present();
+    if (open) host({action:'offlineList'});
+    else window.renderMusicPage?.();
+  }
+  get('downloads').onclick = () => {
+    rememberSection('downloads');
+    openDownloads(true);
+  };
+  let downloadedItems = [];
+  let removeID = '';
+  const removeDialog = get('remove-download');
+  get('remove-download-cancel').onclick = () => removeDialog.close();
+  get('remove-download-confirm').onclick = () => {
+    if (removeID) host({action:'offlineRemove', media:removeID});
+    removeDialog.close();
+  };
+  get('downloads-cancel').onclick = () => host({action:'offlineCancel'});
+  get('downloads-search').oninput = renderDownloads;
+  window.offlineState = reply => {
+    downloadedItems = reply.items || [];
+    get('downloads-status').textContent = reply.message || '';
+    get('downloads-cancel').hidden = !reply.busy;
+    renderDownloads();
+  };
+  window.offlineError = message => { get('downloads-status').textContent = message; };
+  function renderDownloads() {
+    const query = get('downloads-search').value.trim().toLocaleLowerCase();
+    const items = downloadedItems.filter(row => [row.title,row.detail].join(' ').toLocaleLowerCase().includes(query));
+    get('downloads-empty').hidden = downloadedItems.length > 0;
+    const section = get('downloads-items');
+    section.replaceChildren();
+    for (const [type, label] of [['music','Music'], ['movie','Movies'], ['episode','TV Shows']]) {
+      const rows = items.filter(row => row.kind === type);
+      if (!rows.length) continue;
+      const heading = document.createElement('h2');
+      heading.textContent = label;
+      section.append(heading);
+      for (const row of rows) {
+        const item = document.createElement('article');
+        const play = document.createElement('button');
+        play.textContent = row.title + (row.detail ? ' · ' + row.detail : '');
+        play.onclick = () => {
+          const player = window.windowsPlayback;
+          if (type === 'music') player.prepareAudio();
+          else player.action({action:'pause'});
+          host({action:type === 'music' ? 'offlinePlay' : 'offlineVideo', media:row.id, title:row.title});
+        };
+        const remove = document.createElement('button');
+        remove.textContent = 'Remove';
+        remove.setAttribute('aria-label', 'Remove ' + row.title);
+        remove.onclick = () => {
+          removeID = row.id;
+          get('remove-download-name').textContent = row.title;
+          removeDialog.showModal();
+        };
+        item.append(play, remove);
+        section.append(item);
+      }
+    }
+  }
+  get('video-download').onclick = () => {
+    if (!activeItem || !activeScope) return;
+    host({action:'offlineDownloadVideo', item:activeItem.key, library:activeScope.library,
+          kind:activeItem.type, title:activeItem.title, detail:activeItem.subtitle, version:selectedVersion});
+  };
 
   function browse(offset = 0) {
     clearTimeout(timer);
@@ -350,7 +508,7 @@
     const current = parent.at(-1);
     window.interfaceMotion.show(browser, ['video', kind, library, current?.key]);
     get('video-title').textContent = current?.title || titles[kind];
-    search.placeholder = 'Search ' + titles[kind].toLowerCase();
+    search.placeholder = 'Search ' + titles[kind];
     search.setAttribute('aria-label', search.placeholder);
     search.hidden = Boolean(current) || !library;
     search.disabled = !libraryReady;

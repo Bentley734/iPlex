@@ -12,7 +12,8 @@ struct NativeVideoPlayer: View {
     let startAt: Double
     let subtitleMode: VideoSubtitleMode
     let progress: (Double, Bool) -> Void
-    let fallback: (Double) -> Void
+    let fallback: ((Double) -> Void)?
+    var onFailure: (() -> Void)? = nil
 
     #if os(macOS)
     @Environment(\.macVideoPresentation) private var presentation
@@ -76,7 +77,7 @@ struct NativeVideoPlayer: View {
                         ForEach(subtitles) { Text($0.name).tag($0.id) }
                     }
                 }
-                Button("Use Compatibility Mode") { fallback(current) }
+                if let fallback { Button("Use Compatibility Mode") { fallback(current) } }
             }
             .font(.callout).padding(.horizontal, 16).padding(.bottom, 8)
         }
@@ -123,7 +124,7 @@ struct NativeVideoPlayer: View {
                 if !ended { progress(current, true) }
                 ended = true
             case .error:
-                fallback(current)
+                if let fallback { fallback(current) } else { onFailure?() }
                 return
             default: break
             }
@@ -141,7 +142,7 @@ struct NativeVideoPlayer: View {
                 progress(current, false)
             }
             if !ready && ContinuousClock.now - start > .seconds(30) {
-                fallback(current)
+                if let fallback { fallback(current) } else { onFailure?() }
                 return
             }
             do { try await Task.sleep(for: .milliseconds(250)) }

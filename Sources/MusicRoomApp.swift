@@ -1,6 +1,7 @@
 #if os(macOS)
 import AppKit
 import SwiftUI
+import ToolDriveMac
 
 @main
 struct MusicRoomApp: App {
@@ -60,6 +61,9 @@ private struct MusicWindow: View {
     @ObservedObject var model: LibraryModel
     @State private var searchTask: Task<Void, Never>?
     @MusicAppearance private var theme
+    @AppStorage(LiquidGlassAppearance.transparencyKey) private var glassTransparency = LiquidGlassAppearance.defaultTransparency
+    @AppStorage(LiquidGlassTint.preferenceKey) private var glassTint = LiquidGlassTint.themeDefault
+    @AppStorage(glassHoverPreferenceKey) private var glassHoverEffects = true
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @AppStorage(LibraryLayout.preferenceKey) private var libraryLayout = LibraryLayout.grid
     @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
@@ -103,6 +107,7 @@ private struct MusicWindow: View {
     }
 
     private var browseRoute: [String] {
+        if model.toolDriveSelected || model.downloadsSelected { return [model.activeSection.rawValue] }
         if let videoSection { return [videoSection.rawValue] }
         return ["music", model.libraryID, model.kind.rawValue, model.selectedGroup?.id ?? "", model.selectedDetail?.id ?? ""]
     }
@@ -174,19 +179,24 @@ private struct MusicWindow: View {
         return VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    SectionHeaderBrand(section: HeaderBrandSection(video: videoSection),
+                    SectionHeaderBrand(section: model.activeSection,
                                        theme: theme, width: min(155, width - padding * 2), height: 46)
                     VStack(alignment: .leading, spacing: 6) {
                         ForEach(model.visibleVideoKinds) { videoTab($0) }
-                        sidebarButton("Music", icon: "music.note", selected: videoSection == nil) {
+                        sidebarButton(model.sectionName(.toolDrive), icon: "waveform", selected: model.toolDriveSelected) {
+                            model.selectToolDrive()
+                        }
+                        sidebarButton(model.sectionName(.music), icon: "music.note", selected: model.activeSection == .music) {
                             model.selectVideoSection(nil)
                         }
                     }
-                    if videoSection == nil {
+                    if model.activeSection == .music {
                         VStack(alignment: .leading, spacing: 4) {
                             ForEach(model.visibleKinds, id: \.self) { tab($0) }
                         }.padding(.leading, 8)
                     }
+                    sidebarButton(model.sectionName(.downloads), icon: "arrow.down.circle",
+                                  selected: model.downloadsSelected, action: model.selectDownloads)
                 }
                 .padding(padding)
             }
@@ -215,7 +225,7 @@ private struct MusicWindow: View {
     private func sidebarButton(_ title: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Label {
-                Text(title)
+                Text(title).lineLimit(1)
             } icon: {
                 Image(systemName: icon).frame(width: 20)
             }
@@ -239,17 +249,29 @@ private struct MusicWindow: View {
     }
 
     private func videoTab(_ kind: PlexVideoKind) -> some View {
-        sidebarButton(kind.title, icon: kind.icon, selected: videoSection == kind) {
+        sidebarButton(model.sectionName(HeaderBrandSection(video: kind)), icon: kind.icon, selected: videoSection == kind) {
             model.selectVideoSection(kind)
         }.disabled(model.serverID.isEmpty)
     }
 
     private var mainPanel: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let videoSection, !model.serverID.isEmpty {
+            if model.toolDriveSelected {
+                ToolDriveArchiveView(title: model.sectionName(.toolDrive),
+                                     text: LiquidGlassColor.hex(theme.text) ?? "#f2f7ff",
+                                     accent: LiquidGlassColor.hex(copper) ?? "#abe3ff",
+                                     tint: glassTint.color(for: theme).flatMap(LiquidGlassColor.hex),
+                                     density: LiquidGlassAppearance.density(glassTransparency),
+                                     hover: glassHoverEffects, pauseOutsidePlayback: model.player.pause)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .clipShape(.rect(cornerRadius: 22))
+            } else if model.downloadsSelected {
+                DownloadsBrowser(library: model)
+            } else if let videoSection, !model.serverID.isEmpty {
                 PlexVideoBrowser(kind: videoSection, server: model.serverID, service: model.service,
                                  serverReady: model.videoServerReady, connectionError: model.busy ? nil : model.message,
-                                 retryConnection: model.retryLibrary, pauseMusic: model.player.pause)
+                                 retryConnection: model.retryLibrary, pauseMusic: model.player.pause,
+                                 sectionName: model.sectionName(HeaderBrandSection(video: videoSection)))
                     .id(model.serverID + videoSection.rawValue)
             } else if model.libraryID.isEmpty {
                 if !model.libraries.isEmpty { musicBrowseHeader }

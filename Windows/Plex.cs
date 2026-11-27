@@ -1041,6 +1041,9 @@ namespace MusicRoom
             long id = Num(body, "id");
             if (action == "cacheCovers") { await CacheLibraryArtwork(body); return; }
             if (action == "stopCoverCache") { StopCoverCache(true); return; }
+            if (action == "offlineList" || action == "offlineCancel" || action == "offlinePlay" ||
+                action == "offlineRemove" || action == "offlineDownloadMusic" || action == "offlineDownloadVideo")
+            { await HandleOffline(action, body); return; }
             if (action == "beginTrack" || action == "seekTrack")
             {
                 PlaybackPosition(action, Str(body, "handle"));
