@@ -228,6 +228,7 @@ private struct ArchivePage: ViewModifier {
 }
 
 private struct ArchiveSurface: ViewModifier {
+    @Environment(\.iplexArchiveAppearance) private var appearance
     @Environment(\.glassOpacity) private var opacity
     @Environment(\.mobileTheme) private var theme
     @Environment(\.mobileGlassControls) private var glassControls
@@ -253,8 +254,13 @@ private struct ArchiveSurface: ViewModifier {
                     .background(theme.page.opacity(control ? opacity.amount(0.23, min: 0.10, max: 0.91)
                                                          : opacity.amount(0.45, min: 0.14, max: 0.96)), in: shape)
                     .background {
-                        shape.fill(.regularMaterial)
-                            .opacity(opacity.amount(1, min: 0.52, max: 1))
+                        ZStack {
+                            shape.fill(.regularMaterial)
+                                .opacity(opacity.amount(1, min: 0.52, max: 1))
+                            if let tint = appearance.tint {
+                                shape.fill(tint.opacity(0.06 + 0.13 * appearance.density))
+                            }
+                        }
                     }
                     .overlay {
                         shape.strokeBorder(.white.opacity(contrast == .increased ? 0.55 : 0.24))

@@ -4,7 +4,7 @@ import SwiftUI
 struct ShowDetailView: View {
     @Environment(\.archiveAccent) private var accent
     let show: Concert
-    @Environment(\.mobileTheme) private var theme
+    @Environment(\.iplexArchiveAppearance) private var appearance
     @EnvironmentObject private var archive: ArchiveStore
     @EnvironmentObject private var player: AudioPlayer
     @EnvironmentObject private var library: MobileLibrary
@@ -24,10 +24,10 @@ struct ShowDetailView: View {
                     ArchiveScrollingTitle(show.venue.isEmpty ? "Unknown venue" : show.venue)
                         .font(.largeTitle.bold()).accessibilityAddTraits(.isHeader)
                     if !show.location.isEmpty {
-                        Label(show.location, systemImage: "mappin.and.ellipse").font(.callout).foregroundStyle(theme.muted)
+                        Label(show.location, systemImage: "mappin.and.ellipse").font(.callout).foregroundStyle(appearance.muted)
                     }
                     let tour = [show.tour, show.festival].filter(informative).joined(separator: " · ")
-                    if !tour.isEmpty { Text(tour).font(.subheadline).foregroundStyle(theme.muted) }
+                    if !tour.isEmpty { Text(tour).font(.subheadline).foregroundStyle(appearance.muted) }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(16)

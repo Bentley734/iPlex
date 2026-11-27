@@ -468,6 +468,7 @@ private struct TVAccentButtonStyle: ButtonStyle {
 }
 
 private struct TVShowView: View {
+    @Environment(\.iplexArchiveAppearance) private var appearance
     @EnvironmentObject private var archive: ArchiveStore
     @EnvironmentObject private var player: AudioPlayer
     @EnvironmentObject private var library: MobileLibrary
@@ -501,7 +502,7 @@ private struct TVShowView: View {
                         Text("Setlist").font(.title3.bold())
                         ForEach(Array(show.setlist.enumerated()), id: \.offset) { offset, item in
                             HStack(alignment: .firstTextBaseline, spacing: 22) {
-                                Text(String(format: "%02d", offset + 1)).font(.caption.monospacedDigit()).foregroundStyle(archive.theme.muted)
+                                Text(String(format: "%02d", offset + 1)).font(.caption.monospacedDigit()).foregroundStyle(appearance.muted)
                                 ArchiveScrollingTitle(item.title, active: false, restingLines: nil)
                             }.focusable()
                         }
@@ -525,7 +526,7 @@ private struct TVShowView: View {
                             Text([source.version, source.recordingType.capitalized].filter { !$0.isEmpty }.joined(separator: " · "))
                                 .font(.headline)
                             Text(["On the drive", source.codec.uppercased(), source.length]
-                                .filter { !$0.isEmpty }.joined(separator: " · ")).font(.callout).foregroundStyle(archive.theme.muted)
+                                .filter { !$0.isEmpty }.joined(separator: " · ")).font(.callout).foregroundStyle(appearance.muted)
                             if let rating = source.rating { Text("Sound rating \(rating.formatted()) / 10").font(.caption) }
                             if !source.taper.isEmpty { Text("Taper · " + source.taper).font(.caption) }
                             if !source.gear.isEmpty { Text("Equipment · " + source.gear).font(.caption) }
@@ -565,7 +566,7 @@ private struct TVShowView: View {
                                     ProgressView("Finding tracks")
                                 } else if downloads.lastSource == source.id {
                                     Text(downloads.message ?? library.activity.map { "Saving “" + $0 + "” to Library." } ?? library.message)
-                                        .font(.caption).foregroundStyle(archive.theme.muted)
+                                        .font(.caption).foregroundStyle(appearance.muted)
                                 }
                             }
                         }.frame(maxWidth: .infinity, alignment: .leading).padding(28).archivePanel()

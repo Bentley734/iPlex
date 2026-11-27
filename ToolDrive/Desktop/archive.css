@@ -152,3 +152,42 @@
   :root[data-iplex-archive] body:not([data-tracklist-side]) .show-row .sound { grid-area: score; }
   :root[data-iplex-archive] body:not([data-tracklist-side]) .show-row .row-actions { grid-area: actions; }
 }
+
+:root[data-iplex-archive] #show-dialog {
+  background:
+    radial-gradient(ellipse at top left, var(--iplex-glass-highlight), transparent 68%),
+    linear-gradient(155deg, var(--iplex-glass-tint), rgb(18 27 45 / calc(.16 + .32 * var(--iplex-density-value))));
+  color: var(--text);
+  border: 1px solid var(--iplex-glass-edge);
+  border-radius: 22px;
+  box-shadow: inset 0 1px 1px rgb(245 251 255 / .38), 0 18px 42px rgb(0 8 24 / .34);
+  -webkit-backdrop-filter: blur(22px) saturate(135%);
+  backdrop-filter: blur(22px) saturate(135%);
+}
+:root[data-iplex-archive] #show-dialog::backdrop { background: rgb(8 15 28 / .28); }
+:root[data-iplex-archive] #show-dialog .dialog-top {
+  background: color-mix(in srgb, var(--iplex-control) 85%, rgb(20 31 52 / .38));
+  border-bottom-color: var(--iplex-glass-edge);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+:root[data-iplex-archive] #show-dialog :is(.source-card, .setlist, .known-songs) {
+  background: linear-gradient(145deg, var(--iplex-control), rgb(21 34 55 / .16));
+  border: 1px solid var(--iplex-glass-edge);
+  border-radius: 14px;
+  box-shadow: inset 0 1px 0 rgb(245 251 255 / .15);
+}
+:root[data-iplex-archive] #show-dialog :is(.detail-actions button, .dialog-close) {
+  background: var(--iplex-control);
+  border-color: var(--iplex-glass-edge);
+}
+:root[data-iplex-archive] #show-dialog .source-card.unmatched { opacity: .8; }
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-iplex-archive] #show-dialog { background: #19273e; }
+  :root[data-iplex-archive] #show-dialog .dialog-top { background: #22344e; }
+  :root[data-iplex-archive] #show-dialog,
+  :root[data-iplex-archive] #show-dialog .dialog-top {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
