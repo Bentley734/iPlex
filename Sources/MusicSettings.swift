@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum MusicTheme: String, CaseIterable, Identifiable {
-    case copper, classic, classicDark, classicOLED, video, plexify, liquidGlass, roseStudio, roseStudioDark, nightSignal
+    case copper, classic, classicDark, classicOLED, video, plexify, liquidGlass, roseStudio, roseStudioDark, nightSignal, nightSignalOLED
     #if os(macOS)
     case graphite
     #endif
@@ -19,16 +19,18 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         case .roseStudio: "Rose Studio Light"
         case .roseStudioDark: "Rose Studio Dark"
         case .nightSignal: "Night Signal"
+        case .nightSignalOLED: "Night Signal OLED"
         #if os(macOS)
         case .graphite: "Graphite Studio"
         #endif
         }
     }
     var isRoseStudio: Bool { self == .roseStudio || self == .roseStudioDark }
+    var isNightSignal: Bool { self == .nightSignal || self == .nightSignalOLED }
     var usesArtworkPlayback: Bool { isRoseStudio || self == .nightSignal }
     var scheme: ColorScheme { self == .classic || self == .roseStudio ? .light : .dark }
-    var usesLiquidGlass: Bool { self == .liquidGlass || self == .classicDark || self == .classicOLED || isRoseStudio }
-    var keepsBlackCanvas: Bool { self == .classicOLED }
+    var usesLiquidGlass: Bool { self == .liquidGlass || self == .classicDark || keepsBlackCanvas || isRoseStudio }
+    var keepsBlackCanvas: Bool { self == .classicOLED || self == .nightSignalOLED }
     var supportsGlassWallpaper: Bool { usesLiquidGlass && !keepsBlackCanvas }
 
     var accent: Color {
@@ -42,7 +44,7 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         case .liquidGlass: Color(red: 0.67, green: 0.89, blue: 1)
         case .roseStudio: Color(red: 0.62, green: 0.13, blue: 0.34)
         case .roseStudioDark: Color(red: 1.0, green: 0.60, blue: 0.74)
-        case .nightSignal: Color(red: 0.52, green: 0.88, blue: 0.68)
+        case .nightSignal, .nightSignalOLED: Color(red: 0.52, green: 0.88, blue: 0.68)
         #if os(macOS)
         case .graphite: Color(red: 1, green: 0.75, blue: 0.45)
         #endif
@@ -53,7 +55,7 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         case .copper: Color(red: 0.104, green: 0.102, blue: 0.119)
         case .classic: Color(red: 0.84, green: 0.89, blue: 0.94)
         case .classicDark: Color(red: 0.12, green: 0.13, blue: 0.15)
-        case .classicOLED: .black
+        case .classicOLED, .nightSignalOLED: .black
         case .video: Color(red: 0.09, green: 0.12, blue: 0.18)
         case .plexify: Color(red: 0.075, green: 0.125, blue: 0.155)
         case .liquidGlass: Color(red: 0.12, green: 0.17, blue: 0.28)
@@ -107,7 +109,7 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         case .copper: end = Color(red: 0.075, green: 0.073, blue: 0.085)
         case .classic: end = Color(red: 0.96, green: 0.98, blue: 1)
         case .classicDark: end = Color(red: 0.045, green: 0.05, blue: 0.065)
-        case .classicOLED: end = .black
+        case .classicOLED, .nightSignalOLED: end = .black
         case .video: end = Color(red: 0.025, green: 0.037, blue: 0.066)
         case .plexify: end = Color(red: 0.035, green: 0.057, blue: 0.078)
         case .liquidGlass: end = surface
@@ -227,7 +229,7 @@ private struct MusicGlassSurface: ViewModifier {
             ZStack {
                 if reduceTransparency {
                     shape.fill(theme.keepsBlackCanvas ? Color(white: 0.075) : base)
-                } else if theme.keepsBlackCanvas {
+                } else if theme == .classicOLED {
                     shape.fill(.ultraThinMaterial).opacity(0.10 + density * 0.32)
                 } else if theme.isRoseStudio {
                     shape.fill(.regularMaterial).opacity(0.38 + density * 0.52)
@@ -235,12 +237,14 @@ private struct MusicGlassSurface: ViewModifier {
                     let variant: Glass = density > 0.65 ? .regular : .clear
                     let material = color.map { variant.tint($0.opacity(0.04 + density * 0.13)) } ?? variant
                     Color.clear.glassEffect(material.interactive(interactive), in: shape)
+                } else if theme.keepsBlackCanvas {
+                    shape.fill(.ultraThinMaterial).opacity(0.10 + density * 0.32)
                 } else {
                     shape.fill(.thinMaterial).opacity(0.42 + density * 0.50)
                 }
 
                 shape.fill(base.opacity(0.08 + density * 0.63))
-                if tint != .themeDefault, let color, !reduceTransparency {
+                if tint != .themeDefault || theme == .nightSignalOLED, let color, !reduceTransparency {
                     shape.fill(color.opacity(theme.keepsBlackCanvas ? 0.045 + density * 0.035 : 0.08 + density * 0.10))
                 }
                 shape.fill(.linearGradient(
@@ -287,7 +291,7 @@ extension View {
 
 enum MiniPlayerStyle: String, CaseIterable, Identifiable {
     static let preferenceKey = "MiniPlayerStyle"
-    case automatic, classic, classicBlack, video, videoBlack, queue
+    case automatic, classic, classicBlack, video, videoBlack, queue, desktop98
 
     var id: Self { self }
     var label: String {
@@ -298,6 +302,7 @@ enum MiniPlayerStyle: String, CaseIterable, Identifiable {
         case .video: "iPod Video"
         case .videoBlack: "iPod Video Black"
         case .queue: "Artwork & Queue"
+        case .desktop98: "Desktop ’98"
         }
     }
 

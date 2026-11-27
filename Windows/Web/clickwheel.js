@@ -10,7 +10,7 @@ window.clickWheel = (() => {
   let state = {}, item = null, theme = 'copper';
   let preference = 'automatic', style = '';
   let volume = 1, scrubbing = false, preview = null, drag = null, suppressClick = false;
-  let artworkKey;
+  let artworkKey, desktopArtworkKey, coverFactory;
   let queueKey = '';
   let queueIndex;
   const clamp = (value, max) => Math.min(max, Math.max(0, value));
@@ -61,6 +61,7 @@ window.clickWheel = (() => {
     }
     item = currentAlbum;
     state = currentState;
+    coverFactory = makeCover;
     updateTheme(theme);
     if (!item) return;
     const key = JSON.stringify([item.id, item.artwork]);
@@ -87,15 +88,42 @@ window.clickWheel = (() => {
     style = preference === 'automatic' ? (automaticStyles[theme] || '') : preference;
     root.dataset.miniPlayer = style;
     byId('mini-queue').hidden = style !== 'queue';
+    byId('mini-desktop98').hidden = style !== 'desktop98';
+    dialog.setAttribute('aria-labelledby', style === 'desktop98' ? 'desktop98-heading' : 'wheel-heading');
     byId('queue-close').hidden = style !== 'queue';
     opener.hidden = !item || !style;
     if (opener.hidden && dialog.open) closePlayer();
     if (style === 'queue' && item) drawQueue();
+    if (style === 'desktop98' && item && coverFactory) drawDesktop(coverFactory);
   }
 
   function setStyle(choice) {
     preference = choice;
     updateTheme(theme);
+  }
+
+  function drawDesktop(makeCover) {
+    const track = state.tracks?.[state.trackIndex] || {};
+    const artwork = track.artwork || item.artwork || '';
+    if (desktopArtworkKey !== artwork) {
+      desktopArtworkKey = artwork;
+      byId('desktop98-art').replaceChildren(makeCover({...item, artwork}));
+    }
+    const playing = state.status === 'playing';
+    byId('desktop98-title').textContent = state.title || item.title;
+    byId('desktop98-artist').textContent = [track.artist || item.artist, track.album || item.title].filter(Boolean).join(' · ');
+    byId('desktop98-state').textContent = state.message || (playing ? 'Playing' : 'Paused');
+    byId('desktop98-time').textContent = clock(state.elapsed) + ' / ' + clock(state.duration);
+    byId('desktop98-play').textContent = playing ? '⏸' : '▶';
+    byId('desktop98-play').setAttribute('aria-label', playing ? 'Pause' : 'Play');
+    byId('desktop98-prev').disabled = !state.canPrevious;
+    byId('desktop98-next').disabled = !state.canNext;
+    const seek = byId('desktop98-seek');
+    seek.max = Math.max(1, state.duration || 0);
+    seek.disabled = !(state.duration > 0);
+    if (!seek.matches(':active')) seek.value = state.elapsed || 0;
+    const level = byId('desktop98-volume');
+    if (!level.matches(':active')) level.value = Number.isFinite(state.volume) ? state.volume : volume;
   }
 
   function drawQueue() {
@@ -201,7 +229,8 @@ window.clickWheel = (() => {
     if (style === 'queue') {
       byId('queue-close').focus();
       scrollToPlaying();
-    } else byId('wheel-center').focus();
+    } else if (style === 'desktop98') byId('desktop98-play').focus();
+    else byId('wheel-center').focus();
   };
   function closePlayer() {
     if (dialog.open) dialog.close();
@@ -218,11 +247,17 @@ window.clickWheel = (() => {
     closePlayer();
   });
   window.closeFloatingPlayer = closePlayer;
-  dialog.querySelector('.device-screen').addEventListener('pointerdown', event => {
+  for (const handle of dialog.querySelectorAll('.device-screen,.desktop98-titlebar')) handle.addEventListener('pointerdown', event => {
     if (event.button === 0 && event.pointerType === 'mouse' && !event.target.closest('button')) {
       window.chrome.webview.postMessage({action:'dragFloatingPlayer'});
     }
   });
+  byId('desktop98-close').onclick = closePlayer;
+  byId('desktop98-prev').onclick = () => player.action({action:'previous'});
+  byId('desktop98-play').onclick = () => player.action({action:'toggle'});
+  byId('desktop98-next').onclick = () => player.action({action:'next'});
+  byId('desktop98-seek').onchange = event => player.action({action:'seek', seconds:Number(event.target.value)});
+  byId('desktop98-volume').oninput = event => setVolume(Number(event.target.value));
   byId('wheel-menu').onclick = closePlayer;
   byId('queue-close').onclick = closePlayer;
   byId('queue-prev').onclick = () => player.action({action:'previous'});

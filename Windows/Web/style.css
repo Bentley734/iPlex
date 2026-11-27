@@ -157,7 +157,7 @@ footer { grid-column:1/-1; display:flex; align-items:center; gap:17px; padding:1
   #plexify-deck { position:fixed; inset:75px 10px 85px auto; width:230px; z-index:2; border:1px solid var(--line); border-radius:10px; box-shadow:0 10px 30px #0009; }
 }
 main { background:linear-gradient(145deg,var(--ink),var(--surface-end)); }
-:root[data-artwork-colors]:not([data-theme="classicOLED"]) main {
+:root[data-artwork-colors]:not([data-oled-canvas]) main {
   background:linear-gradient(145deg,var(--artwork-wash),transparent 72%),linear-gradient(145deg,var(--ink),var(--surface-end));
 }
 :root[data-artwork-colors] { --copper:var(--artwork-accent); }
@@ -213,7 +213,7 @@ button:hover:enabled { border-color:var(--copper); }
   background:linear-gradient(145deg,var(--surface-end),var(--ink) 75%);
 }
 :root[data-glass] main { background-image:none; }
-:root[data-theme="classicOLED"] #now-playing { background:#000; }
+:root[data-oled-canvas] #now-playing { background:#000; }
 :root[data-theme="classicOLED"][data-glass] {
   --glass-sheen:rgb(217 240 255 / calc(.065 - .028 * var(--glass-density)));
 }
@@ -350,7 +350,7 @@ button:hover:enabled { border-color:var(--copper); }
 }
 #now-playing[open] { display:flex; flex-direction:column; transform-origin:bottom left; }
 #now-playing::backdrop { background:transparent; }
-:root[data-artwork-colors]:not([data-theme="classicOLED"]) #now-playing {
+:root[data-artwork-colors]:not([data-oled-canvas]) #now-playing {
   background:radial-gradient(ellipse at 15% 12%,var(--artwork-wash),transparent 74%),var(--ink);
 }
 .now-playing-header {
@@ -528,12 +528,12 @@ button:hover:enabled { border-color:var(--copper); }
 :root[data-glass] #close-expanded-artwork { backdrop-filter:blur(16px); }
 :root[data-glass] :is(#settings-page,.playback-sheet)::backdrop { background:#050a163b; }
 :root[data-glass] #now-playing[open] { isolation:isolate; }
-:root[data-glass]:not([data-theme="classicOLED"]) #now-playing[open]::before {
+:root[data-glass]:not([data-oled-canvas]) #now-playing[open]::before {
   content:""; position:absolute; z-index:-1; inset:-36px; pointer-events:none;
   background:var(--glass-artwork,none) center / cover;
   filter:blur(36px) grayscale(1); opacity:.22;
 }
-:root[data-glass][data-artwork-colors]:not([data-theme="classicOLED"]) #now-playing[open]::before {
+:root[data-glass][data-artwork-colors]:not([data-oled-canvas]) #now-playing[open]::before {
   filter:blur(36px) saturate(1.15); opacity:.31;
 }
 @media (prefers-reduced-transparency:reduce) {
@@ -542,7 +542,7 @@ button:hover:enabled { border-color:var(--copper); }
   }
   :root[data-glass] #now-playing[open]::before { display:none; }
 }
-:root[data-glass][data-artwork-colors]:not([data-theme="classicOLED"]) {
+:root[data-glass][data-artwork-colors]:not([data-oled-canvas]) {
   --copper:var(--artwork-accent);
   --glass-top:color-mix(in srgb,var(--artwork-wash) calc(20% + 55% * var(--glass-density)),transparent);
 }
@@ -558,7 +558,7 @@ button:hover:enabled { border-color:var(--copper); }
 }
 
 @media (prefers-reduced-motion:no-preference) {
-  :root[data-artwork-colors][data-artwork-motion]:not([data-theme="classicOLED"]) :is(main, #now-playing[open]) {
+  :root[data-artwork-colors][data-artwork-motion]:not([data-oled-canvas]) :is(main, #now-playing[open]) {
     background-image:radial-gradient(ellipse at 32% 29%,var(--artwork-wash),transparent 57%),
                      radial-gradient(ellipse at 67% 68%,color-mix(in srgb,var(--artwork-accent) 16%,transparent),transparent 55%),
                      linear-gradient(145deg,var(--ink),var(--surface-end,var(--panel)));
@@ -613,26 +613,26 @@ button:hover:enabled { border-color:var(--copper); }
 
 
 #glass-wallpaper-setting { display:none; }
-:root[data-glass]:not([data-theme="classicOLED"]) #glass-wallpaper-setting { display:grid; justify-items:start; gap:9px; }
+:root[data-glass]:not([data-oled-canvas]) #glass-wallpaper-setting { display:grid; justify-items:start; gap:9px; }
 #glass-wallpaper-setting label { font-weight:650; }
 :root[data-custom-wallpaper] { --wallpaper-scrim:#0006; }
 :root[data-preset-wallpaper] { --wallpaper-scrim:#0004; }
 #glass-wallpaper-file { max-width:100%; }
 #glass-wallpaper-preview { width:132px; height:74px; object-fit:cover; border-radius:8px; }
 #glass-wallpaper-status:empty { display:none; }
-:root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) body,
-:root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) #now-playing[open] {
+:root[data-glass][data-custom-wallpaper]:not([data-oled-canvas]) body,
+:root[data-glass][data-custom-wallpaper]:not([data-oled-canvas]) #now-playing[open] {
   background:linear-gradient(var(--wallpaper-scrim),var(--wallpaper-scrim)),var(--glass-wallpaper) center / cover no-repeat;
   animation:none;
 }
-:root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) main {
+:root[data-glass][data-custom-wallpaper]:not([data-oled-canvas]) main {
   background-image:var(--glass-surface); animation:none;
 }
 :root[data-glass][data-custom-wallpaper] #now-playing[open]::before { display:none; }
 @media (prefers-reduced-transparency:reduce) {
-  :root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) body,
-  :root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) #now-playing[open] { background:var(--ink); }
-  :root[data-glass][data-custom-wallpaper]:not([data-theme="classicOLED"]) main { background:var(--panel); }
+  :root[data-glass][data-custom-wallpaper]:not([data-oled-canvas]) body,
+  :root[data-glass][data-custom-wallpaper]:not([data-oled-canvas]) #now-playing[open] { background:var(--ink); }
+  :root[data-glass][data-custom-wallpaper]:not([data-oled-canvas]) main { background:var(--panel); }
 }
 
 
@@ -655,7 +655,7 @@ button:hover:enabled { border-color:var(--copper); }
   --glass-bevel:inset 0 1px 1px rgb(245 245 245 / calc(.55 - .19 * var(--glass-density))),
                 inset 1px 0 1px #e5e5e532, inset 0 -1px 1px #ababab48;
 }
-:root[data-theme="classicOLED"][data-glass][data-glass-tint]:not([data-glass-tint="themeDefault"]) {
+:root[data-oled-canvas][data-glass][data-glass-tint]:not([data-glass-tint="themeDefault"]) {
   --glass-top:rgb(var(--custom-tint-rgb) / calc(.02 + .045 * var(--glass-density)));
   --glass-sheen:rgb(var(--custom-tint-rgb) / calc(.05 - .025 * var(--glass-density)));
 }
@@ -834,13 +834,13 @@ button:hover:enabled { border-color:var(--copper); }
 :root[data-theme="nightSignal"] footer {
   margin:0 8px 8px; border:1px solid var(--line); border-radius:16px; background:#162925;
 }
-:root[data-theme="nightSignal"] nav button[aria-pressed=true] {
+:root[data-theme^="nightSignal"] nav button[aria-pressed=true] {
   border-color:transparent; border-inline-start:3px solid var(--copper); background:#37624c54;
 }
-:root[data-theme="nightSignal"] :is(.tile,.video-tile):hover { background:var(--raised); }
-:root[data-theme="nightSignal"] .cover { background:radial-gradient(circle,#385b4b,#172824 82%); }
-:root[data-theme="nightSignal"] .track { border:0; border-radius:8px; }
-:root[data-theme="nightSignal"] :is(.track,#now-duration,#now-elapsed,#elapsed) { font-variant-numeric:tabular-nums; }
+:root[data-theme^="nightSignal"] :is(.tile,.video-tile):hover { background:var(--raised); }
+:root[data-theme^="nightSignal"] .cover { background:radial-gradient(circle,#385b4b,#172824 82%); }
+:root[data-theme^="nightSignal"] .track { border:0; border-radius:8px; }
+:root[data-theme^="nightSignal"] :is(.track,#now-duration,#now-elapsed,#elapsed) { font-variant-numeric:tabular-nums; }
 :root[data-theme="nightSignal"] #now-playing[open] {
   background:radial-gradient(ellipse at 27% 16%,var(--playback-artwork-wash,var(--raised)),transparent 64%),var(--ink);
 }
@@ -849,3 +849,51 @@ button:hover:enabled { border-color:var(--copper); }
 }
 :root[data-theme="nightSignal"] #lyrics-lines button { font-size:clamp(1.15rem,3vw,1.65rem); font-weight:650; }
 :root[data-theme="nightSignal"] #lyrics-lines button[aria-current=true] { color:var(--copper); border-color:var(--line); }
+
+:root[data-theme="nightSignalOLED"] {
+  --ink:#000; --surface-end:#000; --panel:#081510; --raised:#10231b;
+  --text:#ecf4ef; --muted:#a7bcb4; --copper:#85e0ad; --accent-ink:#10251a; --line:#9acfb52a;
+  --sidebar-default:228px; --glass-top-rgb:42 113 80; --glass-bottom-rgb:3 11 8;
+}
+:root[data-theme="nightSignalOLED"]:is(:not([data-glass-tint]),[data-glass-tint="themeDefault"]) {
+  --glass-border:rgb(135 229 180 / calc(.48 - .17 * var(--glass-density)));
+  --glass-sheen:rgb(122 222 172 / calc(.16 - .07 * var(--glass-density)));
+  --glass-control:rgb(95 186 144 / calc(.06 + .13 * var(--glass-density)));
+  --glass-bevel:inset 0 1px 0 #b5f9d88c, inset 0 -1px 1px #195e42a6;
+}
+
+:root[data-mini-player="desktop98"] #wheel-player {
+  color-scheme:light;
+  padding:8px; border-radius:2px; color:#1a2421; background:#d1d4c8;
+  border:2px solid; border-color:#fbfff2 #4a514d #4a514d #fbfff2;
+  box-shadow:0 14px 36px #0007; font:13px "Segoe UI",system-ui,sans-serif;
+}
+:root[data-mini-player="desktop98"] :is(.device-screen,#wheel-ring,.wheel-adjustments) { display:none; }
+#mini-desktop98 { display:flex; flex-direction:column; gap:8px; min-height:0; height:100%; }
+.desktop98-titlebar {
+  display:flex; align-items:center; justify-content:space-between; gap:8px; padding:4px 5px 4px 9px;
+  background:linear-gradient(95deg,#1c3d56,#27655d); color:#fff;
+}
+.desktop98-titlebar h1 { margin:0; font:700 14px ui-monospace,monospace; }
+.desktop98-screen {
+  display:flex; flex-direction:column; flex:1 1 auto; min-height:0; gap:5px; padding:10px;
+  background:#101d1d; color:#f6f7f4; border:2px solid; border-color:#4a514d #eef4e8 #eef4e8 #4a514d;
+}
+#desktop98-art { flex:1 1 auto; min-height:96px; display:grid; place-items:center; overflow:hidden; }
+#desktop98-art .cover { width:min(100%,235px); max-height:100%; border-radius:2px; }
+.desktop98-screen :is(strong,small), #desktop98-state { min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.desktop98-screen small { color:#89ddc7; }
+.desktop98-controls { display:flex; gap:6px; align-items:center; }
+.desktop98-controls span { margin-inline-start:auto; }
+#mini-desktop98 button {
+  color:#15231e; background:#e0e3d9; border:1px solid; padding:4px 8px; min-width:29px;
+  border-color:#fcfff6 #525f57 #525f57 #fcfff6; border-radius:0;
+}
+#mini-desktop98 button:active { border-color:#525f57 #fcfff6 #fcfff6 #525f57; }
+#mini-desktop98 input { accent-color:#28665b; min-width:0; }
+#desktop98-seek { width:100%; margin:0; }
+#desktop98-volume { width:84px; }
+.desktop98-status {
+  display:flex; justify-content:space-between; gap:9px; padding:5px 7px;
+  background:#101d1d; color:#89ddc7; white-space:nowrap; font:12px ui-monospace,monospace;
+}

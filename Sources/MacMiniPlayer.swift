@@ -36,9 +36,9 @@ final class MacMiniPlayer: NSObject, NSWindowDelegate {
         panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
         let host = NSHostingView(rootView:
             MiniPlayerContent(library: library, style: style) { [weak self] in self?.panel?.close() }
-                .preferredColorScheme(style == .classic ? .light : .dark)
+                .preferredColorScheme(style == .classic || style == .desktop98 ? .light : .dark)
                 .overlay(alignment: .top) {
-                    MiniPlayerDragArea().frame(height: 16).accessibilityHidden(true)
+                    MiniPlayerDragArea().frame(height: 16).padding(.trailing, style == .desktop98 ? 54 : 0).accessibilityHidden(true)
                 }
         )
         host.sizingOptions = []

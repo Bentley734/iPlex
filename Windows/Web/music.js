@@ -21,6 +21,7 @@
   const listingIDs = new Set();
   let caching = false;
   let selectedTheme = 'copper';
+  const oledCanvas = theme => ['classicOLED', 'nightSignalOLED'].includes(theme);
   const automaticArtwork = theme => theme.startsWith('roseStudio') || theme === 'nightSignal';
   let artworkColors = false;
   let paletteSource = '';
@@ -53,6 +54,13 @@
     ['realPlayerPlus', [1040, 2808, 471, 176, 2988]]
   ]);
   const wordmarkSheet = new Image();
+  const spotifySheet = new Image();
+  const spotifyLogoRegion = [48, 13, 915, 915];
+  const spotifyWordmarkRegion = [1149, 212, 2235, 596];
+  let spotifyLogoURL = '';
+  function loadSpotifySheet() {
+    if (!spotifySheet.getAttribute('src')) spotifySheet.src = 'HeaderMarks/spotify-brand.png';
+  }
   const pageEnd = get('page-end');
   const pageObserver = new IntersectionObserver(rows => {
     if (!album && hasMore && !busy && !pageFailed && rows.some(row => row.isIntersecting)) browse(true);
@@ -779,7 +787,7 @@
   function chooseArtworkColors(enabled) {
     artworkColors = enabled;
     get('artwork-colors').checked = enabled;
-    get('animate-artwork-colors').disabled = (!enabled && !automaticArtwork(selectedTheme)) || selectedTheme === 'classicOLED';
+    get('animate-artwork-colors').disabled = (!enabled && !automaticArtwork(selectedTheme)) || oledCanvas(selectedTheme);
     try { localStorage.setItem('musicroom-artwork-colors', enabled ? '1' : '0'); } catch {}
     updateArtworkColors(playbackState);
     applyPalette();
@@ -1141,15 +1149,16 @@
     get('app-update').disabled = Boolean(state.disabled);
   };
   function chooseTheme(value) {
-    const theme = ['classic', 'classicDark', 'classicOLED', 'video', 'plexify', 'liquidGlass', 'roseStudio', 'roseStudioDark', 'nightSignal'].includes(value) ? value : 'copper';
+    const theme = ['classic', 'classicDark', 'classicOLED', 'video', 'plexify', 'liquidGlass', 'roseStudio', 'roseStudioDark', 'nightSignal', 'nightSignalOLED'].includes(value) ? value : 'copper';
     selectedTheme = theme;
     document.documentElement.dataset.theme = theme;
     window.clickWheel.updateTheme(theme);
     get('theme').value = theme;
-    const usesGlass = ['liquidGlass', 'classicDark', 'classicOLED', 'roseStudio', 'roseStudioDark'].includes(theme);
+    const usesGlass = (['liquidGlass', 'classicDark', 'roseStudio', 'roseStudioDark'].includes(theme) || oledCanvas(theme));
     layout.toggleAttribute('data-glass', usesGlass);
+    layout.toggleAttribute('data-oled-canvas', oledCanvas(theme));
     get('glass-transparency-setting').hidden = !usesGlass;
-    get('animate-artwork-colors').disabled = (!artworkColors && !automaticArtwork(theme)) || theme === 'classicOLED';
+    get('animate-artwork-colors').disabled = (!artworkColors && !automaticArtwork(theme)) || oledCanvas(theme);
     updateArtworkColors(playbackState);
     applyPalette();
     updateDeckVisibility();
@@ -1195,8 +1204,10 @@
 
   function renderHeaderWordmark() {
     const choice = get('header-wordmark');
-    const region = wordmarkRegions.get(choice.value);
-    const showMusic = Boolean(region && wordmarkSheet.naturalWidth);
+    const spotify = choice.value === 'spotify';
+    const region = spotify ? spotifyWordmarkRegion : wordmarkRegions.get(choice.value);
+    const sheet = spotify ? spotifySheet : wordmarkSheet;
+    const showMusic = Boolean(region && sheet.naturalWidth);
     const markChoice = get('header-logo');
     const cycleMark = get('cycle-header-logo');
     const cycleWordmark = get('cycle-header-wordmark');
@@ -1208,18 +1219,19 @@
       const canvas = brand.querySelector('.music-wordmark');
       if (showMusic) {
         const [x, y, width, height, darkY] = region;
-        canvas.dataset.color = darkY !== undefined ? 'original' : 'template';
+        canvas.dataset.color = spotify || darkY !== undefined ? 'original' : 'template';
         canvas.width = width;
         canvas.height = height;
-        canvas.getContext('2d').drawImage(wordmarkSheet, x, selectedTheme !== 'classic' ? (darkY ?? y) : y, width, height, 0, 0, width, height);
+        canvas.getContext('2d').drawImage(sheet, x, ['classic', 'roseStudio'].includes(selectedTheme) ? y : (darkY ?? y), width, height, 0, 0, width, height);
       }
       canvas.hidden = !showMusic;
-      brand.querySelector('img.wordmark').hidden = showMusic || choice.value === 'none';
+      brand.querySelector('img.wordmark').hidden = showMusic || spotify || choice.value === 'none';
     }
   }
   function chooseHeaderWordmark(value) {
     const choice = get('header-wordmark');
-    choice.value = value === 'none' || wordmarkRegions.has(value) ? value : 'iplex';
+    choice.value = value === 'none' || value === 'spotify' || wordmarkRegions.has(value) ? value : 'iplex';
+    if (choice.value === 'spotify') loadSpotifySheet();
     if (wordmarkRegions.has(choice.value) && !wordmarkSheet.getAttribute('src')) wordmarkSheet.src = 'music-wordmarks.png';
     renderHeaderWordmark();
     try { localStorage.setItem('musicroom-header-wordmark', choice.value); } catch {}
@@ -1229,16 +1241,33 @@
     choice.value = value;
     if (choice.selectedIndex === -1) choice.value = 'none';
     const logo = choice.value;
-    const asset = logo === 'black' || logo === 'white' ? 'monochrome' : logo;
-    for (const image of document.querySelectorAll('.header-mark')) {
-      image.hidden = logo === 'none';
-      image.dataset.mark = logo;
-      if (image.hidden) image.removeAttribute('src');
-      else image.src = 'HeaderMarks/' + asset + '.png';
-    }
+    if (logo === 'spotify') loadSpotifySheet();
+    renderHeaderLogo(logo);
     renderHeaderWordmark();
     try { localStorage.setItem('musicroom-header-logo', logo); } catch {}
   }
+  function renderHeaderLogo(logo) {
+    const asset = logo === 'black' || logo === 'white' ? 'monochrome' : logo;
+    for (const image of document.querySelectorAll('.header-mark')) {
+      image.hidden = logo === 'none' || (logo === 'spotify' && !spotifyLogoURL);
+      image.dataset.mark = logo;
+      if (image.hidden) image.removeAttribute('src');
+      else image.src = logo === 'spotify' ? spotifyLogoURL : 'HeaderMarks/' + asset + '.png';
+    }
+  }
+  spotifySheet.addEventListener('load', () => {
+    renderHeaderWordmark();
+    const [x, y, width, height] = spotifyLogoRegion;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    canvas.getContext('2d').drawImage(spotifySheet, x, y, width, height, 0, 0, width, height);
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      spotifyLogoURL = URL.createObjectURL(blob);
+      if (get('header-logo').value === 'spotify') renderHeaderLogo('spotify');
+    });
+  });
   function chooseHeaderLogoSize(value) {
     const choice = get('header-logo-size');
     choice.value = value;

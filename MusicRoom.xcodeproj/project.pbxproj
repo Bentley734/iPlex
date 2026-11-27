@@ -411,7 +411,7 @@
 		397439B97D2997D30D57C318 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "PrismaticNoteDark MusicGradient MusicWordmark MusicCrimson MusicMonochrome MusicOrange MusicArtists MusicPink Napster NapsterMono Spotify Plex";
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "PrismaticNoteDark MusicGradient MusicWordmark MusicCrimson MusicMonochrome MusicOrange MusicArtists MusicPink Napster NapsterMono Spotify Plex WmpClassic MediaPlayerClassic WmpGlass VlcClassic Vlc Quicktime ItunesDisc Itunes11";
 				ASSETCATALOG_COMPILER_APPICON_NAME = TVBrand;
 				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
 				FRAMEWORK_SEARCH_PATHS = (
@@ -464,7 +464,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 32;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -479,7 +479,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
-				MARKETING_VERSION = 0.1.30;
+				MARKETING_VERSION = 0.1.31;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -492,7 +492,7 @@
 		64365578754BED6828A1E01D /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "PrismaticNoteDark MusicGradient MusicWordmark MusicCrimson MusicMonochrome MusicOrange MusicArtists MusicPink Napster NapsterMono Spotify Plex";
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "PrismaticNoteDark MusicGradient MusicWordmark MusicCrimson MusicMonochrome MusicOrange MusicArtists MusicPink Napster NapsterMono Spotify Plex WmpClassic MediaPlayerClassic WmpGlass VlcClassic Vlc Quicktime ItunesDisc Itunes11";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				FRAMEWORK_SEARCH_PATHS = (
@@ -515,7 +515,7 @@
 		6CEB115B199E0BD249279873 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "PrismaticNoteDark MusicGradient MusicWordmark MusicCrimson MusicMonochrome MusicOrange MusicArtists MusicPink Napster NapsterMono Spotify Plex";
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "PrismaticNoteDark MusicGradient MusicWordmark MusicCrimson MusicMonochrome MusicOrange MusicArtists MusicPink Napster NapsterMono Spotify Plex WmpClassic MediaPlayerClassic WmpGlass VlcClassic Vlc Quicktime ItunesDisc Itunes11";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				FRAMEWORK_SEARCH_PATHS = (
@@ -569,7 +569,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 31;
+				CURRENT_PROJECT_VERSION = 32;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -590,7 +590,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
-				MARKETING_VERSION = 0.1.30;
+				MARKETING_VERSION = 0.1.31;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -604,7 +604,7 @@
 		ECBAE4830A62993D4C987AD8 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "PrismaticNoteDark MusicGradient MusicWordmark MusicCrimson MusicMonochrome MusicOrange MusicArtists MusicPink Napster NapsterMono Spotify Plex";
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "PrismaticNoteDark MusicGradient MusicWordmark MusicCrimson MusicMonochrome MusicOrange MusicArtists MusicPink Napster NapsterMono Spotify Plex WmpClassic MediaPlayerClassic WmpGlass VlcClassic Vlc Quicktime ItunesDisc Itunes11";
 				ASSETCATALOG_COMPILER_APPICON_NAME = TVBrand;
 				ASSETCATALOG_COMPILER_LAUNCHIMAGE_NAME = LaunchImage;
 				FRAMEWORK_SEARCH_PATHS = (

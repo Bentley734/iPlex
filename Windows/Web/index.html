@@ -252,6 +252,26 @@
       <h2 id="mini-queue-heading">Queue</h2>
       <ol id="mini-queue-list"></ol>
     </section>
+    <section id="mini-desktop98" hidden>
+      <div class="desktop98-titlebar">
+        <h1 id="desktop98-heading">♪ iPlex Desktop ’98</h1>
+        <button id="desktop98-close" type="button" aria-label="Back to Library">×</button>
+      </div>
+      <div class="desktop98-screen">
+        <div id="desktop98-art"></div>
+        <strong id="desktop98-title"></strong>
+        <small id="desktop98-artist"></small>
+      </div>
+      <input id="desktop98-seek" type="range" min="0" max="1" step="0.1" aria-label="Playback position">
+      <div class="desktop98-controls">
+        <button id="desktop98-prev" type="button" aria-label="Previous track">⏮</button>
+        <button id="desktop98-play" type="button" aria-label="Play">▶</button>
+        <button id="desktop98-next" type="button" aria-label="Next track">⏭</button>
+        <span aria-hidden="true">◖))</span>
+        <input id="desktop98-volume" type="range" min="0" max="1" step="0.01" aria-label="Volume">
+      </div>
+      <div class="desktop98-status"><span id="desktop98-state"></span><time id="desktop98-time"></time></div>
+    </section>
   </dialog>
   <dialog id="settings-page" aria-labelledby="settings-heading">
     <div class="settings-head">
@@ -277,6 +297,7 @@
         <option value="roseStudio">Rose Studio Light</option>
         <option value="roseStudioDark">Rose Studio Dark</option>
         <option value="nightSignal">Night Signal</option>
+        <option value="nightSignalOLED">Night Signal OLED</option>
       </select>
     </label>
     <label id="glass-transparency-setting" class="theme-choice" hidden>
@@ -321,6 +342,7 @@
         <option value="video">iPod Video</option>
         <option value="videoBlack">iPod Video Black</option>
         <option value="queue">Artwork &amp; Queue</option>
+        <option value="desktop98">Desktop ’98</option>
       </select>
     </label>
     <section>
@@ -332,6 +354,7 @@
           <option value="plex">Plex (Classic)</option>
           <option value="plex2022">Plex (2022)</option>
           <option value="napster">Napster</option>
+          <option value="spotify">Spotify</option>
           <option value="iTunes">iTunes</option>
           <option value="realJukebox">RealJukebox</option>
           <option value="realJukeboxPlus">RealJukebox Plus</option>
@@ -351,9 +374,18 @@
           <option value="aurora">Aurora</option>
           <option value="silver">Polished Silver</option>
           <option value="napster">Napster</option>
+          <option value="spotify">Spotify</option>
           <option value="plex-chevron">Plex Chevron</option>
           <option value="realplayer">RealPlayer</option>
           <option value="realplayer-gartoon">RealPlayer Gartoon</option>
+          <option value="wmp-classic">Windows Media Player 4</option>
+          <option value="media-player-classic">Media Player Classic</option>
+          <option value="wmp-glass">Windows Media Player Glass</option>
+          <option value="vlc-classic">VLC Classic</option>
+          <option value="vlc">VLC</option>
+          <option value="quicktime">QuickTime</option>
+          <option value="itunes-disc">iTunes Disc</option>
+          <option value="itunes-11">iTunes 11</option>
         </select>
       </label>
       <label class="header-logo-choice">Header Logo Size
@@ -386,6 +418,14 @@
         <button type="button" value="napster-mono" aria-pressed="false"><img src="napster-mono.ico" alt=""><span>Napster Monochrome</span></button>
         <button type="button" value="spotify" aria-pressed="false"><img src="spotify.ico" alt=""><span>Spotify</span></button>
         <button type="button" value="plex" aria-pressed="false"><img src="plex.ico" alt=""><span>Plex</span></button>
+        <button type="button" value="wmp-classic" aria-pressed="false"><img src="wmp-classic.ico" alt=""><span>Windows Media Player 4</span></button>
+        <button type="button" value="media-player-classic" aria-pressed="false"><img src="media-player-classic.ico" alt=""><span>Media Player Classic</span></button>
+        <button type="button" value="wmp-glass" aria-pressed="false"><img src="wmp-glass.ico" alt=""><span>Windows Media Player Glass</span></button>
+        <button type="button" value="vlc-classic" aria-pressed="false"><img src="vlc-classic.ico" alt=""><span>VLC Classic</span></button>
+        <button type="button" value="vlc" aria-pressed="false"><img src="vlc.ico" alt=""><span>VLC</span></button>
+        <button type="button" value="quicktime" aria-pressed="false"><img src="quicktime.ico" alt=""><span>QuickTime</span></button>
+        <button type="button" value="itunes-disc" aria-pressed="false"><img src="itunes-disc.ico" alt=""><span>iTunes Disc</span></button>
+        <button type="button" value="itunes-11" aria-pressed="false"><img src="itunes-11.ico" alt=""><span>iTunes 11</span></button>
       </div>
     </section>
     <label class="theme-choice">Library Layout

@@ -28,8 +28,24 @@ enum MusicPlatform {
         })
     }
 
+    private static let spotifyHeader: (logo: CGImage?, wordmark: CGImage?) = {
+        guard let url = Bundle.main.url(forResource: "spotify-brand", withExtension: "png", subdirectory: "HeaderMarks"),
+              let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+              let image = CGImageSourceCreateImageAtIndex(source, 0, nil) else { return (nil, nil) }
+        return (image.cropping(to: CGRect(x: 48, y: 13, width: 915, height: 915)),
+                image.cropping(to: CGRect(x: 1149, y: 212, width: 2235, height: 596)))
+    }()
+
+    static func headerLogoImage(_ option: HeaderMark) -> Image? {
+        if option == .spotify {
+            return spotifyHeader.logo.map { Image(decorative: $0, scale: 1) }
+        }
+        return brandImage(option.assetName, subdirectory: "HeaderMarks")
+    }
+
     static func wordmarkImage(_ option: HeaderWordmark, dark: Bool) -> Image? {
         if option == .iplex { return brandImage("wordmark") }
+        if option == .spotify { return spotifyHeader.wordmark.map { Image(decorative: $0, scale: 1) } }
         return (dark ? darkWordmarks : wordmarks)[option].map { Image(decorative: $0, scale: 1) }
     }
 
@@ -129,7 +145,7 @@ struct ArtworkPalette {
 
 enum HeaderWordmark: String, CaseIterable, Identifiable {
     static let preferenceKey = "HeaderWordmark"
-    case iplex, music, musicBold, plex, plex2022, napster, iTunes
+    case iplex, music, musicBold, plex, plex2022, napster, spotify, iTunes
     case realJukebox, realJukeboxPlus, realPlayer, realPlayerBasic, realPlayerPlus, none
 
     var id: Self { self }
@@ -139,6 +155,7 @@ enum HeaderWordmark: String, CaseIterable, Identifiable {
         case .music, .musicBold: "Music"
         case .plex, .plex2022: "Plex"
         case .napster: "Napster"
+        case .spotify: "Spotify"
         case .iTunes: "iTunes"
         case .realJukebox: "RealJukebox"
         case .realJukeboxPlus: "RealJukebox Plus"
@@ -156,12 +173,12 @@ enum HeaderWordmark: String, CaseIterable, Identifiable {
         default: title
         }
     }
-    var preservesColors: Bool { region(dark: false) != region(dark: true) }
+    var preservesColors: Bool { self == .spotify || region(dark: false) != region(dark: true) }
 
     // Pixel coordinates shared with the Windows asset sheet.
     func region(dark: Bool) -> CGRect? {
         switch self {
-        case .iplex, .none: nil
+        case .iplex, .spotify, .none: nil
         case .music: CGRect(x: 722, y: 251, width: 684, height: 210)
         case .musicBold: CGRect(x: 645, y: 609, width: 810, height: 193)
         case .plex: CGRect(x: 0, y: dark ? 1745 : 1255, width: 1024, height: 332)
@@ -179,10 +196,19 @@ enum HeaderWordmark: String, CaseIterable, Identifiable {
 
 enum HeaderMark: String, CaseIterable, Identifiable {
     static let preferenceKey = "HeaderMark"
-    case none, black, white, rainbow, gold, aurora, silver, napster
+    case none, black, white, rainbow, gold, aurora, silver, napster, spotify
     case plexChevron = "plex-chevron"
     case realPlayer = "realplayer"
     case realPlayerGartoon = "realplayer-gartoon"
+
+    case wmpClassic = "wmp-classic"
+    case mediaPlayerClassic = "media-player-classic"
+    case wmpGlass = "wmp-glass"
+    case vlcClassic = "vlc-classic"
+    case vlc
+    case quicktime
+    case itunesDisc = "itunes-disc"
+    case itunes11 = "itunes-11"
 
     var id: Self { self }
     var isMonochrome: Bool { self == .black || self == .white }
@@ -207,6 +233,15 @@ enum HeaderMark: String, CaseIterable, Identifiable {
         case .aurora: "Aurora"
         case .silver: "Polished Silver"
         case .napster: "Napster"
+        case .wmpClassic: "Windows Media Player 4"
+        case .mediaPlayerClassic: "Media Player Classic"
+        case .wmpGlass: "Windows Media Player Glass"
+        case .vlcClassic: "VLC Classic"
+        case .vlc: "VLC"
+        case .quicktime: "QuickTime"
+        case .itunesDisc: "iTunes Disc"
+        case .itunes11: "iTunes 11"
+        case .spotify: "Spotify"
         case .plexChevron: "Plex Chevron"
         case .realPlayer: "RealPlayer"
         case .realPlayerGartoon: "RealPlayer Gartoon"
@@ -249,7 +284,7 @@ struct HeaderBrand: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            if mark != .none, let image = MusicPlatform.brandImage(mark.assetName, subdirectory: "HeaderMarks") {
+            if mark != .none, let image = MusicPlatform.headerLogoImage(mark) {
                 cycleControl(label: "Change header logo", selection: mark.label, advance: cycleMark) {
                     image.renderingMode(mark.isMonochrome ? .template : .original)
                         .resizable()

@@ -12,6 +12,15 @@ enum AppIconChoice: String, CaseIterable, Identifiable {
     case musicPink = "music-pink"
     case napster, napsterMono = "napster-mono", spotify, plex
 
+    case wmpClassic = "wmp-classic"
+    case mediaPlayerClassic = "media-player-classic"
+    case wmpGlass = "wmp-glass"
+    case vlcClassic = "vlc-classic"
+    case vlc
+    case quicktime
+    case itunesDisc = "itunes-disc"
+    case itunes11 = "itunes-11"
+
     var id: String { rawValue }
     static let defaultChoice = Self.prismaticLight
     static let preferenceKey = "IconStyle"
@@ -34,6 +43,14 @@ enum AppIconChoice: String, CaseIterable, Identifiable {
         case .musicPink: "Pink Note"
         case .napster: "Napster"
         case .napsterMono: "Napster Monochrome"
+        case .wmpClassic: "Windows Media Player 4"
+        case .mediaPlayerClassic: "Media Player Classic"
+        case .wmpGlass: "Windows Media Player Glass"
+        case .vlcClassic: "VLC Classic"
+        case .vlc: "VLC"
+        case .quicktime: "QuickTime"
+        case .itunesDisc: "iTunes Disc"
+        case .itunes11: "iTunes 11"
         case .spotify: "Spotify"
         case .plex: "Plex"
         }

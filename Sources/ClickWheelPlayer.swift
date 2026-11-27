@@ -8,11 +8,136 @@ struct MiniPlayerContent: View {
     var body: some View {
         if style == .queue {
             QueueMiniPlayer(library: library, close: close)
+        } else if style == .desktop98 {
+            DesktopMiniPlayer(library: library, close: close)
         } else {
             ClickWheelPlayer(library: library,
                              theme: style == .video || style == .videoBlack ? .video : .classic,
                              blackShell: style == .classicBlack || style == .videoBlack, close: close)
         }
+    }
+}
+
+private struct DesktopMiniPlayer: View {
+    @ObservedObject var library: LibraryModel
+    let close: () -> Void
+    private let shell = Color(red: 0.82, green: 0.83, blue: 0.78)
+    private let screen = Color(red: 0.055, green: 0.10, blue: 0.10)
+    private let accent = Color(red: 0.34, green: 0.77, blue: 0.67)
+
+    private var duration: Double { max(1, library.state.duration) }
+    private var elapsed: Double { min(duration, max(0, library.state.elapsed)) }
+
+    var body: some View {
+        VStack(spacing: 9) {
+            HStack {
+                Label("iPlex Desktop ’98", systemImage: "opticaldisc")
+                    .font(.system(.headline, design: .monospaced))
+                    .foregroundStyle(.white)
+                Spacer()
+                Button("Back to Library", systemImage: "xmark", action: close)
+                    .labelStyle(.iconOnly).buttonStyle(.bordered)
+                    .foregroundStyle(.white).tint(.white)
+            }
+            .padding(.horizontal, 9).padding(.vertical, 4)
+            .background(.linearGradient(colors: [.init(red: 0.11, green: 0.24, blue: 0.34),
+                                                  .init(red: 0.15, green: 0.39, blue: 0.36)],
+                                        startPoint: .leading, endPoint: .trailing))
+
+            VStack(alignment: .leading, spacing: 7) {
+                artwork
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                Text(library.currentTrack?.title ?? library.state.title)
+                    .font(.headline).lineLimit(1).foregroundStyle(.white)
+                Text([library.currentTrack?.artist ?? library.playingAlbum?.artist,
+                      library.currentTrack?.album ?? library.playingAlbum?.title]
+                    .compactMap { $0 }.filter { !$0.isEmpty }.joined(separator: " · "))
+                    .font(.caption).lineLimit(1).foregroundStyle(accent)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+            .background(screen)
+            .overlay { Rectangle().strokeBorder(.black.opacity(0.6), lineWidth: 2).allowsHitTesting(false) }
+
+            #if os(tvOS)
+            ProgressView(value: elapsed, total: duration).accessibilityLabel("Playback position")
+            #else
+            Slider(value: Binding(get: { elapsed }, set: library.player.seek), in: 0...duration)
+                .disabled(library.state.duration <= 0)
+                .accessibilityLabel("Playback position")
+            #endif
+            HStack(spacing: 9) {
+                transport("Previous track", "backward.end.fill", action: library.player.previous)
+                    .disabled(!library.state.previous)
+                transport(library.state.playing ? "Pause" : "Play", library.state.playing ? "pause.fill" : "play.fill",
+                          action: library.player.toggle)
+                transport("Next track", "forward.end.fill", action: library.player.next)
+                    .disabled(!library.state.next)
+                Spacer(minLength: 6)
+                #if !os(tvOS)
+                Image(systemName: "speaker.wave.2.fill").accessibilityHidden(true)
+                Slider(value: Binding(get: { library.playbackVolume }, set: library.changePlaybackVolume), in: 0...1)
+                    .frame(maxWidth: 105).accessibilityLabel("Volume")
+                #else
+                transport("Back 10 seconds", "gobackward.10") { library.player.seek(to: max(0, elapsed - 10)) }
+                transport("Forward 10 seconds", "goforward.10") { library.player.seek(to: min(duration, elapsed + 10)) }
+                #endif
+            }
+            HStack {
+                Text(library.state.playing ? "Playing" : "Paused")
+                Spacer()
+                Text("\(clock(elapsed)) / \(clock(library.state.duration))").monospacedDigit()
+            }
+            .font(.system(.caption, design: .monospaced))
+            .padding(7).background(screen).foregroundStyle(accent)
+        }
+        .padding(9)
+        .frame(maxWidth: 520, maxHeight: 580)
+        .background(shell)
+        .overlay { bevel.allowsHitTesting(false) }
+        .foregroundStyle(Color(white: 0.10))
+        .tint(Color(red: 0.12, green: 0.35, blue: 0.31))
+        .environment(\.colorScheme, .light)
+        #if os(tvOS)
+        .onExitCommand(perform: close)
+        .onPlayPauseCommand { library.player.toggle() }
+        #endif
+        .onChange(of: library.playingAlbum?.id) { _, id in if id == nil { close() } }
+    }
+
+    @ViewBuilder private var artwork: some View {
+        if let playingArtwork = library.playingArtwork {
+            #if os(macOS)
+            Image(nsImage: playingArtwork).resizable().scaledToFit().accessibilityHidden(true)
+            #else
+            Image(uiImage: playingArtwork).resizable().scaledToFit().accessibilityHidden(true)
+            #endif
+        } else {
+            Image(systemName: "opticaldisc.fill").font(.system(size: 56)).foregroundStyle(accent).accessibilityHidden(true)
+        }
+    }
+
+    private var bevel: some View {
+        Rectangle().strokeBorder(.linearGradient(colors: [.white, .white.opacity(0.85), .black.opacity(0.68)],
+                                                  startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 2)
+    }
+
+    private func transport(_ title: String, _ symbol: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: symbol).labelStyle(.iconOnly)
+                .frame(minWidth: 29, minHeight: 29)
+        }
+        #if os(tvOS)
+        .buttonStyle(.bordered)
+        #else
+        .buttonStyle(.plain)
+        .background(shell).overlay { bevel.allowsHitTesting(false) }
+        #endif
+    }
+
+    private func clock(_ value: Double) -> String {
+        let seconds = value.isFinite ? Int(max(0, min(value, 999_999))) : 0
+        return String(format: "%d:%02d", seconds / 60, seconds % 60)
     }
 }
 

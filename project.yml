@@ -3,8 +3,8 @@ options:
   createIntermediateGroups: true
 settings:
   SWIFT_VERSION: 5.0
-  MARKETING_VERSION: 0.1.30
-  CURRENT_PROJECT_VERSION: 31
+  MARKETING_VERSION: 0.1.31
+  CURRENT_PROJECT_VERSION: 32
   GENERATE_INFOPLIST_FILE: YES
   INFOPLIST_KEY_CFBundleDisplayName: iPlex
   INFOPLIST_KEY_NSLocalNetworkUsageDescription: iPlex connects to your Plex Media Server.
@@ -49,7 +49,7 @@ targets:
       PRODUCT_BUNDLE_IDENTIFIER: net.bentley734.musicroom.ios
       TARGETED_DEVICE_FAMILY: "1,2"
       ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-      ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "PrismaticNoteDark MusicGradient MusicWordmark MusicCrimson MusicMonochrome MusicOrange MusicArtists MusicPink Napster NapsterMono Spotify Plex"
+      ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "PrismaticNoteDark MusicGradient MusicWordmark MusicCrimson MusicMonochrome MusicOrange MusicArtists MusicPink Napster NapsterMono Spotify Plex WmpClassic MediaPlayerClassic WmpGlass VlcClassic Vlc Quicktime ItunesDisc Itunes11"
   MusicRoom-tvOS:
     type: application
     platform: tvOS
@@ -82,4 +82,4 @@ targets:
       PRODUCT_NAME: iPlex
       PRODUCT_BUNDLE_IDENTIFIER: net.bentley734.musicroom.tvos
       ASSETCATALOG_COMPILER_APPICON_NAME: TVBrand
-      ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "PrismaticNoteDark MusicGradient MusicWordmark MusicCrimson MusicMonochrome MusicOrange MusicArtists MusicPink Napster NapsterMono Spotify Plex"
+      ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES: "PrismaticNoteDark MusicGradient MusicWordmark MusicCrimson MusicMonochrome MusicOrange MusicArtists MusicPink Napster NapsterMono Spotify Plex WmpClassic MediaPlayerClassic WmpGlass VlcClassic Vlc Quicktime ItunesDisc Itunes11"

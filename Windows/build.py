@@ -19,6 +19,7 @@ ICONS = (
     DEFAULT_ICON, "prismatic-note-dark", "music-gradient", "music-wordmark", "music-crimson",
     "music-monochrome", "music-orange", "music-artists", "music-pink", "napster",
     "napster-mono", "spotify", "plex",
+    "wmp-classic", "media-player-classic", "wmp-glass", "vlc-classic", "vlc", "quicktime", "itunes-disc", "itunes-11",
 )
 
 

@@ -138,7 +138,7 @@ private struct MusicWindow: View {
                             .musicGlass(theme, radius: 22)
                             .padding(theme.usesLiquidGlass || theme == .nightSignal ? 7 : 0)
                     }
-                    if theme != .nightSignal { Rectangle().fill(Color.primary.opacity(0.12)).frame(height: 1) }
+                    if !theme.isNightSignal { Rectangle().fill(Color.primary.opacity(0.12)).frame(height: 1) }
                     transport
                 }
             }
@@ -317,7 +317,7 @@ private struct MusicWindow: View {
             .foregroundStyle(selected ? copper : .primary)
             .background(selected ? copper.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 8))
             .overlay(alignment: .leading) {
-                if (theme.isRoseStudio || theme == .nightSignal) && selected {
+                if (theme.isRoseStudio || theme.isNightSignal) && selected {
                     Capsule().fill(copper).frame(width: 3, height: 17).padding(.leading, 3)
                 }
             }
@@ -611,7 +611,7 @@ private struct MusicWindow: View {
                     }.buttonStyle(.plain)
                         .contextMenu { LibraryQueueActions(library: model, entry: album, track: track) }
                         .modifier(PlaylistTrackEditing(library: model, track: track))
-                    if theme != .nightSignal { Divider() }
+                    if !theme.isNightSignal { Divider() }
                 }
             }
             .frame(maxWidth: 860, alignment: .leading)
