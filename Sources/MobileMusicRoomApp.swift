@@ -95,7 +95,8 @@ private struct MusicLibraryScreen: View {
     private var libraryScreen: some View {
         VStack(spacing: 0) {
             HStack {
-                HeaderBrand(theme: theme, width: columnWidth, height: 56)
+                SectionHeaderBrand(section: HeaderBrandSection(video: videoSection),
+                                   theme: theme, width: columnWidth, height: 56)
                 Spacer()
                 Button { showAppIcons = true } label: { Image(systemName: "app.dashed") }
                     .accessibilityLabel("App Icon")

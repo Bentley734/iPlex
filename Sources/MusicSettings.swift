@@ -1,4 +1,30 @@
 import SwiftUI
+
+private struct HeaderBrandSettings: View {
+    @AppStorage(HeaderMarkSize.preferenceKey) private var markSize = HeaderMarkSize.medium
+    private var choices: HeaderBrandChoices
+    let theme: MusicTheme
+
+    init(section: HeaderBrandSection, theme: MusicTheme) {
+        choices = HeaderBrandChoices(section: section)
+        self.theme = theme
+    }
+
+    var body: some View {
+        Picker("Header Wordmark", selection: choices.wordmarkSelection) {
+            ForEach(HeaderWordmark.allCases) { Text($0.label).tag($0) }
+        }
+        Picker("Header Logo", selection: choices.logoSelection) {
+            ForEach(HeaderMark.allCases) { Text($0.label).tag($0) }
+        }
+        Picker("Header Logo Size", selection: $markSize) {
+            ForEach(HeaderMarkSize.allCases) { Text($0.label).tag($0) }
+        }
+        HeaderBrand(theme: theme, width: 170, height: 42, allowsCycling: false,
+                    mark: choices.logoSelection, wordmark: choices.wordmarkSelection)
+            .accessibilityHidden(true)
+    }
+}
 #if os(macOS)
 import AppKit
 #else
@@ -320,9 +346,7 @@ struct MusicSettings: View {
     #endif
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @AppStorage(ArtworkColorWash.motionPreference) private var animateArtworkColors = true
-    @AppStorage(HeaderMark.preferenceKey) private var headerMark = HeaderMark.none
-    @AppStorage(HeaderWordmark.preferenceKey) private var headerWordmark = HeaderWordmark.iplex
-    @AppStorage(HeaderMarkSize.preferenceKey) private var headerMarkSize = HeaderMarkSize.medium
+    @State private var headerSection = HeaderBrandSection.music
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @AppStorage(LibraryLayout.preferenceKey) private var libraryLayout = LibraryLayout.grid
     @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
@@ -381,23 +405,13 @@ struct MusicSettings: View {
                             Text(style.label).tag(style)
                         }
                     }
-                    Picker("Header Wordmark", selection: $headerWordmark) {
-                        ForEach(HeaderWordmark.allCases) { wordmark in
-                            Text(wordmark.label).tag(wordmark)
+                    Picker("Customize Header For", selection: $headerSection) {
+                        ForEach(HeaderBrandSection.allCases) { section in
+                            Text(section.title).tag(section)
                         }
                     }
-                    Picker("Header Logo", selection: $headerMark) {
-                        ForEach(HeaderMark.allCases) { mark in
-                            Text(mark.label).tag(mark)
-                        }
-                    }
-                    Picker("Header Logo Size", selection: $headerMarkSize) {
-                        ForEach(HeaderMarkSize.allCases) { size in
-                            Text(size.label).tag(size)
-                        }
-                    }
-                    HeaderBrand(theme: theme, width: 170, height: 42, allowsCycling: false)
-                        .accessibilityHidden(true)
+                    HeaderBrandSettings(section: headerSection, theme: theme)
+                        .id(headerSection)
                     Divider()
                     VStack(alignment: .leading, spacing: 10) {
                         Text("App Icon").font(.headline)

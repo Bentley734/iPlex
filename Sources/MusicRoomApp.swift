@@ -177,7 +177,8 @@ private struct MusicWindow: View {
         return VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    HeaderBrand(theme: theme, width: min(155, width - padding * 2), height: 46)
+                    SectionHeaderBrand(section: HeaderBrandSection(video: videoSection),
+                                       theme: theme, width: min(155, width - padding * 2), height: 46)
                     VStack(alignment: .leading, spacing: 6) {
                         sidebarButton("Music", icon: "music.note", selected: videoSection == nil) { videoSection = nil }
                         ForEach(model.visibleVideoKinds) { videoTab($0) }

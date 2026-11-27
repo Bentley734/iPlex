@@ -298,8 +298,8 @@ struct PlexVideoBrowser: View {
                 } label: {
                     VStack(alignment: .leading, spacing: 8) {
                         poster(item).frame(width: layout.posterWidth, height: layout.posterHeight)
-                        HStack {
-                            labels(item)
+                        HStack(alignment: .top) {
+                            labels(item, reservesSpace: true)
                             if watchedItems.contains(item.id) {
                                 Image(systemName: "checkmark.circle.fill").accessibilityLabel("Watched")
                             }
@@ -415,11 +415,15 @@ struct PlexVideoBrowser: View {
                             snapshot?.items.contains { $0.id == item.id && $0.thumb == item.thumb } == true)
     }
 
-    private func labels(_ item: PlexVideoItem) -> some View {
+    private func labels(_ item: PlexVideoItem, reservesSpace: Bool = false) -> some View {
         VStack(alignment: .leading, spacing: 2) {
-            Text(item.title).font(.headline).lineLimit(2).multilineTextAlignment(.leading)
-            if !item.subtitle.isEmpty {
-                Text(item.subtitle).font(.caption).foregroundStyle(.secondary).lineLimit(1)
+            Text(item.title).font(.headline)
+                .lineLimit(2, reservesSpace: reservesSpace)
+                .multilineTextAlignment(.leading)
+            if reservesSpace || !item.subtitle.isEmpty {
+                Text(item.subtitle.isEmpty ? " " : item.subtitle).font(.caption).foregroundStyle(.secondary)
+                    .lineLimit(1, reservesSpace: reservesSpace)
+                    .accessibilityHidden(item.subtitle.isEmpty)
             }
         }.frame(maxWidth: .infinity, alignment: .leading)
     }

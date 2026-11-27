@@ -46,6 +46,8 @@ aside { background:var(--panel); padding:25px 18px; display:flex; flex-direction
 .header-mark[data-mark="rainbow"] { --artwork-scale:calc(1118 / 1117); }
 .header-mark[data-mark="silver"] { --artwork-scale:calc(409 / 315); }
 .header-mark[data-mark="black"] { filter:drop-shadow(0 0 1px #ffffffb3); }
+.wordmark:is([data-wordmark="disney-plus-mono"],[data-wordmark="apple-tv"],[data-wordmark="apple-tv-classic"],[data-wordmark="tool-drive-project"]),
+.header-mark:is([data-mark="disney-plus-mono"],[data-mark="apple-tv"],[data-mark="apple-tv-classic"]),
 .header-mark[data-mark="white"] { filter:brightness(0) invert(1); }
 #library-navigation { min-height:0; overflow:auto; padding:2px; }
 nav { display:grid; gap:6px; }
@@ -608,6 +610,10 @@ body {
 .video-tile { display:grid; gap:8px; text-align:left; align-content:start; border:0; background:transparent; min-width:0; }
 .video-tile strong,.video-tile small { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .video-tile small { color:var(--muted); margin-top:3px; }
+.video-tile .video-subtitle:empty { display:none; }
+.video-grid:not(.video-episodes) .video-tile .video-subtitle { display:block; min-block-size:1lh; }
+.video-grid:not(.video-episodes) .video-tile strong { min-block-size:2lh; }
+.video-grid:not(.video-episodes) .watched-badge[hidden] { display:block !important; visibility:hidden; }
 #grid[data-layout="grid"]:not(.track-list) > .library-tile > .tile strong,
 .video-grid:not(.video-episodes) .video-tile strong {
   display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; white-space:normal;

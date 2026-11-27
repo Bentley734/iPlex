@@ -268,6 +268,7 @@
 
   function present() {
     document.documentElement.toggleAttribute('data-video-open', Boolean(kind));
+    window.renderHeaderForSection?.(kind || 'music');
     browser.hidden = !kind;
     syncTabs();
   }
@@ -403,11 +404,10 @@
       const title = document.createElement('strong');
       title.textContent = row.title;
       labels.append(title);
-      if (row.subtitle) {
-        const subtitle = document.createElement('small');
-        subtitle.textContent = row.subtitle;
-        labels.append(subtitle);
-      }
+      const subtitle = document.createElement('small');
+      subtitle.className = 'video-subtitle';
+      subtitle.textContent = row.subtitle || '';
+      labels.append(subtitle);
       const badge = document.createElement('small');
       badge.className = 'watched-badge';
       badge.textContent = 'Watched';

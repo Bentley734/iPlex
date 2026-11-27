@@ -1149,70 +1149,95 @@
     window.clickWheel.setStyle(select.value);
     try { localStorage.setItem('musicroom-mini-player', select.value); } catch {}
   }
-  function cycleHeaderChoice(id, choose) {
-    const select = get(id);
-    const options = [...select.options].filter(option => option.value !== 'none');
-    const current = options.findIndex(option => option.value === select.value);
-    choose(options[(current + 1) % options.length].value);
-  }
-  get('cycle-header-logo').onclick = () => cycleHeaderChoice('header-logo', chooseHeaderLogo);
-  get('cycle-header-wordmark').onclick = () => cycleHeaderChoice('header-wordmark', chooseHeaderWordmark);
+  const headerSection = get('header-brand-section');
+  const sidebarBrand = document.querySelector('#library-sidebar .header-brand');
+  const headerPreview = document.querySelector('.header-preview');
+  const headerLogo = get('header-logo');
+  const headerWordmark = get('header-wordmark');
+  const brandWordmarks = new Map([
+    ['netflix', 'netflix-wordmark'], ['hulu', 'hulu'],
+    ['disney-plus', 'disney-plus'], ['disney-plus-mono', 'disney-plus-mono'],
+    ['apple-tv', 'apple-tv'], ['apple-tv-classic', 'apple-tv-classic'], ['apple-tv-glass', 'apple-tv-glass'],
+    ['tool-drive-project', 'tool-drive-project-wordmark']
+  ]);
+  const headerChoices = new Map();
+  let activeHeaderSection = 'music';
 
-  function renderHeaderWordmark() {
-    const choice = get('header-wordmark');
-    const spotify = choice.value === 'spotify';
-    const region = spotify ? spotifyWordmarkRegion : wordmarkRegions.get(choice.value);
+  function brandKey(section, part) {
+    return 'musicroom-header-' + part + (section === 'music' ? '' : '-' + section);
+  }
+  function brandPart(part) {
+    return part === 'logo' ? headerLogo : headerWordmark;
+  }
+  function loadHeaderSection() {
+    const choices = headerChoices.get(headerSection.value);
+    headerLogo.value = choices.logo;
+    headerWordmark.value = choices.wordmark;
+    renderHeaderBrands();
+  }
+  function chooseHeaderPart(section, part, value) {
+    headerChoices.get(section)[part] = value;
+    if (section === headerSection.value) brandPart(part).value = value;
+    try { localStorage.setItem(brandKey(section, part), value); } catch {}
+    renderHeaderBrands();
+  }
+  function cycleHeaderChoice(part) {
+    const select = brandPart(part);
+    const options = [...select.options].filter(option => option.value !== 'none');
+    const current = options.findIndex(option => option.value === headerChoices.get(activeHeaderSection)[part]);
+    chooseHeaderPart(activeHeaderSection, part, options[(current + 1) % options.length].value);
+  }
+  const cycleMark = get('cycle-header-logo');
+  const cycleWordmark = get('cycle-header-wordmark');
+  cycleMark.onclick = () => cycleHeaderChoice('logo');
+  cycleWordmark.onclick = () => cycleHeaderChoice('wordmark');
+  window.renderHeaderForSection = section => {
+    activeHeaderSection = section;
+    renderHeaderBrands();
+  };
+
+  function renderHeaderBrands() {
+    const active = headerChoices.get(activeHeaderSection);
+    renderHeaderBrand(sidebarBrand, active);
+    renderHeaderBrand(headerPreview, headerChoices.get(headerSection.value));
+    cycleMark.hidden = active.logo === 'none';
+    cycleWordmark.hidden = active.wordmark === 'none';
+    for (const [control, part] of [[cycleMark, 'logo'], [cycleWordmark, 'wordmark']]) {
+      const option = [...brandPart(part).options].find(option => option.value === active[part]);
+      control.setAttribute('aria-label', 'Change header ' + part + ', ' + option.textContent);
+    }
+  }
+  function renderHeaderBrand(brand, {logo, wordmark}) {
+    const mark = brand.querySelector('.header-mark');
+    const logoAsset = logo === 'black' || logo === 'white' ? 'monochrome' : logo;
+    if (logo === 'spotify' || wordmark === 'spotify') loadSpotifySheet();
+    mark.hidden = logo === 'none' || (logo === 'spotify' && !spotifyLogoURL);
+    mark.dataset.mark = logo;
+    if (mark.hidden) mark.removeAttribute('src');
+    else mark.src = logo === 'spotify' ? spotifyLogoURL : 'HeaderMarks/' + logoAsset + '.png';
+
+    const spotify = wordmark === 'spotify';
+    const region = spotify ? spotifyWordmarkRegion : wordmarkRegions.get(wordmark);
     const sheet = spotify ? spotifySheet : wordmarkSheet;
-    const showMusic = Boolean(region && sheet.naturalWidth);
-    const markChoice = get('header-logo');
-    const cycleMark = get('cycle-header-logo');
-    const cycleWordmark = get('cycle-header-wordmark');
-    cycleMark.hidden = markChoice.value === 'none';
-    cycleWordmark.hidden = choice.value === 'none';
-    cycleMark.setAttribute('aria-label', 'Change header logo, ' + markChoice.selectedOptions[0].textContent);
-    cycleWordmark.setAttribute('aria-label', 'Change header wordmark, ' + choice.selectedOptions[0].textContent);
-    for (const brand of document.querySelectorAll('.header-brand')) {
-      const canvas = brand.querySelector('.music-wordmark');
-      if (showMusic) {
-        const [x, y, width, height, darkY] = region;
-        canvas.dataset.color = spotify || darkY !== undefined ? 'original' : 'template';
-        canvas.width = width;
-        canvas.height = height;
-        canvas.getContext('2d').drawImage(sheet, x, darkY ?? y, width, height, 0, 0, width, height);
-      }
-      canvas.hidden = !showMusic;
-      brand.querySelector('img.wordmark').hidden = showMusic || spotify || choice.value === 'none';
+    if (region && !spotify && !wordmarkSheet.getAttribute('src')) wordmarkSheet.src = 'music-wordmarks.png';
+    const canvas = brand.querySelector('.music-wordmark');
+    const showCanvas = Boolean(region && sheet.naturalWidth);
+    if (showCanvas) {
+      const [x, y, width, height, darkY] = region;
+      canvas.dataset.color = spotify || darkY !== undefined ? 'original' : 'template';
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d').drawImage(sheet, x, darkY ?? y, width, height, 0, 0, width, height);
     }
-  }
-  function chooseHeaderWordmark(value) {
-    const choice = get('header-wordmark');
-    choice.value = value === 'none' || value === 'spotify' || wordmarkRegions.has(value) ? value : 'iplex';
-    if (choice.value === 'spotify') loadSpotifySheet();
-    if (wordmarkRegions.has(choice.value) && !wordmarkSheet.getAttribute('src')) wordmarkSheet.src = 'music-wordmarks.png';
-    renderHeaderWordmark();
-    try { localStorage.setItem('musicroom-header-wordmark', choice.value); } catch {}
-  }
-  function chooseHeaderLogo(value) {
-    const choice = get('header-logo');
-    choice.value = value;
-    if (choice.selectedIndex === -1) choice.value = 'none';
-    const logo = choice.value;
-    if (logo === 'spotify') loadSpotifySheet();
-    renderHeaderLogo(logo);
-    renderHeaderWordmark();
-    try { localStorage.setItem('musicroom-header-logo', logo); } catch {}
-  }
-  function renderHeaderLogo(logo) {
-    const asset = logo === 'black' || logo === 'white' ? 'monochrome' : logo;
-    for (const image of document.querySelectorAll('.header-mark')) {
-      image.hidden = logo === 'none' || (logo === 'spotify' && !spotifyLogoURL);
-      image.dataset.mark = logo;
-      if (image.hidden) image.removeAttribute('src');
-      else image.src = logo === 'spotify' ? spotifyLogoURL : 'HeaderMarks/' + asset + '.png';
-    }
+    canvas.hidden = !showCanvas;
+    const image = brand.querySelector('img.wordmark');
+    const asset = brandWordmarks.get(wordmark);
+    image.hidden = wordmark !== 'iplex' && !asset && (showCanvas || spotify || wordmark === 'none');
+    image.dataset.wordmark = wordmark;
+    image.src = asset ? 'HeaderMarks/' + asset + '.png' : 'wordmark.png';
   }
   spotifySheet.addEventListener('load', () => {
-    renderHeaderWordmark();
+    renderHeaderBrands();
     const [x, y, width, height] = spotifyLogoRegion;
     const canvas = document.createElement('canvas');
     canvas.width = width;
@@ -1221,9 +1246,20 @@
     canvas.toBlob(blob => {
       if (!blob) return;
       spotifyLogoURL = URL.createObjectURL(blob);
-      if (get('header-logo').value === 'spotify') renderHeaderLogo('spotify');
+      renderHeaderBrands();
     });
   });
+  for (const {value: section} of headerSection.options) {
+    const choices = {logo:'none', wordmark:'iplex'};
+    for (const part of Object.keys(choices)) {
+      try {
+        const saved = localStorage.getItem(brandKey(section, part));
+        if ([...brandPart(part).options].some(option => option.value === saved)) choices[part] = saved;
+      } catch {}
+    }
+    headerChoices.set(section, choices);
+  }
+  loadHeaderSection();
   function chooseHeaderLogoSize(value) {
     const choice = get('header-logo-size');
     choice.value = value;
@@ -1258,9 +1294,10 @@
     else browse();
   };
   get('mini-player-style').onchange = event => chooseMiniPlayer(event.target.value);
-  get('header-logo').onchange = event => chooseHeaderLogo(event.target.value);
-  get('header-wordmark').onchange = event => chooseHeaderWordmark(event.target.value);
-  wordmarkSheet.addEventListener('load', renderHeaderWordmark);
+  headerSection.onchange = loadHeaderSection;
+  headerLogo.onchange = event => chooseHeaderPart(headerSection.value, 'logo', event.target.value);
+  headerWordmark.onchange = event => chooseHeaderPart(headerSection.value, 'wordmark', event.target.value);
+  wordmarkSheet.addEventListener('load', renderHeaderBrands);
   get('header-logo-size').onchange = event => chooseHeaderLogoSize(event.target.value);
   for (const band of bands) get(band).oninput = updateEQ;
   get('reset-eq').onclick = () => {
@@ -1321,13 +1358,10 @@
     savedSidebarWidth = Number(localStorage.getItem('musicroom-sidebar-width')) || 0;
     for (const type of Object.keys(glassDefaults))
       chooseGlassColor(type, localStorage.getItem('musicroom-glass-' + type + '-color'));
-    renderHeaderWordmark();
     chooseGlassTransparency(localStorage.getItem('musicroom-glass-transparency'));
     chooseArtworkColors(localStorage.getItem('musicroom-artwork-colors') === '1');
     chooseArtworkMotion(localStorage.getItem('musicroom-animate-artwork-colors') !== '0');
     chooseMiniPlayer(localStorage.getItem('musicroom-mini-player'));
-    chooseHeaderLogo(localStorage.getItem('musicroom-header-logo'));
-    chooseHeaderWordmark(localStorage.getItem('musicroom-header-wordmark'));
     chooseHeaderLogoSize(localStorage.getItem('musicroom-header-logo-size'));
     const eq = JSON.parse(localStorage.getItem('musicroom-eq')) || {};
     for (const band of bands) get(band).value = Math.max(-10, Math.min(10, Number(eq[band]) || 0));

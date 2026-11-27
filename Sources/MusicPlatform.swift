@@ -46,6 +46,7 @@ enum MusicPlatform {
     static func wordmarkImage(_ option: HeaderWordmark, dark: Bool) -> Image? {
         if option == .iplex { return brandImage("wordmark") }
         if option == .spotify { return spotifyHeader.wordmark.map { Image(decorative: $0, scale: 1) } }
+        if let assetName = option.assetName { return brandImage(assetName, subdirectory: "HeaderMarks") }
         return (dark ? darkWordmarks : wordmarks)[option].map { Image(decorative: $0, scale: 1) }
     }
 
@@ -145,7 +146,14 @@ struct ArtworkPalette {
 
 enum HeaderWordmark: String, CaseIterable, Identifiable {
     static let preferenceKey = "HeaderWordmark"
-    case iplex, music, musicBold, plex, plex2022, napster, spotify, iTunes
+    case iplex, music, musicBold, plex, plex2022, napster, spotify, netflix, iTunes
+    case hulu
+    case disneyPlus = "disney-plus"
+    case disneyPlusMono = "disney-plus-mono"
+    case appleTV = "apple-tv"
+    case appleTVClassic = "apple-tv-classic"
+    case appleTVGlass = "apple-tv-glass"
+    case toolDriveProject = "tool-drive-project"
     case realJukebox, realJukeboxPlus, realPlayer, realPlayerBasic, realPlayerPlus, none
 
     var id: Self { self }
@@ -156,6 +164,14 @@ enum HeaderWordmark: String, CaseIterable, Identifiable {
         case .plex, .plex2022: "Plex"
         case .napster: "Napster"
         case .spotify: "Spotify"
+        case .netflix: "Netflix"
+        case .hulu: "Hulu"
+        case .disneyPlus: "Disney+"
+        case .disneyPlusMono: "Disney+ (Monochrome)"
+        case .appleTV: "Apple TV"
+        case .appleTVClassic: "Apple TV (Classic)"
+        case .appleTVGlass: "Apple TV (Glass)"
+        case .toolDriveProject: "Tool Drive Project"
         case .iTunes: "iTunes"
         case .realJukebox: "RealJukebox"
         case .realJukeboxPlus: "RealJukebox Plus"
@@ -173,12 +189,27 @@ enum HeaderWordmark: String, CaseIterable, Identifiable {
         default: title
         }
     }
-    var preservesColors: Bool { self == .spotify || region(dark: false) != region(dark: true) }
+    var assetName: String? {
+        switch self {
+        case .netflix: "netflix-wordmark"
+        case .toolDriveProject: "tool-drive-project-wordmark"
+        case .hulu, .disneyPlus, .disneyPlusMono, .appleTV, .appleTVClassic, .appleTVGlass: rawValue
+        default: nil
+        }
+    }
+
+    var preservesColors: Bool {
+        switch self {
+        case .spotify, .netflix, .hulu, .disneyPlus, .appleTVGlass: true
+        default: region(dark: false) != region(dark: true)
+        }
+    }
 
     // Pixel coordinates shared with the Windows asset sheet.
     func region(dark: Bool) -> CGRect? {
         switch self {
-        case .iplex, .spotify, .none: nil
+        case .iplex, .spotify, .netflix, .hulu, .disneyPlus, .disneyPlusMono, .appleTV, .appleTVClassic,
+             .appleTVGlass, .toolDriveProject, .none: nil
         case .music: CGRect(x: 722, y: 251, width: 684, height: 210)
         case .musicBold: CGRect(x: 645, y: 609, width: 810, height: 193)
         case .plex: CGRect(x: 0, y: dark ? 1745 : 1255, width: 1024, height: 332)
@@ -196,7 +227,13 @@ enum HeaderWordmark: String, CaseIterable, Identifiable {
 
 enum HeaderMark: String, CaseIterable, Identifiable {
     static let preferenceKey = "HeaderMark"
-    case none, black, white, rainbow, gold, aurora, silver, napster, spotify
+    case none, black, white, rainbow, gold, aurora, silver, napster, spotify, netflix, hulu
+    case disneyPlus = "disney-plus"
+    case disneyPlusMono = "disney-plus-mono"
+    case appleTV = "apple-tv"
+    case appleTVClassic = "apple-tv-classic"
+    case appleTVGlass = "apple-tv-glass"
+    case toolDriveProject = "tool-drive-project"
     case plexChevron = "plex-chevron"
     case realPlayer = "realplayer"
     case realPlayerGartoon = "realplayer-gartoon"
@@ -212,6 +249,7 @@ enum HeaderMark: String, CaseIterable, Identifiable {
 
     var id: Self { self }
     var isMonochrome: Bool { self == .black || self == .white }
+    var usesTextColor: Bool { self == .disneyPlusMono || self == .appleTV || self == .appleTVClassic }
     var assetName: String { isMonochrome ? "monochrome" : rawValue }
     // Ratios of the canvas height to the visible artwork height.
     var artworkScale: CGFloat {
@@ -242,6 +280,14 @@ enum HeaderMark: String, CaseIterable, Identifiable {
         case .itunesDisc: "iTunes Disc"
         case .itunes11: "iTunes 11"
         case .spotify: "Spotify"
+        case .netflix: "Netflix"
+        case .hulu: "Hulu"
+        case .disneyPlus: "Disney+"
+        case .disneyPlusMono: "Disney+ (Monochrome)"
+        case .appleTV: "Apple TV"
+        case .appleTVClassic: "Apple TV (Classic)"
+        case .appleTVGlass: "Apple TV (Glass)"
+        case .toolDriveProject: "Tool Drive Project"
         case .plexChevron: "Plex Chevron"
         case .realPlayer: "RealPlayer"
         case .realPlayerGartoon: "RealPlayer Gartoon"
@@ -265,14 +311,52 @@ enum HeaderMarkSize: String, CaseIterable, Identifiable {
     }
 }
 
+enum HeaderBrandSection: String, CaseIterable, Identifiable {
+    case music, movies, television
+
+    init(video: PlexVideoKind?) {
+        switch video {
+        case nil: self = .music
+        case .movies: self = .movies
+        case .television: self = .television
+        }
+    }
+
+    var id: Self { self }
+    var title: String {
+        switch self {
+        case .music: "Music"
+        case .movies: PlexVideoKind.movies.title
+        case .television: PlexVideoKind.television.title
+        }
+    }
+
+    func preferenceKey(_ base: String) -> String {
+        self == .music ? base : "\(base).\(rawValue)"
+    }
+}
+
+struct HeaderBrandChoices: DynamicProperty {
+    @AppStorage private var mark: HeaderMark
+    @AppStorage private var wordmark: HeaderWordmark
+
+    init(section: HeaderBrandSection) {
+        _mark = AppStorage(wrappedValue: .none, section.preferenceKey(HeaderMark.preferenceKey))
+        _wordmark = AppStorage(wrappedValue: .iplex, section.preferenceKey(HeaderWordmark.preferenceKey))
+    }
+
+    var logoSelection: Binding<HeaderMark> { $mark }
+    var wordmarkSelection: Binding<HeaderWordmark> { $wordmark }
+}
+
 struct HeaderBrand: View {
     @AppStorage(HeaderMarkSize.preferenceKey) private var markSize = HeaderMarkSize.medium
-    @AppStorage(HeaderWordmark.preferenceKey) private var wordmark = HeaderWordmark.iplex
-    @AppStorage(HeaderMark.preferenceKey) private var mark = HeaderMark.none
     let theme: MusicTheme
     let width: CGFloat
     let height: CGFloat
     var allowsCycling = true
+    @Binding var mark: HeaderMark
+    @Binding var wordmark: HeaderWordmark
 
     private var ink: Color { theme.text }
     private var markHeight: CGFloat { height * markSize.fraction }
@@ -280,15 +364,19 @@ struct HeaderBrand: View {
         if mark == .black { return .white.opacity(0.7) }
         return .clear
     }
+    private var markColor: Color {
+        if mark.usesTextColor { return ink }
+        return mark == .black ? .black : .white
+    }
 
     var body: some View {
         HStack(spacing: 8) {
             if mark != .none, let image = MusicPlatform.headerLogoImage(mark) {
                 cycleControl(label: "Change header logo", selection: mark.label, advance: cycleMark) {
-                    image.renderingMode(mark.isMonochrome ? .template : .original)
+                    image.renderingMode(mark.isMonochrome || mark.usesTextColor ? .template : .original)
                         .resizable()
                         .scaledToFit()
-                        .foregroundStyle(mark == .black ? .black : .white)
+                        .foregroundStyle(markColor)
                         .shadow(color: markOutline, radius: 1)
                         .frame(width: markHeight, height: markHeight)
                         .scaleEffect(mark.artworkScale)
@@ -331,6 +419,37 @@ struct HeaderBrand: View {
         let choices = HeaderWordmark.allCases.filter { $0 != .none }
         let current = choices.firstIndex(of: wordmark) ?? -1
         wordmark = choices[(current + 1) % choices.count]
+    }
+}
+
+struct SectionHeaderBrand: View {
+    let section: HeaderBrandSection
+    let theme: MusicTheme
+    let width: CGFloat
+    let height: CGFloat
+
+    var body: some View {
+        SectionBrandContent(section: section, theme: theme, width: width, height: height)
+            .id(section)
+    }
+
+    private struct SectionBrandContent: View {
+        let theme: MusicTheme
+        let width: CGFloat
+        let height: CGFloat
+        private var choices: HeaderBrandChoices
+
+        init(section: HeaderBrandSection, theme: MusicTheme, width: CGFloat, height: CGFloat) {
+            self.theme = theme
+            self.width = width
+            self.height = height
+            choices = HeaderBrandChoices(section: section)
+        }
+
+        var body: some View {
+            HeaderBrand(theme: theme, width: width, height: height,
+                        mark: choices.logoSelection, wordmark: choices.wordmarkSelection)
+        }
     }
 }
 
