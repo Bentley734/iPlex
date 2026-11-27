@@ -153,7 +153,7 @@ extension PlexCredentialStore {
 }
 
 final class PlexKeychainStore: PlexCredentialStore {
-    private let service = "net.bentley734.musicroom.tooldrive.plex"
+    private let service = "net.bentley734.musicroom.plex"
 
     func contains(_ account: String) throws -> Bool {
         var query = baseQuery(account: account)
@@ -987,10 +987,12 @@ final class PlexService {
 
     private static let accountKey = "account"
     private static let preferredServerKey = "PlexPreferredServer"
+    private static let libraryKeyPrefix = "ToolDrivePlexLibrary."
     private static let serverKeyPrefix = "server:"
     private let clientIdentifier: String
     private let version: String
     private let credentials: PlexCredentialStore
+    private let defaults: UserDefaults
     private var hasAccount: Bool
     private let work = DispatchQueue(label: "net.bentley734.musicroom.tooldrive.plex", qos: .utility)
     private let lock = NSLock()
@@ -1006,15 +1008,25 @@ final class PlexService {
     private var cancellationHandler: (() -> Void)?
 
     init(clientIdentifier: String? = nil, version: String = "1.0",
-         credentials: PlexCredentialStore = PlexKeychainStore()) {
+         credentials: PlexCredentialStore = PlexKeychainStore(), defaults: UserDefaults = .standard) {
         self.clientIdentifier = clientIdentifier ?? Self.persistentClientIdentifier()
         self.version = version
         self.credentials = credentials
+        self.defaults = defaults
         hasAccount = (try? credentials.contains(Self.accountKey)) == true
         phase = hasAccount ? "connected" : "disconnected"
+
     }
 
     deinit { cancelCurrentRequest(notify: false) }
+
+    var hasStoredAccount: Bool { (try? credentials.contains(Self.accountKey)) == true }
+
+    var preferredServerID: String? { defaults.string(forKey: Self.preferredServerKey) }
+
+    var preferredLibraryID: String? {
+        preferredServerID.flatMap { defaults.string(forKey: Self.libraryKeyPrefix + $0) }
+    }
 
     var status: PlexStatus {
         lock.lock(); defer { lock.unlock() }
@@ -1129,11 +1141,8 @@ final class PlexService {
                 self.lock.lock()
                 self.records = Dictionary(uniqueKeysWithValues: parsed.map { ($0.server.id, $0) })
                 self.hasAccount = true
-                let saved = UserDefaults.standard.string(forKey: Self.preferredServerKey)
+                let saved = self.defaults.string(forKey: Self.preferredServerKey)
                 self.selectedID = PlexServer.restoredID(in: parsed.map(\.server), preferred: saved)
-                if saved == nil, let selected = self.selectedID {
-                    UserDefaults.standard.set(selected, forKey: Self.preferredServerKey)
-                }
                 self.lock.unlock()
                 self.setPhase("connected", message: "Plex servers are ready.")
                 completion(.success(parsed.map(\.server)))
@@ -1155,7 +1164,7 @@ final class PlexService {
         lock.lock()
         guard records[id] != nil else { lock.unlock(); throw PlexServiceError("That Plex server is unavailable.") }
         selectedID = id
-        UserDefaults.standard.set(id, forKey: Self.preferredServerKey)
+        defaults.set(id, forKey: Self.preferredServerKey)
         libraries = []
         selectedLibraryID = nil
         workingConnection = nil
@@ -1183,11 +1192,13 @@ final class PlexService {
         }) { result in
             switch result {
             case .success(let (available, base)):
-                let preference = UserDefaults.standard.string(forKey: "PlexMusicLibrary." + record.server.id)
+                let key = Self.libraryKeyPrefix + record.server.id
+                let preference = self.defaults.string(forKey: key)
+                let selected = PlexLibrary.restoredID(in: available, preferred: preference)
                 self.lock.lock()
                 self.workingConnection = base
                 self.libraries = available
-                self.selectedLibraryID = PlexLibrary.restoredID(in: available, preferred: preference)
+                self.selectedLibraryID = selected
                 self.lock.unlock()
                 self.setPhase("connected", message: available.isEmpty ? "No music libraries are available on this server." : "Music libraries are ready.")
                 completion(.success(available))
@@ -1209,7 +1220,7 @@ final class PlexService {
         lock.lock()
         selectedLibraryID = id
         lock.unlock()
-        UserDefaults.standard.set(id, forKey: "PlexMusicLibrary." + serverID)
+        defaults.set(id, forKey: Self.libraryKeyPrefix + serverID)
         setPhase("connected", message: "Using " + library.name + ".")
     }
 
@@ -1287,7 +1298,7 @@ final class PlexService {
 
     func disconnect() throws {
         cancelCurrentRequest()
-        UserDefaults.standard.removeObject(forKey: Self.preferredServerKey)
+        defaults.removeObject(forKey: Self.preferredServerKey)
         var removalError: Error?
         do { try credentials.removeValue(for: Self.accountKey) } catch { removalError = error }
         do { try credentials.removeValues(withPrefix: Self.serverKeyPrefix) } catch {

@@ -4,6 +4,8 @@ struct TVPlexView: View {
     @EnvironmentObject private var archive: ArchiveStore
     @EnvironmentObject private var plex: MobilePlex
     @EnvironmentObject private var player: AudioPlayer
+    @Environment(\.iplexPlexSettings) private var plexSettings
+    @State private var showingPlexSettings = false
     @Environment(\.dismiss) private var dismiss
     @Namespace private var focusScope
 
@@ -31,15 +33,18 @@ struct TVPlexView: View {
                     Text(message).font(.callout)
                         .accessibilityIdentifier("tv.plex.message")
                 }
+                if plexSettings != nil {
+                    Button("Plex Settings") { showingPlexSettings = true }
+                }
                 if plex.connected {
                     HStack(alignment: .top, spacing: 36) {
-                        connection
+                        if plexSettings == nil { connection }
                         if plex.libraryID != nil { search }
                     }
                     if let match = plex.match, match.showDate == showDate, plex.libraryID != nil {
                         recording(match)
                     }
-                } else {
+                } else if plexSettings == nil {
                     linkAccount
                 }
             }
@@ -50,6 +55,7 @@ struct TVPlexView: View {
         .buttonStyle(TVActionStyle())
         .archivePage(wallpaperID: archive.wallpaperID)
         .focusScope(focusScope)
+        .fullScreenCover(isPresented: $showingPlexSettings, onDismiss: plex.open) { plexSettings?() }
         .onAppear { plex.open() }
         .onDisappear { plex.cancel() }
         .onExitCommand { dismiss() }

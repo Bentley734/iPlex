@@ -373,10 +373,8 @@ struct MusicSettings: View {
             }
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    if library.connected {
-                        plexConnection
-                        Divider()
-                    }
+                    plexConnection
+                    Divider()
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Liquid Glass").font(.headline)
                         GlassColorControl(title: "Text Color", saved: $textColor, defaultHex: LiquidGlassColor.defaultText)
@@ -589,7 +587,24 @@ struct MusicSettings: View {
     private var plexConnection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Plex Connection").font(.headline)
-            if library.servers.isEmpty {
+            if !library.connected {
+                if library.busy {
+                    #if os(tvOS)
+                    if let code = library.linkCode {
+                        Text("On your phone or computer, go to plex.tv/link and enter this code.")
+                        Text(code).font(.title.monospaced())
+                    } else {
+                        ProgressView("Connecting…")
+                    }
+                    #else
+                    ProgressView("Connecting…")
+                    if let url = library.signInURL { Link("Reopen Plex sign-in", destination: url) }
+                    #endif
+                    Button("Cancel", action: library.cancel)
+                } else {
+                    Button("Connect Plex", action: library.signIn)
+                }
+            } else if library.servers.isEmpty {
                 Button("Refresh Servers", action: library.restore).disabled(library.busy)
             } else {
                 Picker("Server", selection: Binding(get: { library.serverID }, set: library.chooseServer)) {
@@ -602,11 +617,15 @@ struct MusicSettings: View {
                     Text("Choose library").tag("")
                     ForEach(library.libraries, id: \.id) { Text($0.name).tag($0.id) }
                 }
+                Picker("Tool Drive Library", selection: Binding(get: { library.toolDriveLibraryID }, set: library.chooseToolDriveLibrary)) {
+                    Text("Choose library").tag("")
+                    ForEach(library.libraries, id: \.id) { Text($0.name).tag($0.id) }
+                }
             }
             if library.libraryID.isEmpty, let message = library.message {
                 Text(message).foregroundStyle(.secondary)
             }
-            Button("Disconnect Plex", action: library.disconnect)
+            if library.connected { Button("Disconnect Plex", action: library.disconnect) }
         }
     }
 

@@ -53,6 +53,7 @@ public final class ToolDriveTransport: ObservableObject {
         if trackIndex != index { trackIndex = index }
     }
 
+    public func refreshPlex() { controller?.handlePlex(["action": "status"]) }
     public func toggle() { controller?.handlePlayer(["action": "toggle"]) }
     public func previous() { controller?.handlePlayer(["action": "previous"]) }
     public func next() { controller?.handlePlayer(["action": "next"]) }
@@ -76,14 +77,17 @@ public struct ToolDriveArchiveView: NSViewRepresentable {
     private let transport: ToolDriveTransport
     private let volume: Double
     private let pauseOutsidePlayback: () -> Void
+    private let openPlexSettings: () -> Void
 
     public init(title: String, text: String, accent: String, tint: String?, density: Double,
-                hover: Bool, transport: ToolDriveTransport, volume: Double, pauseOutsidePlayback: @escaping () -> Void) {
+                hover: Bool, transport: ToolDriveTransport, volume: Double, pauseOutsidePlayback: @escaping () -> Void,
+                openPlexSettings: @escaping () -> Void) {
         self.transport = transport
         self.volume = volume
         appearance = ["title": title, "text": text, "accent": accent, "tint": tint ?? "",
                       "density": density, "hover": hover]
         self.pauseOutsidePlayback = pauseOutsidePlayback
+        self.openPlexSettings = openPlexSettings
     }
 
     public final class Coordinator {
@@ -98,6 +102,7 @@ public struct ToolDriveArchiveView: NSViewRepresentable {
         controller.transport = transport
         controller.setPlaybackVolume(volume)
         controller.pauseOutsidePlayback = pauseOutsidePlayback
+        controller.openPlexSettings = openPlexSettings
         controller.setIPlexAppearance(appearance)
         controller.start()
         return controller.content
@@ -105,6 +110,7 @@ public struct ToolDriveArchiveView: NSViewRepresentable {
 
     public func updateNSView(_ view: NSView, context: Context) {
         context.coordinator.controller.pauseOutsidePlayback = pauseOutsidePlayback
+        context.coordinator.controller.openPlexSettings = openPlexSettings
         context.coordinator.controller.setIPlexAppearance(appearance)
         context.coordinator.controller.setPlaybackVolume(volume)
     }

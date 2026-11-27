@@ -132,7 +132,8 @@ private struct MusicLibraryScreen: View {
                     ToolDriveArchiveView(title: library.sectionName(.toolDrive), text: theme.text,
                                          accent: accent, tint: glassTint.color(for: theme),
                                          density: LiquidGlassAppearance.density(glassTransparency),
-                                         transport: archiveTransport, pauseOutsidePlayback: library.player.pause)
+                                         transport: archiveTransport, pauseOutsidePlayback: library.player.pause,
+                                         plexSettings: { AnyView(MusicSettings(library: library)) })
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                         .musicGlass(theme, radius: 22)
                         .clipShape(.rect(cornerRadius: 22))

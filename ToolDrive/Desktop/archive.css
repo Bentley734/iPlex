@@ -202,3 +202,5 @@
 :root[data-iplex-archive] #mac-player:not(:has(#mac-tracklist-panel:not([hidden]))) {
   display: none !important;
 }
+
+:root[data-iplex-archive] #plex-dialog .plex-sources { display:none; }

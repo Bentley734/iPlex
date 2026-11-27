@@ -18,6 +18,35 @@
   table.append(listHead, showList);
   document.querySelector('#show-library').textContent = 'Recording Library';
 
+  const plexDialog = document.getElementById('plex-dialog');
+  const showPlex = document.getElementById('show-plex');
+  showPlex.textContent = 'Search Plex';
+  plexDialog.querySelector('.eyebrow').remove();
+  document.getElementById('plex-title').textContent = 'Search Plex';
+  plexDialog.querySelector('.plex-privacy').remove();
+  plexDialog.querySelector('.plex-sources').hidden = true;
+  const plexActions = plexDialog.querySelector('.plex-connection-actions');
+  plexActions.querySelectorAll('button').forEach(button => button.style.display = 'none');
+  const plexSettings = document.createElement('button');
+  plexSettings.textContent = 'Plex Settings';
+  const openPlexSettings = () => {
+    document.querySelector('dialog[open]')?.close();
+    if (window.toolWindows) window.toolWindows.send('iplexPlexSettings', {});
+    else window.toolMac.plex({action:'openSettings'});
+  };
+  plexSettings.addEventListener('click', openPlexSettings);
+  plexActions.append(plexSettings);
+  const menuPlex = document.getElementById('settings-plex');
+  if (menuPlex) {
+    menuPlex.textContent = 'Search Plex';
+    const menuPlexSettings = menuPlex.cloneNode(false);
+    menuPlexSettings.removeAttribute('id');
+    menuPlexSettings.textContent = 'Plex Settings';
+    menuPlexSettings.addEventListener('click', openPlexSettings);
+    menuPlex.after(menuPlexSettings);
+  }
+  window.refreshIPlexArchivePlex = () => window.toolMac.plex({action:'status'});
+
   window.applyIPlexArchiveAppearance = settings => {
     title.textContent = settings.title || 'Tool Drive';
     root.style.setProperty('--iplex-text', settings.text);

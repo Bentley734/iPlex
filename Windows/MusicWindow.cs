@@ -217,6 +217,9 @@ namespace MusicRoom
                     BeginInvoke(new Action(() => { if (!closing && floatingPlayer) DragFloatingPlayer(); }));
                 else if (action == "updateApp") await UpdateApp();
                 else if (action == "toolDrivePanel") UpdateToolDrivePanel(request);
+                else if (action == "refreshToolDrivePlex") {
+                    if (toolDrive != null) toolDrive.RefreshPlex();
+                }
                 else if (action == "toolDriveTransport") {
                     if (toolDrive != null && !toolDrive.IsDisposed) toolDrive.TransportAction(
                         WindowsMediaService.Map(request["command"]));
@@ -294,6 +297,7 @@ namespace MusicRoom
                 string warning;
                 var catalog = ToolDriveOffline.CatalogCache.Load(out warning);
                 toolDrive = new ToolDriveOffline.ArchiveWindow(catalog, warning);
+                toolDrive.OpenPlexSettings = () => Emit("openToolDrivePlexSettings", null);
                 toolDrive.TransportChanged = state => Emit("toolDriveTransport", state);
                 toolDrive.VisualizerChanged = levels => Emit("toolDriveVisualizer", levels);
                 Controls.Add(toolDrive);

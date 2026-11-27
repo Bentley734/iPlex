@@ -669,15 +669,19 @@
     get('connect').hidden = connected || connecting;
     get('refresh-plex').hidden = !state.refreshAvailable;
     get('cancel').hidden = !connecting;
-    get('connection').hidden = !connected;
+    get('settings-connect').hidden = connected || connecting;
+    get('settings-cancel-plex').hidden = !connecting;
+    get('server-label').hidden = !connected;
+    get('disconnect').hidden = !connected;
     get('open-plex-settings').hidden = !connected || Boolean(state.libraryId);
     get('plex-settings-status').textContent = state.message;
     get('plex-settings-status').hidden = Boolean(state.libraryId) || !state.message;
-    get('library-label').hidden = !state.libraries.length;
+    get('tool-drive-library-label').hidden = get('library-label').hidden = !connected || !state.libraries.length;
     get('welcome-title').textContent = connected ? 'Choose your music library' : 'Connect to Plex';
     get('connection-status').textContent = state.message;
     options(get('server'), state.servers, state.serverId, 'Choose server');
     options(get('library'), state.libraries, state.libraryId, 'Choose library');
+    options(get('tool-drive-library'), state.libraries, state.toolDriveLibraryId || '', 'Choose library');
     const quick = get('quick-library');
     const previewLibrary = state.preview;
     const musicChoices = state.libraryId ? state.libraries :
@@ -1254,16 +1258,21 @@
   get('now-next').onclick = () => footerCommand({action:'next'});
   get('now-seek').oninput = event => footerCommand({action:'seek', seconds:event.target.value});
   get('now-volume').oninput = event => footerCommand({action:'volume', value:event.target.value});
-  get('connect').onclick = () => host({action:'connect'});
+  get('settings-connect').onclick = get('connect').onclick = () => host({action:'connect'});
+  get('settings-cancel-plex').onclick = () => get('cancel').click();
   get('refresh-plex').onclick = () => host({action:'servers'});
   const openSettings = () => {
     const dialog = get('settings-page');
-    dialog.showModal();
+    if (!dialog.open) dialog.showModal();
     dialog.scrollTop = 0;
   };
+  window.openToolDrivePlexSettings = openSettings;
   get('settings').onclick = openSettings;
   get('open-plex-settings').onclick = openSettings;
   get('close-settings').onclick = () => get('settings-page').close();
+  get('settings-page').addEventListener('close', () => {
+    if (layout.hasAttribute('data-tool-drive-open')) host({action:'refreshToolDrivePlex'});
+  });
   get('app-update').onclick = () => host({action:'updateApp'});
   window.musicAppUpdate = state => {
     get('app-update-status').textContent = state.status;
@@ -1512,6 +1521,9 @@
   };
   get('cancel').onclick = () => host({action:'cancel'});
   get('server').onchange = event => { if (event.target.value) host({action:'selectServer', server:event.target.value}); };
+  get('tool-drive-library').onchange = event => {
+    if (event.target.value) host({action:'selectToolDriveLibrary', library:event.target.value});
+  };
   get('quick-library').onchange = get('library').onchange = event => { if (event.target.value) host({action:'selectLibrary', library:event.target.value}); };
   const iconChoices = Array.from(get('icon-choices').querySelectorAll('button'));
   function chooseIcon(value) {

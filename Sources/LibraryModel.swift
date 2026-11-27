@@ -17,6 +17,7 @@ final class LibraryModel: ObservableObject {
     @Published private(set) var libraries: [PlexLibrary] = []
     @Published private(set) var serverID = ""
     @Published private(set) var libraryID = ""
+    @Published private(set) var toolDriveLibraryID = ""
     @Published private(set) var pins: [MusicEntry] = []
     @Published private(set) var entries: [MusicEntry] = []
     @Published private(set) var selectedGroup: MusicEntry?
@@ -243,6 +244,7 @@ final class LibraryModel: ObservableObject {
         if serverID != discovered {
             serverID = discovered
             libraryID = ""
+            toolDriveLibraryID = ""
             libraries = []
             resetLibrary()
         }
@@ -260,14 +262,27 @@ final class LibraryModel: ObservableObject {
             self.serverID = id
             self.libraries = []
             self.libraryID = ""
+            self.toolDriveLibraryID = ""
             self.resetLibrary()
             try await self.findLibraries()
         }
     }
 
+    func chooseToolDriveLibrary(_ id: String) {
+        guard videoServerReady, libraries.contains(where: { $0.id == id }) else { return }
+        UserDefaults.standard.set(id, forKey: "ToolDrivePlexLibrary." + serverID)
+        toolDriveLibraryID = id
+    }
+
     private func findLibraries() async throws {
         libraries = try await request(service.refreshLibraries)
         try Task.checkCancellation()
+        let archiveKey = "ToolDrivePlexLibrary." + serverID
+        let savedArchiveLibrary = UserDefaults.standard.string(forKey: archiveKey)
+        toolDriveLibraryID = PlexLibrary.restoredID(in: libraries, preferred: savedArchiveLibrary) ?? ""
+        if savedArchiveLibrary == nil, !toolDriveLibraryID.isEmpty {
+            UserDefaults.standard.set(toolDriveLibraryID, forKey: archiveKey)
+        }
         let discovered = service.status.selectedLibraryID ?? ""
         if libraryID != discovered {
             libraryID = discovered
@@ -319,6 +334,7 @@ final class LibraryModel: ObservableObject {
             libraries = []
             serverID = ""
             libraryID = ""
+            toolDriveLibraryID = ""
             if videoSection != nil || lastVideoSection != nil { selectVideoSection(nil) }
             resetLibrary()
         } catch { message = error.localizedDescription }

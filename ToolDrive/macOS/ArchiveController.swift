@@ -34,6 +34,7 @@ final class AppDelegate: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
     var window: NSWindow! { content.window }
     var pauseOutsidePlayback: (() -> Void)?
     weak var transport: ToolDriveTransport?
+    var openPlexSettings: (() -> Void)?
 
     func setPlaybackVolume(_ value: Double) { playerController.setPlaybackVolume(value) }
     func setPlaybackEqualizer(_ settings: PlaybackEQSettings) { playerController.setEqualizer(settings) }
@@ -456,7 +457,7 @@ final class AppDelegate: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
             }
         }
     }
-    func refreshPlexServers() {
+    func refreshPlexServers(completion: (() -> Void)? = nil) {
         cancelPlexSearch()
         clearPlexLibraries()
         plexService.refreshServers { [weak self] result in
@@ -464,7 +465,7 @@ final class AppDelegate: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
             switch result {
             case .success(let servers):
                 self.plexServers = servers
-                self.refreshPlexLibraries()
+                self.refreshPlexLibraries(completion: completion)
             case .failure(let error):
                 guard (error as? PlexServiceError)?.isCancellation != true else { return }
                 let state = self.plexService.status.connected ? "connected" : "error"
@@ -480,8 +481,11 @@ final class AppDelegate: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
         plexMatches = [:]
         plexMatchOrder = []
     }
-    func refreshPlexLibraries() {
-        guard let server = plexService.status.selectedServerID else { return }
+    func refreshPlexLibraries(completion: (() -> Void)? = nil) {
+        guard let server = plexService.status.selectedServerID else {
+            publishPlexState(messageOverride: "Choose a server in iPlex Settings.")
+            return
+        }
         cancelPlexSearch()
         clearPlexLibraries()
         let generation = plexLibraryGeneration
@@ -501,6 +505,7 @@ final class AppDelegate: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
                 self.plexLibraryMessage = error.localizedDescription
             }
             self.publishPlexState()
+            if case .success = result { completion?() }
         }
     }
     func stopPlexPlayback() {
@@ -559,7 +564,24 @@ final class AppDelegate: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
         return id
     }
     func searchPlex(date: String, preferredVersion: Int?, autoplay: Bool, context: String? = nil,
-                    allowUnversionedAlbum: Bool = false, resume: DesktopResumePosition? = nil) {
+                    allowUnversionedAlbum: Bool = false, resume: DesktopResumePosition? = nil,
+                    refreshSelection: Bool = true) {
+        if openPlexSettings != nil {
+            guard plexService.hasStoredAccount, plexService.preferredLibraryID != nil else {
+                if autoplay { openPlexSettings?() }
+                else { publishPlexState(messageOverride: "Choose a Tool Drive library in iPlex Settings.") }
+                return
+            }
+            if refreshSelection && (plexService.status.selectedServerID != plexService.preferredServerID ||
+                                    plexService.status.selectedLibraryID != plexService.preferredLibraryID) {
+                refreshPlexServers { [weak self] in
+                    self?.searchPlex(date: date, preferredVersion: preferredVersion, autoplay: autoplay,
+                                     context: context, allowUnversionedAlbum: allowUnversionedAlbum, resume: resume,
+                                     refreshSelection: false)
+                }
+                return
+            }
+        }
         guard plexService.status.connected else {
             if autoplay { alert("Stream from Plex", "Connect your Plex account using the Plex button in the toolbar.") }
             publishPlexState(statusOverride: "disconnected", messageOverride: "Connect Plex before searching your archive.")
@@ -619,6 +641,27 @@ final class AppDelegate: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
     }
     func handlePlex(_ request: [String: Any]) {
         guard !testing, let action = request["action"] as? String else { return }
+        if let openPlexSettings {
+            switch action {
+            case "openSettings": openPlexSettings(); return
+            case "status":
+                if plexService.hasStoredAccount {
+                    if plexService.status.phase != "loadingServers" && !plexLoadingLibraries &&
+                        (plexServers.isEmpty || plexService.status.selectedServerID != plexService.preferredServerID ||
+                         plexService.status.selectedLibraryID != plexService.preferredLibraryID) {
+                        refreshPlexServers()
+                    } else {
+                        publishPlexState()
+                    }
+                } else {
+                    clearPlexLibraries()
+                    publishPlexState(statusOverride: "disconnected", messageOverride: "Connect Plex in iPlex Settings.")
+                }
+                return
+            case "connect", "disconnect", "servers", "selectServer", "refreshLibraries", "selectLibrary": return
+            default: break
+            }
+        }
         switch action {
         case "status":
             let status = plexService.status
@@ -698,6 +741,12 @@ final class AppDelegate: NSObject, WKScriptMessageHandler, WKNavigationDelegate 
                        context: source.displayContext + " · Plex", allowUnversionedAlbum: source.allowsUnversionedPlexAlbum,
                        resume: resumePosition(request))
         case "playMatch":
+            if openPlexSettings != nil,
+               !plexService.hasStoredAccount || plexService.status.selectedServerID != plexService.preferredServerID ||
+               plexService.status.selectedLibraryID != plexService.preferredLibraryID {
+                handlePlex(["action": "status"])
+                return
+            }
             guard let id = request["matchId"] as? String, let match = plexMatches[id] else { return }
             if plexAutoplaySearch { cancelPlexSearch() }
             playPlexMatch(match)

@@ -4,12 +4,15 @@ public struct ToolDriveArchiveView: View {
     private let appearance: IPlexArchiveAppearance
     private let transport: ToolDriveTransport
     private let pauseOutsidePlayback: () -> Void
+    private let plexSettings: () -> AnyView
 
     public init(title: String, text: Color, accent: Color, tint: Color?, density: Double,
-                transport: ToolDriveTransport, pauseOutsidePlayback: @escaping () -> Void) {
+                transport: ToolDriveTransport, pauseOutsidePlayback: @escaping () -> Void,
+                plexSettings: @escaping () -> AnyView) {
         self.transport = transport
         appearance = IPlexArchiveAppearance(title: title, text: text, accent: accent, tint: tint, density: density)
         self.pauseOutsidePlayback = pauseOutsidePlayback
+        self.plexSettings = plexSettings
     }
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var archive = ArchiveStore()
@@ -23,6 +26,7 @@ public struct ToolDriveArchiveView: View {
             .environmentObject(audio)
             .environmentObject(library)
             .environmentObject(plex)
+            .environment(\.iplexPlexSettings, plexSettings)
             .environment(\.iplexArchiveAppearance, appearance)
             .environment(\.mobileTheme, .liquidGlass)
             .environment(\.mobileGlassControls, true)

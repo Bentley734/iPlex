@@ -5,6 +5,8 @@ struct PlexView: View {
     @EnvironmentObject private var archive: ArchiveStore
     @EnvironmentObject private var plex: MobilePlex
     @EnvironmentObject private var player: AudioPlayer
+    @Environment(\.iplexPlexSettings) private var plexSettings
+    @State private var showingPlexSettings = false
     @Environment(\.dismiss) private var dismiss
     @State private var date = ""
     @State private var confirmDisconnect = false
@@ -16,11 +18,16 @@ struct PlexView: View {
     var body: some View {
         NavigationStack {
             List {
+                if plexSettings != nil {
+                    Section {
+                        Button("Plex Settings") { showingPlexSettings = true }
+                    }.listRowBackground(ArchiveRowBackground())
+                }
                 if plex.connected {
-                    connection
+                    if plexSettings == nil { connection }
                     if plex.libraryID != nil { searchForm }
                     if let match = plex.match, match.showDate == trimmedDate, plex.libraryID != nil { recording(match) }
-                } else {
+                } else if plexSettings == nil {
                     Section {
                         if plex.activity == .signingIn {
                             ProgressView("Waiting for Plex sign-in")
@@ -44,6 +51,7 @@ struct PlexView: View {
             .navigationTitle("Plex")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { close() } } }
+            .sheet(isPresented: $showingPlexSettings, onDismiss: plex.open) { plexSettings?() }
             .sheet(item: $plex.signInPage) { page in
                 PlexSignInBrowser(url: page.url) { plex.signInPage = nil }.ignoresSafeArea()
             }

@@ -26,21 +26,29 @@ final class MobilePlex: ObservableObject {
     @Published private(set) var message: String?
 
     private let service: PlexService
-    private let defaults: UserDefaults
-    private let serverKey = "mobilePreferredPlexServer"
     private var task: Task<Void, Never>?
     private var operationID = UUID()
     private var loadedServers = false
 
     init(defaults: UserDefaults = .standard, service: PlexService? = nil) {
-        self.defaults = defaults
-        let actual = service ?? PlexService(version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
+        let actual = service ?? PlexService(
+            version: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0",
+            defaults: defaults
+        )
         self.service = actual
         connected = actual.status.connected
     }
 
+    var hasPlexAccount: Bool { service.hasStoredAccount }
+    var hasToolDriveLibrary: Bool { service.preferredLibraryID != nil }
+
+    private var selectionChanged: Bool {
+        serverID != service.preferredServerID || libraryID != service.preferredLibraryID
+    }
+
     func open() {
-        if connected && !loadedServers && activity == .idle { refresh() }
+        connected = hasPlexAccount
+        if connected && (!loadedServers || selectionChanged) && activity == .idle { refresh() }
     }
 
     func signIn() {
@@ -104,14 +112,7 @@ final class MobilePlex: ObservableObject {
             message = "No Plex servers are available to this account."
             return
         }
-        let selected: String?
-        if let saved = defaults.string(forKey: serverKey) {
-            // Older mobile builds stored the preferred server separately.
-            selected = PlexServer.restoredID(in: found, preferred: saved)
-        } else {
-            selected = service.status.selectedServerID
-        }
-        guard let selected else {
+        guard let selected = service.status.selectedServerID else {
             message = "Choose an available server in Plex settings, then try again."
             return
         }
@@ -128,9 +129,8 @@ final class MobilePlex: ObservableObject {
         libraryID = nil
         libraries = []
         match = nil
-        try service.selectServer(id: id)
+        if service.status.selectedServerID != id { try service.selectServer(id: id) }
         serverID = id
-        defaults.set(id, forKey: serverKey)
         libraries = try await request(service.refreshLibraries)
         libraryID = service.status.selectedLibraryID
         if libraries.isEmpty { message = "This server has no music libraries available to your account." }
@@ -165,8 +165,8 @@ final class MobilePlex: ObservableObject {
             }
         }
         return try await withTaskCancellationHandler {
-            guard connected else {
-                throw PlexServiceError("Link your account in Plex settings to stream this recording.")
+            guard hasPlexAccount else {
+                throw PlexServiceError("Link your account in iPlex Settings to stream this recording.")
             }
             let onDrive = show.sources.filter { $0.status == "OTD" }
             guard source.streamVersion == version, onDrive.contains(where: { $0.id == source.id && $0.streamVersion == version }) else {
@@ -175,12 +175,12 @@ final class MobilePlex: ObservableObject {
             guard onDrive.filter({ $0.streamVersion == version }).count == 1 else {
                 throw PlexServiceError("Several archive recordings have this version. Plex cannot identify which one you selected.")
             }
-            if !loadedServers || serverID == nil || libraries.isEmpty { try await loadServers() }
+            if !loadedServers || selectionChanged || serverID == nil || libraries.isEmpty { try await loadServers() }
             guard serverID != nil else {
                 throw PlexServiceError("Choose an available server in Plex settings, then try again.")
             }
             guard libraryID != nil else {
-                throw PlexServiceError("Choose a music library in Plex settings, then try again.")
+                throw PlexServiceError("Choose a Tool Drive library in iPlex Settings, then try again.")
             }
             activity = .searching
             let soleOnDriveSource = onDrive.count == 1
@@ -215,7 +215,6 @@ final class MobilePlex: ObservableObject {
         libraries = []
         serverID = nil
         libraryID = nil
-        defaults.removeObject(forKey: serverKey)
     }
 
     func cancel() {
@@ -262,18 +261,30 @@ final class MobilePlex: ObservableObject {
     }
 }
 
+private struct IPlexPlexSettingsKey: EnvironmentKey {
+    static let defaultValue: (() -> AnyView)? = nil
+}
+
+extension EnvironmentValues {
+    var iplexPlexSettings: (() -> AnyView)? {
+        get { self[IPlexPlexSettingsKey.self] }
+        set { self[IPlexPlexSettingsKey.self] = newValue }
+    }
+}
+
 #if !LEGACY_IOS
 struct PlexStreamButton: View {
     let show: Concert
     let source: RecordingSource
     @EnvironmentObject private var plex: MobilePlex
     @EnvironmentObject private var player: AudioPlayer
+    @Environment(\.iplexPlexSettings) private var plexSettings
     @State private var offerSetup = false
     @State private var showSettings = false
 
     var body: some View {
         Button {
-            if plex.connected { player.stream(show: show, source: source, from: plex) }
+            if plex.hasPlexAccount && (plexSettings == nil || plex.hasToolDriveLibrary) { player.stream(show: show, source: source, from: plex) }
             else { offerSetup = true }
         } label: {
             let active = player.isStreaming(source, fromPlex: true) && player.phase != .failed
@@ -283,17 +294,19 @@ struct PlexStreamButton: View {
             Button("Open Plex settings") { showSettings = true }
             Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Link your Plex account and choose the music library that contains your recordings.")
+            Text("Connect Plex and choose the Tool Drive library that contains your recordings.")
         }
         #if os(tvOS)
-        .fullScreenCover(isPresented: $showSettings, onDismiss: streamAfterSetup) { TVPlexView() }
+        .fullScreenCover(isPresented: $showSettings, onDismiss: streamAfterSetup) { if let plexSettings { plexSettings() } else { TVPlexView() } }
         #else
-        .sheet(isPresented: $showSettings, onDismiss: streamAfterSetup) { PlexView() }
+        .sheet(isPresented: $showSettings, onDismiss: streamAfterSetup) { if let plexSettings { plexSettings() } else { PlexView() } }
         #endif
     }
 
     private func streamAfterSetup() {
-        if plex.connected && plex.libraryID != nil { player.stream(show: show, source: source, from: plex) }
+        if plex.hasPlexAccount && (plexSettings == nil ? plex.libraryID != nil : plex.hasToolDriveLibrary) {
+            player.stream(show: show, source: source, from: plex)
+        }
     }
 }
 #endif

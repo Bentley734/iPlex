@@ -94,7 +94,7 @@ private struct MusicWindow: View {
         .background(theme.backdrop(using: palette))
         .toolbarBackground(theme.surface(using: palette), for: .windowToolbar)
         .toolbarBackground(.visible, for: .windowToolbar)
-        .sheet(isPresented: $showSettings) { MusicSettings(library: model) }
+        .sheet(isPresented: $showSettings, onDismiss: archiveTransport.refreshPlex) { MusicSettings(library: model) }
         .sheet(item: $model.playlistEdit) { edit in PlexPlaylistEditor(library: model, edit: edit) }
         .foregroundStyle(theme.text)
         .tint(copper)
@@ -263,7 +263,8 @@ private struct MusicWindow: View {
                                      tint: glassTint.color(for: theme).flatMap(LiquidGlassColor.hex),
                                      density: LiquidGlassAppearance.density(glassTransparency),
                                      hover: glassHoverEffects, transport: archiveTransport,
-                                     volume: model.playbackVolume, pauseOutsidePlayback: model.player.pause)
+                                     volume: model.playbackVolume, pauseOutsidePlayback: model.player.pause,
+                                     openPlexSettings: { showSettings = true })
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .clipShape(.rect(cornerRadius: 22))
             } else if model.downloadsSelected {

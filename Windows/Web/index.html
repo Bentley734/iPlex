@@ -322,10 +322,13 @@
       <h1 id="settings-heading">Settings</h1>
       <button id="close-settings" type="button">Done</button>
     </div>
-    <section id="connection" hidden>
+    <section id="connection">
       <h2>Plex Connection</h2>
-      <label class="plex-choice">Server<select id="server"></select></label>
+      <button id="settings-connect" type="button" hidden>Connect Plex</button>
+      <button id="settings-cancel-plex" type="button" hidden>Cancel Plex Sign-in</button>
+      <label id="server-label" class="plex-choice">Server<select id="server"></select></label>
       <label id="library-label" class="plex-choice">Music Library<select id="library"></select></label>
+      <label id="tool-drive-library-label" class="plex-choice">Tool Drive Library<select id="tool-drive-library"></select></label>
       <p id="plex-settings-status" role="status" hidden></p>
       <button id="disconnect" type="button">Disconnect Plex</button>
     </section>

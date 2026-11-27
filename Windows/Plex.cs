@@ -148,7 +148,10 @@ namespace MusicRoom
                 status, message, loadingLibraries = loadingSections, libraryMessage = "",
                 refreshAvailable = status == "connected" && phase != "loading" && !loadingSections && selectedSection.Length == 0,
                 serverId = selectedServer, serverName = server != null ? server.Name : "",
-                libraryId = selectedSection, pins = PinSnapshot(), preview, videoLibraries = videoSections,
+                libraryId = selectedSection,
+                toolDriveLibraryId = sections.Any(s => s.id == Pref("toolDriveLibrary." + selectedServer))
+                    ? Pref("toolDriveLibrary." + selectedServer) : "",
+                pins = PinSnapshot(), preview, videoLibraries = videoSections,
                 videoServer, waitingForVideo, videoConnectionError = phase == "error",
                 videoPreviews = new { movie = ReadLaunchVideo("movie", videoServer), show = ReadLaunchVideo("show", videoServer) },
                 servers =
@@ -373,6 +376,12 @@ namespace MusicRoom
             videoSections = list.Where(s => s.type != "artist").ToList();
             list = list.Where(s => s.type == "artist").ToList();
             sections = list;
+            var toolDriveKey = "toolDriveLibrary." + server.Id;
+            if (Pref(toolDriveKey).Length == 0 && list.Count == 1)
+            {
+                plexPrefs[toolDriveKey] = list[0].id;
+                SavePrefs();
+            }
             var previous = Pref("library." + server.Id);
             selectedSection = list.Any(s => s.id == previous) ? previous :
                 list.Count == 1 ? list[0].id : "";
@@ -1128,6 +1137,14 @@ namespace MusicRoom
                     ClearMusic();
                     selectedSection = library;
                     plexPrefs["library." + selectedServer] = library;
+                    SavePrefs();
+                    PlexState();
+                }
+                else if (action == "selectToolDriveLibrary")
+                {
+                    string library = Str(body, "library");
+                    if (!sections.Any(section => section.id == library)) throw Problem("Select a Tool Drive library from the list.");
+                    plexPrefs["toolDriveLibrary." + selectedServer] = library;
                     SavePrefs();
                     PlexState();
                 }

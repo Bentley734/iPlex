@@ -44,7 +44,7 @@ namespace ToolDriveOffline
         CancellationTokenSource plexJob;
         string account = "", selectedServer = "", selectedSection = "", plexMessage = "", phase = "",
                clientID = "";
-        bool initialized, searching, loadingSections;
+        bool searching, loadingSections;
         string TokenFile
         {
             get {
@@ -57,36 +57,13 @@ namespace ToolDriveOffline
                 return Path.Combine(root, "plex-preferences.json");
             }
         }
-        static void Atomic(string path, byte[] bytes)
-        {
-            var temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
-            try
-            {
-                File.WriteAllBytes(temp, bytes);
-                if (File.Exists(path))
-                    File.Replace(temp, path, null);
-                else
-                    File.Move(temp, path);
-            }
-            finally
-            {
-                if (File.Exists(temp))
-                    File.Delete(temp);
-            }
-        }
-        void SavePrefs()
-        {
-            Atomic(PrefFile, Encoding.UTF8.GetBytes(Json().Serialize(plexPrefs)));
-        }
         string Pref(string k)
         {
             string v;
             return plexPrefs.TryGetValue(k, out v) ? v : "";
         }
-        void InitPlex()
+        void ReadPlexSettings()
         {
-            if (initialized)
-                return;
             plexPrefs = new Dictionary<string, string>();
             if (File.Exists(PrefFile))
             {
@@ -102,14 +79,13 @@ namespace ToolDriveOffline
                 {
                 }
             }
-            clientID = Pref("client");
+            var savedClient = Pref("client");
             Guid id;
-            if (!Guid.TryParse(clientID, out id))
-            {
-                clientID = Guid.NewGuid().ToString();
-                plexPrefs["client"] = clientID;
-                SavePrefs();
-            }
+            if (Guid.TryParse(savedClient, out id)) clientID = savedClient;
+            else if (clientID.Length == 0) clientID = Guid.NewGuid().ToString();
+
+            string previousAccount = account;
+            account = "";
             if (File.Exists(TokenFile))
             {
                 try
@@ -122,7 +98,14 @@ namespace ToolDriveOffline
                     plexMessage = "Connect Plex again to authorize this Windows account.";
                 }
             }
-            initialized = true;
+            if (account != previousAccount || selectedServer != Pref("server") ||
+                selectedSection != Pref("toolDriveLibrary." + selectedServer))
+            {
+                selectedServer = selectedSection = "";
+                servers.Clear();
+                sections.Clear();
+                matches.Clear();
+            }
         }
         static bool ValidToken(string s)
         {
@@ -162,12 +145,12 @@ namespace ToolDriveOffline
         {
             var req = new HttpRequestMessage(method, uri);
             req.Headers.Add("Accept", "application/json");
-            req.Headers.Add("X-Plex-Product", "Tool Drive Offline");
+            req.Headers.Add("X-Plex-Product", "iPlex");
             req.Headers.Add("X-Plex-Version", typeof(WindowsMediaService).Assembly.GetName().Version.ToString(3));
             req.Headers.Add("X-Plex-Platform", "Windows");
             req.Headers.Add("X-Plex-Client-Identifier", clientID);
             req.Headers.Add("X-Plex-Device", "Windows");
-            req.Headers.Add("X-Plex-Device-Name", "Tool Drive Offline");
+            req.Headers.Add("X-Plex-Device-Name", "iPlex");
             if (!String.IsNullOrEmpty(token))
                 req.Headers.Add("X-Plex-Token", token);
             return req;
@@ -178,41 +161,6 @@ namespace ToolDriveOffline
             var text = await TextAsync(PlexRequest(method, url, token), max, ct, seconds);
             ct.ThrowIfCancellationRequested();
             return Json().DeserializeObject(text);
-        }
-        async Task Authorize(CancellationToken token)
-        {
-            phase = "connecting";
-            plexMessage = "Complete sign-in in your browser.";
-            PlexState();
-            var pin = Map(await FetchPlex(HttpMethod.Post, new Uri("https://plex.tv/api/v2/pins?strong=true"),
-                                          null, token));
-            long id = Num(pin, "id");
-            string code = Str(pin, "code");
-            if (id <= 0 || !Regex.IsMatch(code, @"^[a-zA-Z0-9_-]{1,200}\z"))
-                throw Problem("Plex returned an invalid sign-in code.");
-            OpenSignIn("https://app.plex.tv/auth#?clientID=" + Uri.EscapeDataString(clientID) +
-                       "&code=" + Uri.EscapeDataString(code) +
-                       "&context%5Bdevice%5D%5Bproduct%5D=Tool%20Drive%20Offline");
-            DateTime expires = DateTime.UtcNow.AddMinutes(5);
-            while (DateTime.UtcNow < expires)
-            {
-                await Task.Delay(3000, token);
-                var result = Map(await FetchPlex(HttpMethod.Get, new Uri("https://plex.tv/api/v2/pins/" + id),
-                                                 null, token));
-                var secret = Str(result, "authToken");
-                if (String.IsNullOrEmpty(secret))
-                    continue;
-                if (!ValidToken(secret))
-                    throw Problem("Plex returned an invalid credential.");
-                token.ThrowIfCancellationRequested();
-                Atomic(TokenFile, ProtectedData.Protect(Encoding.UTF8.GetBytes(secret), null,
-                                                        DataProtectionScope.CurrentUser));
-                account = secret;
-                phase = "";
-                await LoadServers(token);
-                return;
-            }
-            throw Problem("The Plex sign-in request expired. Choose Connect to retry.");
         }
         static Uri SecureBase(string raw)
         {
@@ -328,12 +276,11 @@ namespace ToolDriveOffline
                 token);
             token.ThrowIfCancellationRequested();
             sections = list;
-            var previous = Pref("library." + server.Id);
-            selectedSection = list.Any(s => s.id == previous) ? previous :
-                previous.Length == 0 && list.Count == 1 ? list[0].id : "";
+            var previous = Pref("toolDriveLibrary." + server.Id);
+            selectedSection = list.Any(s => s.id == previous) ? previous : "";
             loadingSections = false;
             plexMessage = list.Count == 0         ? "No music libraries found on this server."
-                          : selectedSection == "" ? "Choose a music library."
+                          : selectedSection == "" ? "Choose a Tool Drive library in iPlex Settings."
                                                   : "Connected to your music library.";
             PlexState();
         }
@@ -509,7 +456,7 @@ namespace ToolDriveOffline
             Server server;
             string section = selectedSection;
             if (!servers.TryGetValue(selectedServer, out server) || !sections.Any(s => s.id == section))
-                throw Problem("Choose a Plex server and music library first.");
+                throw Problem("Choose a Tool Drive library in iPlex Settings.");
             bool automatic = source != null;
             bool unversioned = automatic && sources.Values.Count(s => s.date == date) == 1;
             return await WithServer(server, async uri =>
@@ -545,20 +492,11 @@ namespace ToolDriveOffline
                 return match;
             }, token);
         }
-        void ClearPlexPlayback()
-        {
-            lock (handles) if (handles.Values.Any(track => track.token != null)) ReleaseHandles();
-        }
         async Task PlexAction(Dictionary<string, object> p, long request)
         {
-            bool first = !initialized;
-            InitPlex();
             string action = Str(p, "action");
-            if (action == "status" && !(first && account.Length > 0))
-            {
-                PlexState();
-                return;
-            }
+            if (action != "status" && action != "play" && action != "search" && action != "playMatch") return;
+            ReadPlexSettings();
             if (plexJob != null)
                 plexJob.Cancel();
             var job = CancellationTokenSource.CreateLinkedTokenSource(shutdown.Token);
@@ -569,55 +507,10 @@ namespace ToolDriveOffline
                 searching = false;
                 loadingSections = false;
                 phase = "";
-                if (action == "disconnect")
+                if (action == "status")
                 {
-                    if (File.Exists(TokenFile))
-                        File.Delete(TokenFile);
-                    account = "";
-                    selectedServer = selectedSection = "";
-                    servers.Clear();
-                    sections.Clear();
-                    matches.Clear();
-                    ClearPlexPlayback();
-                    var client = clientID;
-                    plexPrefs.Clear();
-                    plexPrefs["client"] = client;
-                    SavePrefs();
-                    plexMessage = "Plex disconnected.";
-                    PlexState();
-                }
-                else if (action == "connect")
-                    await Authorize(token);
-                else if (action == "status" || action == "servers")
-                    await LoadServers(token);
-                else if (action == "selectServer")
-                {
-                    var id = Str(p, "serverId");
-                    if (!servers.ContainsKey(id))
-                        throw Problem("Choose a Plex server from the list.");
-                    selectedServer = id;
-                    selectedSection = "";
-                    sections.Clear();
-                    matches.Clear();
-                    ClearPlexPlayback();
-                    plexPrefs["server"] = id;
-                    SavePrefs();
-                    await LoadSections(token);
-                }
-                else if (action == "refreshLibraries")
-                    await LoadSections(token);
-                else if (action == "selectLibrary")
-                {
-                    var id = Str(p, "libraryId");
-                    if (!sections.Any(s => s.id == id))
-                        throw Problem("Choose an available music library.");
-                    selectedSection = id;
-                    matches.Clear();
-                    ClearPlexPlayback();
-                    plexPrefs["library." + selectedServer] = id;
-                    SavePrefs();
-                    plexMessage = "Connected to your music library.";
-                    PlexState();
+                    if (account.Length > 0 && servers.Count == 0) await LoadServers(token);
+                    else PlexState();
                 }
                 else if (action == "playMatch")
                 {
@@ -628,6 +521,9 @@ namespace ToolDriveOffline
                 }
                 else if (action == "play" || action == "search")
                 {
+                    if (account.Length == 0 || Pref("toolDriveLibrary." + Pref("server")).Length == 0)
+                        throw Problem("Choose a Tool Drive library in iPlex Settings.");
+                    if (servers.Count == 0) await LoadServers(token);
                     string date;
                     int? version;
                     SourceRef source = null;

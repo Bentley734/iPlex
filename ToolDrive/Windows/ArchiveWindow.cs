@@ -32,6 +32,9 @@ namespace ToolDriveOffline
 
         internal Action<object> TransportChanged;
         internal Action<object> VisualizerChanged;
+        internal Action OpenPlexSettings;
+
+        internal void RefreshPlex() { Script("window.refreshIPlexArchivePlex?.()"); }
 
         internal ArchiveWindow(Catalog initialCatalog, string warning)
         {
@@ -205,6 +208,9 @@ namespace ToolDriveOffline
                         if (startupWarning != null) Notice(startupWarning);
                         UpdateState("app", "Managed in iPlex Settings.", "Check now", false, false);
                         await UpdateCatalog();
+                        break;
+                    case "iplexPlexSettings":
+                        if (OpenPlexSettings != null) OpenPlexSettings();
                         break;
                     case "iplexTransport":
                         if (TransportChanged != null) TransportChanged(body);
