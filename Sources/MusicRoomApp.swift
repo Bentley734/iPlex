@@ -133,10 +133,12 @@ private struct MusicWindow: View {
                     HStack(spacing: 0) {
                         resizableSidebar(availableWidth: width, defaultWidth: theme.isRoseStudio ? 238 : 216)
                         mainPanel.frame(maxWidth: .infinity, maxHeight: .infinity)
+                            .background(theme == .nightSignal ? slate.opacity(0.85) : .clear,
+                                        in: .rect(cornerRadius: 17))
                             .musicGlass(theme, radius: 22)
-                            .padding(theme.usesLiquidGlass ? 7 : 0)
+                            .padding(theme.usesLiquidGlass || theme == .nightSignal ? 7 : 0)
                     }
-                    Rectangle().fill(Color.primary.opacity(0.12)).frame(height: 1)
+                    if theme != .nightSignal { Rectangle().fill(Color.primary.opacity(0.12)).frame(height: 1) }
                     transport
                 }
             }
@@ -315,7 +317,7 @@ private struct MusicWindow: View {
             .foregroundStyle(selected ? copper : .primary)
             .background(selected ? copper.opacity(0.13) : .clear, in: RoundedRectangle(cornerRadius: 8))
             .overlay(alignment: .leading) {
-                if theme.isRoseStudio && selected {
+                if (theme.isRoseStudio || theme == .nightSignal) && selected {
                     Capsule().fill(copper).frame(width: 3, height: 17).padding(.leading, 3)
                 }
             }
@@ -609,7 +611,7 @@ private struct MusicWindow: View {
                     }.buttonStyle(.plain)
                         .contextMenu { LibraryQueueActions(library: model, entry: album, track: track) }
                         .modifier(PlaylistTrackEditing(library: model, track: track))
-                    Divider()
+                    if theme != .nightSignal { Divider() }
                 }
             }
             .frame(maxWidth: 860, alignment: .leading)
@@ -628,9 +630,10 @@ private struct MusicWindow: View {
             Text(clock(model.state.elapsed)).font(.caption.monospacedDigit()).foregroundStyle(.secondary).frame(width: 40)
         }
         .padding(.horizontal, 22).frame(height: 69)
-        .background(theme.usesLiquidGlass ? .clear : slate)
+        .background(theme.usesLiquidGlass ? .clear : slate,
+                    in: RoundedRectangle(cornerRadius: theme == .nightSignal ? 17 : 0))
         .musicGlass(theme, radius: 24)
-        .padding(theme.usesLiquidGlass ? 8 : 0)
+        .padding(theme.usesLiquidGlass || theme == .nightSignal ? 8 : 0)
     }
 
     @ViewBuilder private var miniPlayerButton: some View {

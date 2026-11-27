@@ -2102,6 +2102,24 @@ extension PlexParser {
         return PlexVideoPage(items: items, next: more ? end : nil)
     }
 
+    static func videoMatches(_ data: Data) throws -> [PlexVideoMatch] {
+        let container = try metadataContainer(data)
+        let rows = container["SearchResult"] as? [[String: Any]]
+            ?? container["Metadata"] as? [[String: Any]] ?? []
+        var seen = Set<String>()
+        return rows.prefix(60).compactMap { row in
+            guard let id = string(row["guid"] ?? row["id"], maximum: 500), id.contains("://"),
+                  let title = string(row["name"] ?? row["title"], maximum: 300), seen.insert(id).inserted else { return nil }
+            return PlexVideoMatch(id: id, title: title, year: integer(row["year"]))
+        }
+    }
+
+    static func containsVideo(_ data: Data, section: String, item: PlexVideoItem) throws -> Bool {
+        try metadataRows(data, sectionID: section).contains {
+            $0["type"] as? String == item.type && numericIdentifier($0["ratingKey"]) == item.id
+        }
+    }
+
     private static func videoItem(_ row: [String: Any], expected: String) -> PlexVideoItem? {
         guard row["type"] as? String == expected, let id = numericIdentifier(row["ratingKey"]),
               id.allSatisfy({ $0.isASCII && $0.isNumber }), let title = string(row["title"], maximum: 400) else { return nil }
@@ -2195,9 +2213,8 @@ extension PlexService {
     }
 
     func videoPage(server: String, kind: PlexVideoKind, section: String, parent: PlexVideoItem?,
-                   query: String, offset: Int) async throws -> PlexVideoPage {
+                   query: String, offset: Int, size: Int = 60) async throws -> PlexVideoPage {
         try await serverOperation(server: server) { record, base, operation in
-            let size = 60
             let path = parent.map { "/library/metadata/\($0.id)/children" } ?? "/library/sections/\(section)/all"
             var filters: [URLQueryItem] = []
             if parent == nil {
@@ -2212,6 +2229,75 @@ extension PlexService {
                                             section: section, expected: expected, parent: parent?.id,
                                             offset: offset, size: size)
         }
+    }
+
+    func videoMatches(server: String, section: String, item: PlexVideoItem, title: String, year: String) async throws -> [PlexVideoMatch] {
+        let name = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let releaseYear = year.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty, name.count <= 150,
+              releaseYear.isEmpty || releaseYear.range(of: #"^[1-9][0-9]{3}$"#, options: .regularExpression) != nil else {
+            throw PlexServiceError("Enter a title and an optional four-digit year.")
+        }
+        return try await serverOperation(server: server) { record, base, operation in
+            let path = try self.verifyVideoForMatching(item, section: section, record: record, base: base, operation: operation)
+            let query: [URLQueryItem] = [.init(name: "manual", value: "1"),
+                                        .init(name: "title", value: name), .init(name: "year", value: releaseYear)]
+            var request = try self.videoMatchRequest(path + "/matches", query: query, token: record.token, base: base)
+            // Plex servers also support the read-only GET form used by older clients.
+            request.httpMethod = "PUT"
+            do {
+                return try PlexParser.videoMatches(operation.fetch(request, limit: 2 * 1024 * 1024, timeout: 16))
+            } catch let error as PlexServiceError where [404, 405].contains(error.httpStatus ?? 0) {
+                request.httpMethod = "GET"
+                return try PlexParser.videoMatches(operation.fetch(request, limit: 2 * 1024 * 1024, timeout: 16))
+            }
+        }
+    }
+
+    func applyVideoMatch(server: String, section: String, item: PlexVideoItem, match: PlexVideoMatch) async throws {
+        try await serverOperation(server: server) { record, base, operation in
+            let path = try self.verifyVideoForMatching(item, section: section, record: record, base: base, operation: operation)
+            var query: [URLQueryItem] = [.init(name: "guid", value: match.id), .init(name: "name", value: match.title)]
+            if let year = match.year { query.append(.init(name: "year", value: String(year))) }
+            var request = try self.videoMatchRequest(path + "/match", query: query, token: record.token, base: base)
+            request.httpMethod = "PUT"
+            guard self.status.selectedServerID == server else { throw PlexServiceError("The Plex server changed. Try again.") }
+            do {
+                _ = try operation.fetch(request, limit: 2 * 1024 * 1024, timeout: 20)
+            } catch let error as PlexServiceError {
+                if error.isCancellation { throw error }
+                if error.httpStatus == 401 || error.httpStatus == 403 {
+                    throw PlexServiceError("Your Plex account doesn’t have permission to change this match.")
+                }
+                if let status = error.httpStatus, (400..<500).contains(status) {
+                    throw PlexServiceError("Plex rejected this match (HTTP \(status)).")
+                }
+                throw PlexServiceError("Plex didn’t confirm the change. Refresh the library before retrying.")
+            }
+        }
+    }
+
+    private func verifyVideoForMatching(_ item: PlexVideoItem, section: String, record: PlexServerRecord, base: URL,
+                                        operation: PlexRequestOperation) throws -> String {
+        guard PlexVideoKind(rawValue: item.type) != nil, PlexParser.validPlaylistID(item.id) else {
+            throw PlexServiceError("Choose a movie or TV show to match.")
+        }
+        let path = "/library/metadata/\(item.id)"
+        let request = try serverRequest(base: base, path: path, query: [], token: record.token)
+        let data = try operation.fetch(request, limit: 4 * 1024 * 1024, timeout: 8)
+        guard try PlexParser.containsVideo(data, section: section, item: item) else {
+            throw PlexServiceError("This title is no longer available in the selected library.")
+        }
+        return path
+    }
+
+    private func videoMatchRequest(_ path: String, query: [URLQueryItem], token: String, base: URL) throws -> URLRequest {
+        var request = try serverRequest(base: base, path: path, query: query, token: token)
+        if let url = request.url, var components = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+            components.percentEncodedQuery = components.percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+            request.url = components.url
+        }
+        return request
     }
 
     func videoPoster(server: String, section: String, path: String, cachedOnly: Bool = false,

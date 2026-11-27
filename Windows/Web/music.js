@@ -21,6 +21,7 @@
   const listingIDs = new Set();
   let caching = false;
   let selectedTheme = 'copper';
+  const automaticArtwork = theme => theme.startsWith('roseStudio') || theme === 'nightSignal';
   let artworkColors = false;
   let paletteSource = '';
   let palette = null;
@@ -728,14 +729,14 @@
     const root = document.documentElement;
     root.toggleAttribute('data-artwork-colors', artworkColors && Boolean(palette));
     if (!palette) {
-      root.style.removeProperty('--rose-artwork-wash');
+      root.style.removeProperty('--playback-artwork-wash');
       return;
     }
     const light = selectedTheme === 'classic' || selectedTheme === 'roseStudio';
     const blend = (gray, amount) => `rgb(${palette.map(value => Math.round(value * (1 - amount) + gray * amount)).join(' ')})`;
     root.style.setProperty('--artwork-accent', blend(light ? 0 : 255, 0.55));
     root.style.setProperty('--artwork-wash', blend(light ? 255 : 20, light ? 0.72 : 0.67));
-    root.style.setProperty('--rose-artwork-wash', blend(light ? 245 : 20, light ? 0.45 : 0.54));
+    root.style.setProperty('--playback-artwork-wash', blend(light ? 245 : 20, light ? 0.45 : 0.54));
   }
   function pickPalette(image) {
     const canvas = document.createElement('canvas');
@@ -759,7 +760,7 @@
     return best.weight > 0 ? best.totals.map(value => value / best.weight) : null;
   }
   function updateArtworkColors(state) {
-    const path = artworkColors || selectedTheme.startsWith('roseStudio') ? playingCover(state) : '';
+    const path = artworkColors || automaticArtwork(selectedTheme) ? playingCover(state) : '';
     const source = artworkPattern.test(path) ? path : '';
     if (source === paletteSource) return;
     paletteSource = source;
@@ -778,7 +779,7 @@
   function chooseArtworkColors(enabled) {
     artworkColors = enabled;
     get('artwork-colors').checked = enabled;
-    get('animate-artwork-colors').disabled = (!enabled && !selectedTheme.startsWith('roseStudio')) || selectedTheme === 'classicOLED';
+    get('animate-artwork-colors').disabled = (!enabled && !automaticArtwork(selectedTheme)) || selectedTheme === 'classicOLED';
     try { localStorage.setItem('musicroom-artwork-colors', enabled ? '1' : '0'); } catch {}
     updateArtworkColors(playbackState);
     applyPalette();
@@ -1140,7 +1141,7 @@
     get('app-update').disabled = Boolean(state.disabled);
   };
   function chooseTheme(value) {
-    const theme = ['classic', 'classicDark', 'classicOLED', 'video', 'plexify', 'liquidGlass', 'roseStudio', 'roseStudioDark'].includes(value) ? value : 'copper';
+    const theme = ['classic', 'classicDark', 'classicOLED', 'video', 'plexify', 'liquidGlass', 'roseStudio', 'roseStudioDark', 'nightSignal'].includes(value) ? value : 'copper';
     selectedTheme = theme;
     document.documentElement.dataset.theme = theme;
     window.clickWheel.updateTheme(theme);
@@ -1148,7 +1149,7 @@
     const usesGlass = ['liquidGlass', 'classicDark', 'classicOLED', 'roseStudio', 'roseStudioDark'].includes(theme);
     layout.toggleAttribute('data-glass', usesGlass);
     get('glass-transparency-setting').hidden = !usesGlass;
-    get('animate-artwork-colors').disabled = (!artworkColors && !theme.startsWith('roseStudio')) || theme === 'classicOLED';
+    get('animate-artwork-colors').disabled = (!artworkColors && !automaticArtwork(theme)) || theme === 'classicOLED';
     updateArtworkColors(playbackState);
     applyPalette();
     updateDeckVisibility();
@@ -1383,6 +1384,7 @@
   function selectPageSize(value) {
     pageSize = ['30', '60', '120', 'all'].includes(value) ? value : '60';
     get('library-page-size').value = pageSize;
+    window.plexVideoPageSize(pageSize);
     try { localStorage.setItem('musicroom-library-page-size', pageSize); } catch {}
   }
 })();

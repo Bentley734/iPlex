@@ -27,7 +27,7 @@ struct NativeVideoPlayer: View {
         VStack(spacing: 8) {
             VideoDrawable(player: player).frame(maxWidth: .infinity, maxHeight: .infinity)
                 .overlay {
-                    if !ready { ProgressView("Opening video…") }
+                    if !ready { ProgressView("Opening video…").allowsHitTesting(false) }
                 }
             HStack(spacing: 14) {
                 Button("Back 10 seconds", systemImage: "gobackward.10") { seek(current - 10) }
@@ -73,6 +73,9 @@ struct NativeVideoPlayer: View {
         var lastReport = start
         var awaitingSeek = startAt >= 5
         while !Task.isCancelled {
+            let elapsed = Double(player.time.value?.intValue ?? 0) / 1_000
+            playing = player.isPlaying
+            if playing || (elapsed > 0 && player.hasVideoOut) { ready = true }
             switch player.state {
             case .playing, .paused: ready = true
             case .ended:
@@ -83,7 +86,6 @@ struct NativeVideoPlayer: View {
                 return
             default: break
             }
-            let elapsed = Double(player.time.value?.intValue ?? 0) / 1_000
             if elapsed > 0 || (!ended && ready) { current = max(0, elapsed) }
             let length = Double(player.media?.length.value?.intValue ?? 0) / 1_000
             if length > 0 { duration = length }
@@ -92,7 +94,6 @@ struct NativeVideoPlayer: View {
                 awaitingSeek = false
                 if startAt < duration { seek(startAt) }
             }
-            playing = player.isPlaying
             if ready, !awaitingSeek, !ended, ContinuousClock.now - lastReport >= .seconds(5) {
                 lastReport = ContinuousClock.now
                 progress(current, false)
@@ -143,6 +144,12 @@ private struct VideoDrawable: NSViewRepresentable {
     }
 
     func updateNSView(_ view: NSView, context: Context) {}
+
+    func makeCoordinator() -> VLCMediaPlayer { player }
+
+    static func dismantleNSView(_ view: NSView, coordinator: VLCMediaPlayer) {
+        if coordinator.drawable as? NSView === view { coordinator.drawable = nil }
+    }
 }
 #else
 private struct VideoDrawable: UIViewRepresentable {
@@ -156,5 +163,11 @@ private struct VideoDrawable: UIViewRepresentable {
     }
 
     func updateUIView(_ view: UIView, context: Context) {}
+
+    func makeCoordinator() -> VLCMediaPlayer { player }
+
+    static func dismantleUIView(_ view: UIView, coordinator: VLCMediaPlayer) {
+        if coordinator.drawable as? UIView === view { coordinator.drawable = nil }
+    }
 }
 #endif

@@ -122,6 +122,8 @@ struct PlexVideoBrowser: View {
     @State private var discoveryRetry = 0
     @State private var generation = UUID()
     @State private var presentation: PlexVideoItem?
+    @State private var matching: PlexVideoItem?
+    @AppStorage(LibraryPageSize.preferenceKey) private var pageSize = LibraryPageSize.standard
     @State private var recent = [VideoWatchRecord]()
     @State private var watchedItems = Set<String>()
 
@@ -146,7 +148,7 @@ struct PlexVideoBrowser: View {
     private var preference: String { kind.libraryPreference(server: server) }
     private var parent: PlexVideoItem? { trail.last }
     private var episodes: Bool { parent?.type == "season" }
-    private var requestKey: [String] { [String(ready), selection, parent?.id ?? "", query, String(retry)] }
+    private var requestKey: [String] { [String(ready), selection, parent?.id ?? "", query, pageSize.rawValue, String(retry)] }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -206,6 +208,9 @@ struct PlexVideoBrowser: View {
                                 }
                             }.disabled(!ready).contextMenu {
                                 if ready && item.type == "movie" { watchActions(item) }
+                                if ready && item.type == kind.rawValue {
+                                    Button("Fix Match", systemImage: "magnifyingglass") { matching = item }
+                                }
                             }
                         }
                     }
@@ -233,7 +238,7 @@ struct PlexVideoBrowser: View {
                     Text(libraries.isEmpty ? "No \(kind.title) libraries on this Plex server." : "No matches.")
                         .foregroundStyle(.secondary).padding(16)
                 }
-                if let next, message == nil {
+                if let next, message == nil, pageSize != .all {
                     Button("Load more") { Task { await load(offset: next, generation: generation) } }
                         .disabled(busy)
                 }
@@ -257,6 +262,11 @@ struct PlexVideoBrowser: View {
             trail = []
             items = showingRoot && snapshot?.library.id == value ? snapshot?.items ?? [] : []
             refreshWatchState()
+        }
+        .sheet(item: $matching) { item in
+            PlexVideoMatchEditor(item: item, server: server, section: selection, service: service) {
+                retry += 1
+            }
         }
         .sheet(item: $presentation, onDismiss: refreshWatchState) { item in
             PlexVideoSession(item: item, server: server, section: selection, service: service, pauseMusic: pauseMusic)
@@ -354,30 +364,137 @@ struct PlexVideoBrowser: View {
         defer { if generation == current && !Task.isCancelled { busy = false } }
         do {
             if parent == nil && !query.isEmpty { try await Task.sleep(for: .milliseconds(280)) }
-            let page = try await service.videoPage(server: server, kind: kind, section: selection,
-                                                   parent: parent, query: query, offset: offset)
-            try Task.checkCancellation()
-            guard generation == current else { return }
-            if offset == 0 {
-                items = page.items
-                if showingRoot, let library = libraries.first(where: { $0.id == selection }) {
-                    let previews = items.prefix(60).map {
-                        PlexVideoItem(id: $0.id, type: $0.type, title: $0.title, subtitle: $0.subtitle,
-                                      summary: String($0.summary.prefix(400)), thumb: $0.thumb)
+            let size = pageSize
+            var cursor: Int? = offset
+            var seen = Set(offset == 0 ? [] : items.map(\.id))
+            while let currentOffset = cursor {
+                let page = try await service.videoPage(server: server, kind: kind, section: selection,
+                                                       parent: parent, query: query, offset: currentOffset, size: size.batch)
+                try Task.checkCancellation()
+                guard generation == current else { return }
+                let fresh = page.items.filter { seen.insert($0.id).inserted }
+                if currentOffset == 0 {
+                    items = fresh
+                    if showingRoot, let library = libraries.first(where: { $0.id == selection }) {
+                        let previews = items.prefix(60).map {
+                            PlexVideoItem(id: $0.id, type: $0.type, title: $0.title, subtitle: $0.subtitle,
+                                          summary: String($0.summary.prefix(400)), thumb: $0.thumb)
+                        }
+                        let saved = PlexVideoSnapshot(server: server, library: library, items: previews)
+                        saved.save(kind: kind)
+                        snapshot = saved
                     }
-                    let saved = PlexVideoSnapshot(server: server, library: library, items: previews)
-                    saved.save(kind: kind)
-                    snapshot = saved
+                } else {
+                    items.append(contentsOf: fresh)
                 }
-            } else {
-                let previous = Set(items.map(\.id))
-                items.append(contentsOf: page.items.filter { !previous.contains($0.id) })
+                next = fresh.isEmpty ? nil : page.next
+                cursor = size == .all ? next : nil
             }
-            next = page.next
             refreshWatchState()
         } catch {
             if !Task.isCancelled && generation == current { message = error.localizedDescription }
         }
+    }
+}
+
+struct PlexVideoMatch: Identifiable {
+    let id: String
+    let title: String
+    let year: Int?
+}
+
+private struct PlexVideoMatchEditor: View {
+    let item: PlexVideoItem
+    let server: String
+    let section: String
+    let service: PlexService
+    let didSave: () -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var title = ""
+    @State private var year = ""
+    @State private var results = [PlexVideoMatch]()
+    @State private var choice: PlexVideoMatch?
+    @State private var message: String?
+    @State private var busy = false
+    @State private var saving = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 15) {
+            Text("Fix Match").font(.title2.bold())
+            Text(item.title).foregroundStyle(.secondary)
+            HStack {
+                TextField("Title", text: $title)
+                TextField("Year (optional)", text: $year).frame(maxWidth: 190)
+                Button("Search") { Task { await search() } }
+                    .disabled(busy || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            }
+            #if !os(tvOS)
+            .textFieldStyle(.roundedBorder)
+            #endif
+            .disabled(saving)
+            if busy { ProgressView(saving ? "Saving match…" : "Searching Plex…") }
+            if let message { Text(message).foregroundStyle(.secondary) }
+            ScrollView {
+                LazyVStack(alignment: .leading) {
+                    ForEach(results) { result in
+                        Button {
+                            choice = result
+                        } label: {
+                            HStack {
+                                Text(result.title)
+                                if let year = result.year { Text(String(year)).foregroundStyle(.secondary) }
+                                Spacer()
+                                if choice?.id == result.id { Image(systemName: "checkmark") }
+                            }.frame(maxWidth: .infinity, alignment: .leading)
+                        }.buttonStyle(.bordered)
+                    }
+                }
+            }.frame(maxHeight: 320).disabled(busy)
+            HStack {
+                Button("Cancel") { dismiss() }.disabled(saving)
+                Spacer()
+                Button("Apply Match") { if let choice { Task { await apply(choice) } } }
+                    .buttonStyle(.borderedProminent).disabled(choice == nil || busy)
+            }
+        }
+        .padding(24)
+        #if os(macOS)
+        .frame(width: 520, height: 465)
+        #endif
+        .interactiveDismissDisabled(saving)
+        .task {
+            title = item.title
+            year = item.subtitle
+            await search()
+        }
+    }
+
+    private func search() async {
+        guard !busy else { return }
+        busy = true
+        defer { busy = false }
+        choice = nil
+        results = []
+        message = nil
+        do {
+            results = try await service.videoMatches(server: server, section: section, item: item, title: title, year: year)
+            if results.isEmpty { message = "No matches found. Try another title or clear the year." }
+        } catch {
+            if !Task.isCancelled { message = error.localizedDescription }
+        }
+    }
+
+    private func apply(_ match: PlexVideoMatch) async {
+        guard !busy else { return }
+        busy = true
+        saving = true
+        defer { busy = false; saving = false }
+        do {
+            try await service.applyVideoMatch(server: server, section: section, item: item, match: match)
+            didSave()
+            dismiss()
+        } catch { message = error.localizedDescription }
     }
 }
 
@@ -506,7 +623,11 @@ private struct PlexVideoPlayback: View {
                     forceTranscode = true
                 }.id(native)
             } else {
+                #if os(macOS)
+                MacVideoPlayerView(player: player).frame(maxWidth: .infinity, maxHeight: .infinity)
+                #else
                 VideoPlayer(player: player).frame(maxWidth: .infinity, maxHeight: .infinity)
+                #endif
             }
         }
         #if os(macOS)
@@ -722,6 +843,27 @@ private struct PlexVideoPlayback: View {
         }
     }
 }
+
+#if os(macOS)
+struct MacVideoPlayerView: NSViewRepresentable {
+    let player: AVPlayer
+
+    func makeNSView(context: Context) -> AVPlayerView {
+        let view = AVPlayerView()
+        view.controlsStyle = .inline
+        view.player = player
+        return view
+    }
+
+    func updateNSView(_ view: AVPlayerView, context: Context) {
+        if view.player !== player { view.player = player }
+    }
+
+    static func dismantleNSView(_ view: AVPlayerView, coordinator: ()) {
+        view.player = nil
+    }
+}
+#endif
 
 private func videoTime(_ seconds: Double) -> String {
     let total = Int(max(0, seconds))

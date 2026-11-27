@@ -31,7 +31,7 @@ struct NowPlayingView: View {
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     let close: () -> Void
 
-    private var palette: ArtworkPalette? { artworkColors || theme.isRoseStudio ? library.playingPalette : nil }
+    private var palette: ArtworkPalette? { artworkColors || theme.usesArtworkPlayback ? library.playingPalette : nil }
     private var accent: Color { theme.accent(using: artworkColors ? palette : nil) }
     private var duration: Double { max(0, library.state.duration) }
     private var elapsed: Double { min(duration, max(0, library.state.elapsed)) }
@@ -529,6 +529,7 @@ private struct NowPlayingLyrics: View {
         .padding(26)
         .background {
             if theme.isRoseStudio { theme.backdrop(using: library.playingPalette).opacity(0.7) }
+            if theme == .nightSignal { theme.surface(using: library.playingPalette) }
         }
         #if os(macOS)
         .frame(minWidth: 460, minHeight: 450)
@@ -553,7 +554,7 @@ private struct NowPlayingLyrics: View {
 
     private func lyric(_ line: MusicLyricLine) -> some View {
         Text(line.text.isEmpty ? "♪" : line.text)
-            .font(theme.isRoseStudio ? .system(size: 29, weight: .semibold)
+            .font(theme.usesArtworkPlayback ? .system(size: 29, weight: .semibold)
                   : .title2.weight(active == line.id ? .bold : .medium))
             .foregroundStyle(active == nil || active == line.id ? .primary : .secondary)
             .frame(maxWidth: .infinity, alignment: .leading)

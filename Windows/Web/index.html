@@ -110,6 +110,20 @@
     <p id="playlist-editor-status" role="status"></p>
     <button id="playlist-editor-close" type="button">Cancel</button>
   </dialog>
+  <dialog id="video-match" class="playback-sheet" aria-labelledby="video-match-heading">
+    <h2 id="video-match-heading">Fix Match</h2>
+    <form id="video-match-form">
+      <input id="video-match-name" aria-label="Title" placeholder="Title" maxlength="150" required>
+      <input id="video-match-year" aria-label="Year (optional)" placeholder="Year (optional)" maxlength="4" inputmode="numeric">
+      <button type="submit">Search</button>
+    </form>
+    <p id="video-match-status" role="status"></p>
+    <select id="video-match-choices" aria-label="Plex matches"></select>
+    <div class="video-match-buttons">
+      <button id="video-match-close" type="button">Cancel</button>
+      <button id="video-match-apply" type="button" class="primary" disabled>Apply Match</button>
+    </div>
+  </dialog>
   <dialog id="video-dialog" aria-labelledby="video-playing-title">
     <header>
       <div><h2 id="video-playing-title"></h2><span id="video-mode" role="status"></span></div>
@@ -262,6 +276,7 @@
         <option value="liquidGlass">Liquid Glass</option>
         <option value="roseStudio">Rose Studio Light</option>
         <option value="roseStudioDark">Rose Studio Dark</option>
+        <option value="nightSignal">Night Signal</option>
       </select>
     </label>
     <label id="glass-transparency-setting" class="theme-choice" hidden>

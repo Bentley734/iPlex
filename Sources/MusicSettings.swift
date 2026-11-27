@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum MusicTheme: String, CaseIterable, Identifiable {
-    case copper, classic, classicDark, classicOLED, video, plexify, liquidGlass, roseStudio, roseStudioDark
+    case copper, classic, classicDark, classicOLED, video, plexify, liquidGlass, roseStudio, roseStudioDark, nightSignal
     #if os(macOS)
     case graphite
     #endif
@@ -18,12 +18,14 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         case .liquidGlass: "Liquid Glass"
         case .roseStudio: "Rose Studio Light"
         case .roseStudioDark: "Rose Studio Dark"
+        case .nightSignal: "Night Signal"
         #if os(macOS)
         case .graphite: "Graphite Studio"
         #endif
         }
     }
     var isRoseStudio: Bool { self == .roseStudio || self == .roseStudioDark }
+    var usesArtworkPlayback: Bool { isRoseStudio || self == .nightSignal }
     var scheme: ColorScheme { self == .classic || self == .roseStudio ? .light : .dark }
     var usesLiquidGlass: Bool { self == .liquidGlass || self == .classicDark || self == .classicOLED || isRoseStudio }
     var keepsBlackCanvas: Bool { self == .classicOLED }
@@ -40,6 +42,7 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         case .liquidGlass: Color(red: 0.67, green: 0.89, blue: 1)
         case .roseStudio: Color(red: 0.62, green: 0.13, blue: 0.34)
         case .roseStudioDark: Color(red: 1.0, green: 0.60, blue: 0.74)
+        case .nightSignal: Color(red: 0.52, green: 0.88, blue: 0.68)
         #if os(macOS)
         case .graphite: Color(red: 1, green: 0.75, blue: 0.45)
         #endif
@@ -56,6 +59,7 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         case .liquidGlass: Color(red: 0.12, green: 0.17, blue: 0.28)
         case .roseStudio: Color(red: 0.99, green: 0.95, blue: 0.96)
         case .roseStudioDark: Color(red: 0.16, green: 0.11, blue: 0.17)
+        case .nightSignal: Color(red: 0.08, green: 0.12, blue: 0.12)
         #if os(macOS)
         case .graphite: Color(red: 0.09, green: 0.095, blue: 0.103)
         #endif
@@ -109,6 +113,7 @@ enum MusicTheme: String, CaseIterable, Identifiable {
         case .liquidGlass: end = surface
         case .roseStudio: end = Color(red: 0.95, green: 0.89, blue: 0.93)
         case .roseStudioDark: end = Color(red: 0.08, green: 0.07, blue: 0.13)
+        case .nightSignal: end = Color(red: 0.035, green: 0.065, blue: 0.07)
         #if os(macOS)
         case .graphite: end = Color(red: 0.055, green: 0.059, blue: 0.068)
         #endif
@@ -397,7 +402,7 @@ struct MusicSettings: View {
                     Toggle("Artwork Colors", isOn: $artworkColors)
                         .help("Match the interface to the artwork for the current track.")
                     Toggle("Animate Artwork Colors", isOn: $animateArtworkColors)
-                        .disabled((!artworkColors && !theme.isRoseStudio) || theme.keepsBlackCanvas)
+                        .disabled((!artworkColors && !theme.usesArtworkPlayback) || theme.keepsBlackCanvas)
                         .help("Let the album colors drift slowly across the background.")
                     Picker("Mini-player", selection: $miniPlayerStyle) {
                         ForEach(MiniPlayerStyle.allCases) { style in

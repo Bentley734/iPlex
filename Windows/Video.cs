@@ -136,6 +136,8 @@ namespace MusicRoom
         void ResetVideoLibraries()
         {
             videoSections.Clear();
+            ++matchSearch;
+            videoMatches = new VideoMatch[0];
             videoArt.Clear();
             videoArtIds.Clear();
             ReleaseVideoPlayback();
@@ -179,6 +181,111 @@ namespace MusicRoom
         {
             return String.Join("&", fields.Select(pair =>
                 Uri.EscapeDataString(pair.Key) + "=" + Uri.EscapeDataString(pair.Value)));
+        }
+
+        sealed class VideoMatch
+        {
+            public string key { get; set; }
+            public string title { get; set; }
+            public string year { get; set; }
+        }
+
+        VideoMatch[] videoMatches = new VideoMatch[0];
+        string matchServer, matchLibrary, matchItem;
+        long matchSearch;
+        bool applyingVideoMatch;
+
+        async Task VideoMatchAction(Dictionary<string, object> request, string action, long id)
+        {
+            bool apply = action == "videoApplyMatch";
+            var token = shutdown.Token;
+            string library = Str(request, "library"), kind = Str(request, "kind"), item = Str(request, "item");
+            string serverID = Str(request, "server");
+            var choice = apply && serverID == matchServer && library == matchLibrary && item == matchItem
+                ? videoMatches.FirstOrDefault(candidate => candidate.key == Str(request, "choice")) : null;
+            if (apply && applyingVideoMatch) return;
+            if (apply) applyingVideoMatch = true;
+            long search = apply ? matchSearch : ++matchSearch;
+            if (!apply) videoMatches = new VideoMatch[0];
+
+            try
+            {
+                Server server;
+                if (serverID != selectedServer || !servers.TryGetValue(serverID, out server) || !ItemID.IsMatch(item) ||
+                    !videoSections.Any(section => section.type == kind && section.id == library))
+                    throw Problem("Choose a movie or TV show from the connected library.");
+                if (apply && choice == null) throw Problem("Search again and choose a match.");
+                string title = Str(request, "title").Trim(), year = Str(request, "year").Trim();
+                if (!apply && (title.Length == 0 || title.Length > 150 || (year.Length > 0 && !Regex.IsMatch(year, @"^[1-9][0-9]{3}\z"))))
+                    throw Problem("Enter a title and an optional four-digit year.");
+
+                string path = "/library/metadata/" + item;
+                var basis = await WithServer(server, async url => {
+                    var payload = await FetchPlex(HttpMethod.Get, new Uri(url, path), server.Token, token, 4 * 1024 * 1024, 8);
+                    if (!Metadata(payload, library).Any(row => Str(row, "type") == kind && Str(row, "ratingKey") == item))
+                        throw Problem("This title is no longer available in the selected library.");
+                    return url;
+                }, token);
+
+                if (selectedServer != serverID || search != matchSearch) return;
+                if (apply)
+                {
+                    var query = new Dictionary<string, string> { { "guid", choice.key }, { "name", choice.title } };
+                    if (choice.year.Length > 0) query.Add("year", choice.year);
+                    try
+                    {
+                        await FetchBytes(PlexRequest(HttpMethod.Put, new Uri(basis, path + "/match?" + VideoQuery(query)),
+                            server.Token), 2 * 1024 * 1024, token, 20);
+                    }
+                    catch (InvalidDataException error)
+                    {
+                        if (error.Message == "The service returned HTTP 401." || error.Message == "The service returned HTTP 403.")
+                            throw Problem("Your Plex account doesn’t have permission to change this match.");
+                        if (error.Message.StartsWith("The service returned HTTP 4", StringComparison.Ordinal))
+                            throw Problem("Plex rejected this match. " + error.Message);
+                        throw Problem("Plex didn’t confirm the change. Refresh the library before retrying.");
+                    }
+                    catch (Exception)
+                    {
+                        throw Problem("Plex didn’t confirm the change. Refresh the library before retrying.");
+                    }
+                    videoMatches = new VideoMatch[0];
+                    Send("plexVideoMatchResult", new { id, saved = true });
+                    return;
+                }
+
+                var target = new Uri(basis, path + "/matches?" + VideoQuery(new Dictionary<string, string> {
+                    { "manual", "1" }, { "title", title }, { "year", year }
+                }));
+                object matches = null;
+                try { matches = await FetchPlex(HttpMethod.Put, target, server.Token, token, 2 * 1024 * 1024, 16); }
+                catch (InvalidDataException error)
+                {
+                    if (error.Message != "The service returned HTTP 404." && error.Message != "The service returned HTTP 405.") throw;
+                }
+                if (matches == null) matches = await FetchPlex(HttpMethod.Get, target, server.Token, token, 2 * 1024 * 1024, 16);
+                if (selectedServer != serverID || search != matchSearch) return;
+                var box = Map(Get(Map(matches), "MediaContainer"));
+                videoMatches = Rows(Get(box, "SearchResult") ?? Get(box, "Metadata")).Take(60).Select(row => {
+                    var key = Str(row, "guid");
+                    var name = Str(row, "name");
+                    return new VideoMatch { key = key.Length > 0 ? key : Str(row, "id"),
+                        title = name.Length > 0 ? name : Str(row, "title"), year = Str(row, "year") };
+                }).Where(row => row.key.Length <= 500 && row.key.Contains("://") && !row.key.Any(Char.IsControl) &&
+                    row.title.Length > 0 && row.title.Length <= 300 && !row.title.Any(Char.IsControl))
+                    .GroupBy(row => row.key).Select(group => group.First()).ToArray();
+                matchServer = serverID;
+                matchLibrary = library;
+                matchItem = item;
+                Send("plexVideoMatchResult", new { id, choices = videoMatches });
+            }
+            catch (Exception error)
+            {
+                if (!token.IsCancellationRequested)
+                    Send("plexVideoMatchResult", new { id, error = error is InvalidDataException
+                        ? error.Message : "Couldn’t search Plex for a match." });
+            }
+            finally { if (apply) applyingVideoMatch = false; }
         }
 
         async Task VideoAction(Dictionary<string, object> request, string action, long id)
@@ -238,6 +345,8 @@ namespace MusicRoom
                 {
                     long offset = Num(request, "offset");
                     if (offset < 0 || offset > Int32.MaxValue - 2000) throw Problem("Invalid video listing.");
+                    long requested = Num(request, "pageSize");
+                    int size = requested == 30 || requested == 120 ? (int)requested : 60;
                     bool savePreview = key.Length == 0 && offset == 0 && Str(request, "query").Trim().Length == 0;
                     string path;
                     if (key.Length == 0)
@@ -254,7 +363,7 @@ namespace MusicRoom
                         path = "/library/metadata/" + key + "/children?";
                     }
                     path += (path.EndsWith("?") ? "" : "&") + "X-Plex-Container-Start=" +
-                        offset.ToString(CultureInfo.InvariantCulture) + "&X-Plex-Container-Size=60";
+                        offset.ToString(CultureInfo.InvariantCulture) + "&X-Plex-Container-Size=" + size.ToString(CultureInfo.InvariantCulture);
                     var result = await WithServer(server, url => FetchPlex(HttpMethod.Get, new Uri(url, path),
                         server.Token, job.Token, 8 * 1024 * 1024), job.Token);
                     var container = Map(Get(Map(result), "MediaContainer"));
@@ -271,7 +380,7 @@ namespace MusicRoom
                     if (savePreview) SaveLaunchVideo(server.Id, library, kind, rows);
                     int count = Rows(Get(container, "Metadata")).Count();
                     long end = offset + count, total = Num(container, "totalSize");
-                    Send("plexVideoListing", new { id, items, next = items.Length > 0 && (total > 0 ? end < total : count >= 60)
+                    Send("plexVideoListing", new { id, items, next = items.Length > 0 && (total > 0 ? end < total : count >= size)
                         ? (long?)end : null });
                 }
                 else if (action == "videoPlay")

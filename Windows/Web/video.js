@@ -41,6 +41,73 @@
   let watchRecords = new Map(), watchSequence = 0, activeItem, activeScope, lastReport = 0;
   let lastSaved = 0, awaitingSeek = false, nativeActive = false;
   let selectedVersion = -1, activeVersion = null, nextEpisode = null, nextTimer = null;
+  let pageSize = '60';
+  const matchDialog = get('video-match');
+  const matchStatus = get('video-match-status');
+  const matchChoices = get('video-match-choices');
+  const matchForm = get('video-match-form');
+  const matchApply = get('video-match-apply');
+  let matchEdit, matchSequence = 0;
+
+  window.plexVideoPageSize = value => {
+    if (pageSize === value) return;
+    pageSize = value;
+    if (kind && libraryReady) browse();
+  };
+  function openMatch(item) {
+    if (matchDialog.open) return;
+    matchEdit = {...watchContext(), item:item.key};
+    get('video-match-name').value = item.title;
+    get('video-match-year').value = /^\d{4}$/.test(item.subtitle) ? item.subtitle : '';
+    matchDialog.showModal();
+    searchMatches();
+  }
+  function matchBusy(busy) {
+    matchForm.querySelector('button').disabled = busy;
+    matchChoices.disabled = busy;
+    matchApply.disabled = busy || !matchChoices.value;
+    get('video-match-close').disabled = Boolean(matchEdit?.saving);
+  }
+  function searchMatches() {
+    if (!matchEdit || matchEdit.saving) return;
+    const title = get('video-match-name').value.trim();
+    if (!title) return;
+    const year = get('video-match-year').value.trim();
+    matchChoices.replaceChildren();
+    matchBusy(true);
+    matchStatus.textContent = 'Searching Plex…';
+    matchEdit.id = ++matchSequence;
+    host({action:'videoSearchMatches', ...matchEdit, title, year});
+  }
+  matchForm.onsubmit = event => { event.preventDefault(); searchMatches(); };
+  matchChoices.onchange = () => { matchApply.disabled = !matchChoices.value; };
+  matchApply.onclick = () => {
+    if (!matchEdit || matchEdit.saving || !matchChoices.value) return;
+    matchEdit.id = ++matchSequence;
+    matchEdit.saving = true;
+    matchBusy(true);
+    matchStatus.textContent = 'Saving match…';
+    host({action:'videoApplyMatch', ...matchEdit, choice:matchChoices.value});
+  };
+  get('video-match-close').onclick = () => matchDialog.close();
+  matchDialog.addEventListener('cancel', event => { if (matchEdit?.saving) event.preventDefault(); });
+  matchDialog.addEventListener('close', () => { if (!matchDialog.open) matchEdit = null; });
+  window.plexVideoMatchResult = reply => {
+    if (!matchDialog.open || reply.id !== matchEdit?.id) return;
+    matchEdit.saving = false;
+    if (reply.saved) {
+      matchDialog.close();
+      browse();
+      return;
+    }
+    if (reply.choices?.length) {
+      matchChoices.replaceChildren(new Option('Choose a match', ''), ...reply.choices.map(row =>
+        new Option(row.year ? row.title + ' (' + row.year + ')' : row.title, row.key)));
+    }
+    matchBusy(false);
+    matchStatus.textContent = reply.error || (reply.choices?.length ? '' : 'No matches found. Try another title or clear the year.');
+  };
+
   let ended = false;
 
   function watchContext() { return {kind, library, server:state?.serverId}; }
@@ -167,6 +234,7 @@
         JSON.stringify(previous?.videoLibraries) !== JSON.stringify(state.videoLibraries)) {
       if (changedServer) {
         if (dialog.open) dialog.close();
+        if (matchDialog.open) matchDialog.close();
         watchRecords.clear();
         ++watchSequence;
         parent = [];
@@ -185,6 +253,7 @@
   window.plexVideoExit = () => {
     if (!kind) return;
     kind = '';
+    if (matchDialog.open) matchDialog.close();
     watchRecords.clear();
     ++watchSequence;
     ++pending;
@@ -249,7 +318,7 @@
     busy = true;
     status.textContent = 'Loading…';
     host({action:'videoBrowse', id, library, kind, offset, item:current?.key, query:search.value,
-      type:current?.type === 'show' ? 'season' : 'episode'});
+      type:current?.type === 'show' ? 'season' : 'episode', pageSize:pageSize === 'all' ? 120 : Number(pageSize)});
   }
 
   picker.onchange = () => {
@@ -273,7 +342,10 @@
       tiles.replaceChildren();
       rendered.clear();
     }
+    const previousCount = rendered.size;
     renderItems(reply.items, true);
+    if (rendered.size === previousCount || next <= listOffset) next = null;
+    if (pageSize === 'all' && next !== null) { browse(next); return; }
     status.textContent = rendered.size ? '' : 'No matches.';
     loadMore.hidden = next === null;
   };
@@ -320,7 +392,20 @@
         if (row.type === 'movie' || row.type === 'episode') open(row);
         else { parent.push(row); browse(); }
       };
-      tiles.append(tile);
+      if (interactive && row.type === kind) {
+        const card = document.createElement('div');
+        card.className = 'video-match-card';
+        card.dataset.item = row.key;
+        const fix = document.createElement('button');
+        fix.type = 'button';
+        fix.className = 'video-fix-match';
+        fix.textContent = '⋯';
+        fix.title = 'Fix Match';
+        fix.setAttribute('aria-label', 'Fix Match for ' + row.title);
+        fix.onclick = () => openMatch(row);
+        card.append(tile, fix);
+        tiles.append(card);
+      } else tiles.append(tile);
     }
   }
 
