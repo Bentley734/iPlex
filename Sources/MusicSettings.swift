@@ -14,7 +14,7 @@ private struct HeaderBrandSettings: View {
 
     var body: some View {
         Picker("Header Wordmark", selection: choices.wordmarkSelection) {
-            ForEach(HeaderWordmark.allCases) { Text($0.label).tag($0) }
+            ForEach(HeaderWordmark.choices(for: section)) { Text($0.label).tag($0) }
         }
         Picker("Header Logo", selection: choices.logoSelection) {
             ForEach(HeaderMark.choices(for: section)) { Text($0.label).tag($0) }

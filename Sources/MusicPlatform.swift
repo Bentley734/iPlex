@@ -144,6 +144,28 @@ struct ArtworkPalette {
     }
 }
 
+enum VideoHeaderBrand: String {
+    case comcast2000 = "comcast-2000"
+    case attUverse2016 = "att-uverse-2016"
+    case att2016 = "att-2016"
+    case xfinity
+    case dishNetwork = "dish-network"
+    case directv
+    case directvClassic = "directv-classic"
+
+    var label: String {
+        switch self {
+        case .comcast2000: "Comcast (2000)"
+        case .attUverse2016: "AT&T U-verse (2016)"
+        case .att2016: "AT&T (2016)"
+        case .xfinity: "Xfinity"
+        case .dishNetwork: "DISH Network"
+        case .directv: "DIRECTV"
+        case .directvClassic: "DIRECTV (Classic)"
+        }
+    }
+}
+
 enum HeaderWordmark: String, CaseIterable, Identifiable {
     static let preferenceKey = "HeaderWordmark"
     case iplex, music, musicBold, plex, plex2022, napster, spotify, netflix, iTunes
@@ -154,7 +176,21 @@ enum HeaderWordmark: String, CaseIterable, Identifiable {
     case appleTVClassic = "apple-tv-classic"
     case appleTVGlass = "apple-tv-glass"
     case toolDriveProject = "tool-drive-project"
-    case realJukebox, realJukeboxPlus, realPlayer, realPlayerBasic, realPlayerPlus, none
+    case realJukebox, realJukeboxPlus, realPlayer, realPlayerBasic, realPlayerPlus
+    case comcast2000 = "comcast-2000"
+    case attUverse2016 = "att-uverse-2016"
+    case att2016 = "att-2016"
+    case xfinity
+    case dishNetwork = "dish-network"
+    case directv
+    case directvClassic = "directv-classic"
+    case none
+
+    var videoBrand: VideoHeaderBrand? { VideoHeaderBrand(rawValue: rawValue) }
+
+    static func choices(for section: HeaderBrandSection) -> [Self] {
+        allCases.filter { section.supportsVideoBranding || $0.videoBrand == nil }
+    }
 
     var id: Self { self }
     var title: String {
@@ -178,6 +214,8 @@ enum HeaderWordmark: String, CaseIterable, Identifiable {
         case .realPlayer: "RealPlayer"
         case .realPlayerBasic: "RealPlayer Basic"
         case .realPlayerPlus: "RealPlayer Plus"
+        case .comcast2000, .attUverse2016, .att2016, .xfinity,
+             .dishNetwork, .directv, .directvClassic: videoBrand?.label ?? rawValue
         case .none: "None"
         }
     }
@@ -194,14 +232,14 @@ enum HeaderWordmark: String, CaseIterable, Identifiable {
         case .netflix: "netflix-wordmark"
         case .toolDriveProject: "tool-drive-project-wordmark"
         case .hulu, .disneyPlus, .disneyPlusMono, .appleTV, .appleTVClassic, .appleTVGlass: rawValue
-        default: nil
+        default: videoBrand?.rawValue
         }
     }
 
     var preservesColors: Bool {
         switch self {
         case .spotify, .netflix, .hulu, .disneyPlus, .appleTVGlass: true
-        default: region(dark: false) != region(dark: true)
+        default: videoBrand != nil || region(dark: false) != region(dark: true)
         }
     }
 
@@ -209,7 +247,9 @@ enum HeaderWordmark: String, CaseIterable, Identifiable {
     func region(dark: Bool) -> CGRect? {
         switch self {
         case .iplex, .spotify, .netflix, .hulu, .disneyPlus, .disneyPlusMono, .appleTV, .appleTVClassic,
-             .appleTVGlass, .toolDriveProject, .none: nil
+             .appleTVGlass, .toolDriveProject, .none,
+             .comcast2000, .attUverse2016, .att2016, .xfinity,
+             .dishNetwork, .directv, .directvClassic: nil
         case .music: CGRect(x: 722, y: 251, width: 684, height: 210)
         case .musicBold: CGRect(x: 645, y: 609, width: 810, height: 193)
         case .plex: CGRect(x: 0, y: dark ? 1745 : 1255, width: 1024, height: 332)
@@ -247,6 +287,14 @@ enum HeaderMark: String, CaseIterable, Identifiable {
     case itunesDisc = "itunes-disc"
     case itunes11 = "itunes-11"
 
+    case comcast2000 = "comcast-2000"
+    case attUverse2016 = "att-uverse-2016"
+    case att2016 = "att-2016"
+    case xfinity
+    case dishNetwork = "dish-network"
+    case directv
+    case directvClassic = "directv-classic"
+
     case toolArchiveClassic = "tool-archive-classic"
     case toolArchive2006 = "tool-archive-2006"
     case toolArchiveOpiate = "tool-archive-opiate"
@@ -277,8 +325,13 @@ enum HeaderMark: String, CaseIterable, Identifiable {
         self == .toolArchiveClassic || self == .toolArchive2006
     }
 
+    var videoBrand: VideoHeaderBrand? { VideoHeaderBrand(rawValue: rawValue) }
+
     static func choices(for section: HeaderBrandSection) -> [Self] {
-        allCases.filter { section == .toolDrive || !$0.rawValue.hasPrefix("tool-archive-") }
+        allCases.filter {
+            if $0.videoBrand != nil { return section.supportsVideoBranding }
+            return section == .toolDrive || !$0.rawValue.hasPrefix("tool-archive-")
+        }
     }
     var assetName: String { isMonochrome ? "monochrome" : rawValue }
     // Ratios of the canvas height to the visible artwork height.
@@ -315,6 +368,8 @@ enum HeaderMark: String, CaseIterable, Identifiable {
         case .toolArchive1992: "Tool 1992"
         case .toolArchiveAenima: "Tool Ænima"
         case .toolArchiveBone: "Tool Bone"
+        case .comcast2000, .attUverse2016, .att2016, .xfinity,
+             .dishNetwork, .directv, .directvClassic: videoBrand?.label ?? rawValue
         case .none: "Text Only"
         case .black: "Black"
         case .white: "White"
@@ -385,6 +440,8 @@ enum HeaderBrandSection: String, CaseIterable, Identifiable {
         }
     }
 
+    var supportsVideoBranding: Bool { self == .movies || self == .television }
+
     func preferenceKey(_ base: String) -> String {
         self == .music ? base : "\(base).\(rawValue)"
     }
@@ -418,7 +475,11 @@ struct HeaderBrand: View {
     private var markHeight: CGFloat { height * markSize.fraction }
     private var markOutline: Color {
         if mark == .black { return .white.opacity(0.7) }
+        if mark.videoBrand != nil { return .white.opacity(0.45) }
         return .clear
+    }
+    private var markWidth: CGFloat {
+        mark.videoBrand == nil ? markHeight : min(width * 0.48, markHeight * 2.25)
     }
     private var markColor: Color {
         if mark.usesTextColor { return ink }
@@ -434,7 +495,7 @@ struct HeaderBrand: View {
                         .scaledToFit()
                         .foregroundStyle(markColor)
                         .shadow(color: markOutline, radius: 1)
-                        .frame(width: markHeight, height: markHeight)
+                        .frame(width: markWidth, height: markHeight)
                         .scaleEffect(mark.artworkScale)
                 }
             }
@@ -443,6 +504,7 @@ struct HeaderBrand: View {
                     if let image = MusicPlatform.wordmarkImage(wordmark, dark: true) {
                         image.renderingMode(wordmark.preservesColors ? .original : .template).resizable().scaledToFit()
                             .foregroundStyle(ink)
+                            .shadow(color: wordmark.videoBrand == nil ? .clear : .white.opacity(0.45), radius: 1)
                     } else {
                         Text(wordmark.title).font(.system(size: height * 0.68, weight: wordmark == .musicBold ? .bold : .medium))
                             .lineLimit(1).minimumScaleFactor(0.6)
@@ -472,7 +534,7 @@ struct HeaderBrand: View {
     }
 
     private func cycleWordmark() {
-        let choices = HeaderWordmark.allCases.filter { $0 != .none }
+        let choices = HeaderWordmark.choices(for: section).filter { $0 != .none }
         let current = choices.firstIndex(of: wordmark) ?? -1
         wordmark = choices[(current + 1) % choices.count]
     }

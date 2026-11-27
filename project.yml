@@ -3,8 +3,8 @@ options:
   createIntermediateGroups: true
 settings:
   SWIFT_VERSION: 5.0
-  MARKETING_VERSION: 0.1.42
-  CURRENT_PROJECT_VERSION: 43
+  MARKETING_VERSION: 0.1.43
+  CURRENT_PROJECT_VERSION: 44
   GENERATE_INFOPLIST_FILE: YES
   INFOPLIST_KEY_CFBundleDisplayName: iPlex
   INFOPLIST_KEY_NSLocalNetworkUsageDescription: iPlex connects to your Plex Media Server.

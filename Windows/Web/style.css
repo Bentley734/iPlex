@@ -46,6 +46,8 @@ aside { background:var(--panel); padding:25px 18px; display:flex; flex-direction
 .header-mark[data-mark="rainbow"] { --artwork-scale:calc(1118 / 1117); }
 .header-mark[data-mark="silver"] { --artwork-scale:calc(409 / 315); }
 .header-mark[data-mark="black"] { filter:drop-shadow(0 0 1px #ffffffb3); }
+.header-mark[data-video-brand] { width:min(calc(var(--header-height) * var(--mark-size) * 2.25), 75px); }
+:is(.header-mark,.wordmark)[data-video-brand] { filter:drop-shadow(0 0 1px #ffffff73); }
 .wordmark:is([data-wordmark="disney-plus-mono"],[data-wordmark="apple-tv"],[data-wordmark="apple-tv-classic"],[data-wordmark="tool-drive-project"]),
 .header-mark:is([data-mark="disney-plus-mono"],[data-mark="apple-tv"],[data-mark="apple-tv-classic"],
   [data-mark="tool-archive-classic"],[data-mark="tool-archive-2006"]),

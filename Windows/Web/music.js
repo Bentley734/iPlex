@@ -1179,7 +1179,8 @@
     ['netflix', 'netflix-wordmark'], ['hulu', 'hulu'],
     ['disney-plus', 'disney-plus'], ['disney-plus-mono', 'disney-plus-mono'],
     ['apple-tv', 'apple-tv'], ['apple-tv-classic', 'apple-tv-classic'], ['apple-tv-glass', 'apple-tv-glass'],
-    ['tool-drive-project', 'tool-drive-project-wordmark']
+    ['tool-drive-project', 'tool-drive-project-wordmark'],
+    ...wordmarkOptions.filter(option => option.hasAttribute('data-video-brand')).map(option => [option.value, option.value])
   ]);
   const headerChoices = new Map();
   let activeHeaderSection = 'music';
@@ -1191,13 +1192,17 @@
     return part === 'logo' ? headerLogo : headerWordmark;
   }
   function brandOptions(section, part) {
-    return part === 'logo' ? logoOptions.filter(option => section === 'toolDrive' || !option.hasAttribute('data-tool-drive'))
-      : wordmarkOptions;
+    const options = part === 'logo' ? logoOptions : wordmarkOptions;
+    return options.filter(option => {
+      if (option.hasAttribute('data-video-brand')) return section === 'movie' || section === 'show';
+      return section === 'toolDrive' || !option.hasAttribute('data-tool-drive');
+    });
   }
   function loadHeaderSection() {
     const choices = headerChoices.get(headerSection.value);
     headerLogo.replaceChildren(...brandOptions(headerSection.value, 'logo').map(option => option.cloneNode(true)));
     headerLogo.value = choices.logo;
+    headerWordmark.replaceChildren(...brandOptions(headerSection.value, 'wordmark').map(option => option.cloneNode(true)));
     headerWordmark.value = choices.wordmark;
     renderHeaderBrands();
   }
@@ -1238,6 +1243,7 @@
     if (logo === 'spotify' || wordmark === 'spotify') loadSpotifySheet();
     mark.hidden = logo === 'none' || (logo === 'spotify' && !spotifyLogoURL);
     mark.dataset.mark = logo;
+    mark.toggleAttribute('data-video-brand', logoOptions.some(option => option.value === logo && option.hasAttribute('data-video-brand')));
     if (mark.hidden) mark.removeAttribute('src');
     else mark.src = logo === 'spotify' ? spotifyLogoURL : 'HeaderMarks/' + logoAsset + '.png';
 
@@ -1259,6 +1265,7 @@
     const asset = brandWordmarks.get(wordmark);
     image.hidden = wordmark !== 'iplex' && !asset && (showCanvas || spotify || wordmark === 'none');
     image.dataset.wordmark = wordmark;
+    image.toggleAttribute('data-video-brand', wordmarkOptions.some(option => option.value === wordmark && option.hasAttribute('data-video-brand')));
     image.src = asset ? 'HeaderMarks/' + asset + '.png' : 'wordmark.png';
   }
   spotifySheet.addEventListener('load', () => {
