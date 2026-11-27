@@ -11,8 +11,9 @@ def integrated_catalog(source: Path) -> str:
     catalog = source.read_text(encoding="utf-8")
     head, end_head, catalog = catalog.partition("</head>")
     body, end_body, tail = catalog.rpartition("</body>")
-    if not end_head or not end_body:
+    if "<html " not in head or not end_head or not end_body:
         raise ValueError("Tool Drive catalog is missing its HTML structure")
+    head = head.replace("<html ", "<html data-iplex-archive data-iplex-archive-loading ", 1)
     return f"{head}<style>\n{style}</style>{end_head}{body}<script>\n{script}</script>{end_body}{tail}"
 
 

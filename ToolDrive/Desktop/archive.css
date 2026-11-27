@@ -1,3 +1,8 @@
+/* Keep the initial document hidden until its iPlex header and table are installed. */
+:root[data-iplex-archive-loading] body {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
 :root[data-iplex-archive] {
   --text: var(--iplex-text, #f2f7ff) !important;
   --muted: color-mix(in srgb, var(--text) 73%, transparent) !important;

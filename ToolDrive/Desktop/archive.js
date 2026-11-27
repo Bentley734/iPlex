@@ -17,7 +17,6 @@
   listHead.before(table);
   table.append(listHead, showList);
   document.querySelector('#show-library').textContent = 'Recording Library';
-  root.dataset.iplexArchive = '';
 
   window.applyIPlexArchiveAppearance = settings => {
     title.textContent = settings.title || 'Tool Drive';
@@ -34,4 +33,5 @@
     root.toggleAttribute('data-iplex-hover', settings.hover);
   };
   if (window.initialIPlexArchiveAppearance) window.applyIPlexArchiveAppearance(window.initialIPlexArchiveAppearance);
+  root.removeAttribute('data-iplex-archive-loading');
 })();

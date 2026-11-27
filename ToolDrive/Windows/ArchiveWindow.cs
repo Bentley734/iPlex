@@ -93,7 +93,9 @@ namespace ToolDriveOffline
                 core.WebMessageReceived += MessageReceived;
                 core.AddWebResourceRequestedFilter("*", CoreWebView2WebResourceContext.All);
                 core.WebResourceRequested += ResourceRequested;
-                core.Navigate(Page);
+                if (appearanceJson != null)
+                    await core.AddScriptToExecuteOnDocumentCreatedAsync("window.initialIPlexArchiveAppearance = " + appearanceJson);
+                if (!closing) core.Navigate(Page);
             }
             catch (Exception error)
             {
