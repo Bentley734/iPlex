@@ -485,9 +485,10 @@ struct HeaderBrand: View {
     let section: HeaderBrandSection
     @Binding var mark: HeaderMark
     @Binding var wordmark: HeaderWordmark
+    var previewMarkSize: HeaderMarkSize? = nil
 
     private var ink: Color { theme.text }
-    private var markHeight: CGFloat { height * markSize.fraction }
+    private var markHeight: CGFloat { height * (previewMarkSize ?? markSize).fraction }
     private var markOutline: Color {
         if mark == .black { return .white.opacity(0.7) }
         if mark.videoBrand != nil { return .white.opacity(0.45) }

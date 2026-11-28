@@ -1,32 +1,5 @@
 import SwiftUI
 
-private struct HeaderBrandSettings: View {
-    @AppStorage(HeaderMarkSize.preferenceKey) private var markSize = HeaderMarkSize.medium
-    private let section: HeaderBrandSection
-    private var choices: HeaderBrandChoices
-    let theme: MusicTheme
-
-    init(section: HeaderBrandSection, theme: MusicTheme) {
-        self.section = section
-        choices = HeaderBrandChoices(section: section)
-        self.theme = theme
-    }
-
-    var body: some View {
-        Picker("Header Wordmark", selection: choices.wordmarkSelection) {
-            ForEach(HeaderWordmark.choices(for: section)) { Text($0.label).tag($0) }
-        }
-        Picker("Header Logo", selection: choices.logoSelection) {
-            ForEach(HeaderMark.choices(for: section)) { Text($0.label).tag($0) }
-        }
-        Picker("Header Logo Size", selection: $markSize) {
-            ForEach(HeaderMarkSize.allCases) { Text($0.label).tag($0) }
-        }
-        HeaderBrand(theme: theme, width: 170, height: 42, allowsCycling: false, section: section,
-                    mark: choices.logoSelection, wordmark: choices.wordmarkSelection)
-            .accessibilityHidden(true)
-    }
-}
 #if os(macOS)
 import AppKit
 #else
@@ -351,7 +324,7 @@ struct MusicSettings: View {
     #endif
     @AppStorage(ArtworkPalette.preferenceKey) private var artworkColors = false
     @AppStorage(ArtworkColorWash.motionPreference) private var animateArtworkColors = true
-    @State private var headerSection = HeaderBrandSection.music
+    @State private var showHeaderAppearance = false
     @AppStorage(MiniPlayerStyle.preferenceKey) private var miniPlayerStyle = MiniPlayerStyle.automatic
     @AppStorage(LibraryLayout.preferenceKey) private var libraryLayout = LibraryLayout.grid
     @AppStorage(LibraryArtworkSize.preferenceKey) private var libraryArtworkSize = LibraryArtworkSize.medium
@@ -408,13 +381,13 @@ struct MusicSettings: View {
                             Text(style.label).tag(style)
                         }
                     }
-                    Picker("Customize Header For", selection: $headerSection) {
-                        ForEach(HeaderBrandSection.allCases) { section in
-                            Text(library.sectionName(section)).tag(section)
+                    Button { showHeaderAppearance = true } label: {
+                        HStack {
+                            Label("Header Logos & Wordmarks", systemImage: "photo.on.rectangle")
+                            Spacer()
+                            Image(systemName: "chevron.right")
                         }
                     }
-                    HeaderBrandSettings(section: headerSection, theme: theme)
-                        .id(headerSection)
                     #if !os(macOS)
                     Divider()
                     VStack(alignment: .leading, spacing: 10) {
@@ -541,6 +514,7 @@ struct MusicSettings: View {
             }
         }
         .padding(30)
+        .sheet(isPresented: $showHeaderAppearance) { HeaderAppearanceSettings(library: library) }
         #if os(macOS)
         .frame(width: 490, height: 560)
         #endif

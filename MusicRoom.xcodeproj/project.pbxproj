@@ -127,6 +127,7 @@
 		C284DBCED45CCE762D0F6D1D /* ArchiveStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = B4CFDD76F8DC8019AE8E5222 /* ArchiveStore.swift */; };
 		C5010D1FF9F009AF00F040A6 /* VideoWatchStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2039AEF6F237EEFE851F5A1 /* VideoWatchStore.swift */; };
 		C807279C131DCDCE259BF62E /* TVFilamentSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = 994231CC3E59AB0C48302065 /* TVFilamentSurface.swift */; };
+		CA4A8FAC314CFAA64D4B8846 /* HeaderAppearanceSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B02B61B6F8ED3DD10CA6C591 /* HeaderAppearanceSettings.swift */; };
 		CCB98FB3410726E5C21B20C2 /* PlexView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2D8D6D54E6232361B6D546B /* PlexView.swift */; };
 		CFCAD59E994057089D18A941 /* MusicGenreList.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7C3DEA02512BD0C8E406A0F /* MusicGenreList.swift */; };
 		D296E8554105827C14E228BD /* LiveMedia.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8F51B5492182699B91E5DA3B /* LiveMedia.swift */; };
@@ -145,6 +146,7 @@
 		EC460D45FB79918027ADC727 /* AudioAnalysis.swift in Sources */ = {isa = PBXBuildFile; fileRef = 20ED016874656D8722273626 /* AudioAnalysis.swift */; };
 		F182B582B8AD5EA4BE657200 /* MobileVLCKit.xcframework in Embed Frameworks */ = {isa = PBXBuildFile; fileRef = F28951F1D53D43A1D29492C2 /* MobileVLCKit.xcframework */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		F307562545993D2771A354AC /* GlassWallpaperPreferences.swift in Sources */ = {isa = PBXBuildFile; fileRef = 84303833AB4AE2FE7352B25A /* GlassWallpaperPreferences.swift */; };
+		F728D4BFE9DF646E142E33D2 /* HeaderAppearanceSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = B02B61B6F8ED3DD10CA6C591 /* HeaderAppearanceSettings.swift */; };
 		F7D000EAFF036916AC9FA4E6 /* GlassBackgrounds in Resources */ = {isa = PBXBuildFile; fileRef = E359008C174456F0E7E13E19 /* GlassBackgrounds */; };
 		F905822CE1DFB0F1DB80A2B6 /* TVKaleidoscope.metal in Sources */ = {isa = PBXBuildFile; fileRef = 4CEB33019888933A2455EB19 /* TVKaleidoscope.metal */; };
 		FADC6818B7AC6229F0DB486F /* TVIconPreviews in Resources */ = {isa = PBXBuildFile; fileRef = C9C23189D2582E8551851186 /* TVIconPreviews */; };
@@ -251,6 +253,7 @@
 		A7C3DEA02512BD0C8E406A0F /* MusicGenreList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MusicGenreList.swift; sourceTree = "<group>"; };
 		AA7664D59D65ABDB49AA33D6 /* GlobalLibrarySearch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GlobalLibrarySearch.swift; sourceTree = "<group>"; };
 		AE3A4685EF46B49FB6B22D90 /* MacMiniPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MacMiniPlayer.swift; sourceTree = "<group>"; };
+		B02B61B6F8ED3DD10CA6C591 /* HeaderAppearanceSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeaderAppearanceSettings.swift; sourceTree = "<group>"; };
 		B231419E2817C1F973377DD4 /* VideoDetailsPage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoDetailsPage.swift; sourceTree = "<group>"; };
 		B2DA695E5F978CFBEDD54C3D /* ClickWheelPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClickWheelPlayer.swift; sourceTree = "<group>"; };
 		B368254AA2FA6C110A7860BB /* MusicRoom-tvOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "MusicRoom-tvOS.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -470,6 +473,7 @@
 				B2DA695E5F978CFBEDD54C3D /* ClickWheelPlayer.swift */,
 				83BDC61173C885223594A01D /* GlassWallpaper.swift */,
 				AA7664D59D65ABDB49AA33D6 /* GlobalLibrarySearch.swift */,
+				B02B61B6F8ED3DD10CA6C591 /* HeaderAppearanceSettings.swift */,
 				1E11ED386C44B1F0E5CB11FA /* InterfaceMotion.swift */,
 				C69FD3E93908A0408008D345 /* LibraryModel.swift */,
 				ED9C2A0F694BD3960FADA938 /* MacAppUpdates.swift */,
@@ -663,6 +667,7 @@
 				AD0027C3EA6B7D84AD57F90D /* ClickWheelPlayer.swift in Sources */,
 				857073C928677ED881AC8112 /* GlassWallpaper.swift in Sources */,
 				36875384EA443F8BF7BB95FD /* GlobalLibrarySearch.swift in Sources */,
+				CA4A8FAC314CFAA64D4B8846 /* HeaderAppearanceSettings.swift in Sources */,
 				977E177DAED424AE445D3F86 /* InterfaceMotion.swift in Sources */,
 				66D831237EA3E508723100E1 /* LibraryModel.swift in Sources */,
 				4852498FF890C183BB536F7A /* MacAppUpdates.swift in Sources */,
@@ -769,6 +774,7 @@
 				29CF984811D8CCAD74A6AB1F /* ClickWheelPlayer.swift in Sources */,
 				9986C5B0BC30A08F62C49E57 /* GlassWallpaper.swift in Sources */,
 				B3F489AFB07B38BC7DBE8CFB /* GlobalLibrarySearch.swift in Sources */,
+				F728D4BFE9DF646E142E33D2 /* HeaderAppearanceSettings.swift in Sources */,
 				B959B6B9F749535AC78A8563 /* InterfaceMotion.swift in Sources */,
 				C0F0713CDBB0212EBBDFA09D /* LibraryModel.swift in Sources */,
 				4F8F42D2AB91DCC695B06BD6 /* MacAppUpdates.swift in Sources */,
@@ -895,7 +901,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 57;
+				CURRENT_PROJECT_VERSION = 58;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
@@ -910,7 +916,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
-				MARKETING_VERSION = 0.1.56;
+				MARKETING_VERSION = 0.1.57;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -1000,7 +1006,7 @@
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 57;
+				CURRENT_PROJECT_VERSION = 58;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
@@ -1021,7 +1027,7 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = iPlex;
 				INFOPLIST_KEY_NSLocalNetworkUsageDescription = "iPlex connects to your Plex Media Server.";
-				MARKETING_VERSION = 0.1.56;
+				MARKETING_VERSION = 0.1.57;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;

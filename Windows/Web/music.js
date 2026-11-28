@@ -1341,6 +1341,9 @@
   ]);
   const headerChoices = new Map();
   let activeHeaderSection = 'music';
+  let headerDraft = null;
+  let activeHeaderSize = 'medium';
+  let headerGalleryPart = 'logo';
 
   function brandKey(section, part) {
     return 'musicroom-header-' + part + (section === 'music' ? '' : '-' + section);
@@ -1362,6 +1365,11 @@
     headerLogo.value = choices.logo;
     headerWordmark.replaceChildren(...brandOptions(headerSection.value, 'wordmark').map(option => option.cloneNode(true)));
     headerWordmark.value = choices.wordmark;
+    if (get('header-appearance').open) {
+      headerDraft = {...choices, size:activeHeaderSize};
+      get('header-logo-size').value = headerDraft.size;
+      buildHeaderGallery();
+    }
     renderHeaderBrands();
   }
   function chooseHeaderPart(section, part, value) {
@@ -1387,7 +1395,9 @@
   function renderHeaderBrands() {
     const active = headerChoices.get(activeHeaderSection);
     renderHeaderBrand(sidebarBrand, active);
-    renderHeaderBrand(headerPreview, headerChoices.get(headerSection.value));
+    renderHeaderBrand(headerPreview, headerDraft || headerChoices.get(headerSection.value));
+    headerPreview.dataset.markSize = headerDraft?.size || activeHeaderSize;
+    renderHeaderGallery();
     cycleMark.hidden = active.logo === 'none';
     cycleWordmark.hidden = active.wordmark === 'none';
     for (const [control, part] of [[cycleMark, 'logo'], [cycleWordmark, 'wordmark']]) {
@@ -1463,9 +1473,70 @@
     const choice = get('header-logo-size');
     choice.value = value;
     if (choice.selectedIndex === -1) choice.value = 'medium';
-    for (const brand of document.querySelectorAll('.header-brand')) brand.dataset.markSize = choice.value;
-    try { localStorage.setItem('musicroom-header-logo-size', choice.value); } catch {}
+    activeHeaderSize = choice.value;
+    for (const brand of document.querySelectorAll('#library-sidebar .header-brand')) brand.dataset.markSize = activeHeaderSize;
+    try { localStorage.setItem('musicroom-header-logo-size', activeHeaderSize); } catch {}
   }
+  function buildHeaderGallery() {
+    const gallery = get('header-gallery');
+    gallery.replaceChildren();
+    for (const option of brandOptions(headerSection.value, headerGalleryPart)) {
+      const tile = document.createElement('button');
+      tile.type = 'button';
+      tile.dataset.value = option.value;
+      const preview = headerPreview.cloneNode(true);
+      preview.className = 'header-brand header-option-preview';
+      preview.dataset.markSize = 'large';
+      if (option.value === 'none') {
+        const empty = document.createElement('span');
+        empty.className = 'header-empty-preview';
+        empty.textContent = headerGalleryPart === 'logo' ? 'No logo' : 'No wordmark';
+        tile.append(empty);
+      } else tile.append(preview);
+      const label = document.createElement('span');
+      label.textContent = option.textContent;
+      tile.append(label);
+      tile.onclick = () => {
+        headerDraft[headerGalleryPart] = option.value;
+        renderHeaderBrands();
+      };
+      gallery.append(tile);
+    }
+    gallery.scrollTop = 0;
+    renderHeaderGallery();
+  }
+  function renderHeaderGallery() {
+    if (!headerDraft) return;
+    for (const tile of get('header-gallery').children) {
+      const value = tile.dataset.value;
+      tile.setAttribute('aria-pressed', String(value === headerDraft[headerGalleryPart]));
+      const brand = tile.querySelector('.header-brand');
+      if (brand) renderHeaderBrand(brand, headerGalleryPart === 'logo' ? {logo:value, wordmark:'none'} : {logo:'none', wordmark:value});
+    }
+  }
+  const headerDialog = get('header-appearance');
+  get('open-header-appearance').onclick = () => {
+    headerDialog.showModal();
+    loadHeaderSection();
+  };
+  get('cancel-header-appearance').onclick = () => headerDialog.close();
+  headerDialog.addEventListener('close', () => { headerDraft = null; });
+  for (const [id, part] of [['header-gallery-logos','logo'], ['header-gallery-wordmarks','wordmark']]) {
+    get(id).onclick = () => {
+      headerGalleryPart = part;
+      get('header-gallery-logos').setAttribute('aria-pressed', String(part === 'logo'));
+      get('header-gallery-wordmarks').setAttribute('aria-pressed', String(part === 'wordmark'));
+      buildHeaderGallery();
+    };
+  }
+  get('apply-header-appearance').onclick = () => {
+    const section = headerSection.value;
+    const draft = {...headerDraft};
+    chooseHeaderPart(section, 'logo', draft.logo);
+    chooseHeaderPart(section, 'wordmark', draft.wordmark);
+    chooseHeaderLogoSize(draft.size);
+    headerDialog.close();
+  };
   function updateEQ() {
     const settings = {magik:get('eq-magik').checked};
     for (const band of bands) {
@@ -1502,10 +1573,10 @@
   };
   get('mini-player-style').onchange = event => chooseMiniPlayer(event.target.value);
   headerSection.onchange = loadHeaderSection;
-  headerLogo.onchange = event => chooseHeaderPart(headerSection.value, 'logo', event.target.value);
-  headerWordmark.onchange = event => chooseHeaderPart(headerSection.value, 'wordmark', event.target.value);
+  headerLogo.onchange = event => { if (headerDraft) { headerDraft.logo = event.target.value; renderHeaderBrands(); } };
+  headerWordmark.onchange = event => { if (headerDraft) { headerDraft.wordmark = event.target.value; renderHeaderBrands(); } };
   wordmarkSheet.addEventListener('load', renderHeaderBrands);
-  get('header-logo-size').onchange = event => chooseHeaderLogoSize(event.target.value);
+  get('header-logo-size').onchange = event => { if (headerDraft) { headerDraft.size = event.target.value; renderHeaderBrands(); } };
   for (const band of bands) get(band).oninput = updateEQ;
   get('eq-preset').onchange = event => chooseEQPreset(event.target.value);
   get('eq-magik').onchange = updateEQ;
