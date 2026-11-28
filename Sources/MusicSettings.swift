@@ -415,15 +415,13 @@ struct MusicSettings: View {
                     }
                     HeaderBrandSettings(section: headerSection, theme: theme)
                         .id(headerSection)
+                    #if !os(macOS)
                     Divider()
                     VStack(alignment: .leading, spacing: 10) {
                         Text("App Icon").font(.headline)
-                        #if os(macOS)
-                        MacAppIconGrid()
-                        #else
                         Button("Choose App Icon") { showAppIcons = true }
-                        #endif
                     }
+                    #endif
                     Divider()
                     Picker("Library Layout", selection: $libraryLayout) {
                         ForEach(LibraryLayout.allCases) { layout in

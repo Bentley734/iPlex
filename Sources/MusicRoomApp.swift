@@ -9,7 +9,6 @@ struct MusicRoomApp: App {
     @StateObject private var model = LibraryModel()
     @StateObject private var updates = MacAppUpdates()
     @MusicAppearance private var theme
-    @AppStorage(AppIconChoice.preferenceKey) private var iconStyle = AppIconChoice.defaultChoice.rawValue
 
     init() { MacAppUpdates.recordLaunchingProcess() }
 
@@ -22,29 +21,10 @@ struct MusicRoomApp: App {
                 .task {
                     appDelegate.library = model
                     updates.acknowledgeLaunch()
-                    applyIcon()
                     model.restore()
                 }
-                .onChange(of: iconStyle) { _, _ in applyIcon() }
         }
         .defaultSize(width: 1120, height: 750)
-        .commands {
-            CommandMenu("Appearance") {
-                Picker("App Icon", selection: $iconStyle) {
-                    ForEach(AppIconChoice.allCases) { choice in
-                        Text(choice.label).tag(choice.rawValue)
-                    }
-                }
-            }
-        }
-    }
-
-    private func applyIcon() {
-        let choice = AppIconChoice(rawValue: iconStyle) ?? .defaultChoice
-        if iconStyle != choice.rawValue { iconStyle = choice.rawValue }
-        if let icon = choice.macImage {
-            NSApplication.shared.applicationIconImage = icon
-        }
     }
 }
 

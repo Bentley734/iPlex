@@ -57,56 +57,6 @@ enum AppIconChoice: String, CaseIterable, Identifiable {
     }
 }
 
-#if os(macOS)
-import AppKit
-
-extension AppIconChoice {
-    var macImage: NSImage? {
-        guard let url = Bundle.main.url(forResource: rawValue, withExtension: "png") else { return nil }
-        return NSImage(contentsOf: url)
-    }
-}
-
-struct MacAppIconGrid: View {
-    @AppStorage(AppIconChoice.preferenceKey) private var iconStyle = AppIconChoice.defaultChoice.rawValue
-
-    var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 91), spacing: 8)], spacing: 8) {
-            ForEach(AppIconChoice.allCases) { choice in
-                let selected = choice.rawValue == iconStyle
-                Button {
-                    iconStyle = choice.rawValue
-                } label: {
-                    VStack(spacing: 7) {
-                        if let image = choice.macImage {
-                            Image(nsImage: image)
-                                .resizable().scaledToFit()
-                                .frame(width: 55, height: 55)
-                                .accessibilityHidden(true)
-                        }
-                        Text(choice.label)
-                            .font(.caption)
-                            .multilineTextAlignment(.center)
-                            .frame(minHeight: 28)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(7)
-                    .background(selected ? Color.accentColor.opacity(0.15) : Color.primary.opacity(0.04),
-                                in: RoundedRectangle(cornerRadius: 8))
-                    .overlay(alignment: .topTrailing) {
-                        if selected {
-                            Image(systemName: "checkmark.circle.fill").padding(5).accessibilityHidden(true)
-                        }
-                    }
-                }
-                .buttonStyle(.plain)
-                .accessibilityAddTraits(selected ? .isSelected : [])
-            }
-        }
-    }
-}
-#endif
-
 #if os(iOS) || os(tvOS)
 import UIKit
 
